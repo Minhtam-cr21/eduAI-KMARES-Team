@@ -1,0 +1,60 @@
+# Dự án: EduAI MVP
+# Techstack: Next.js 14 (App Router), TypeScript, Tailwind, shadcn/ui, Supabase
+
+## Cấu trúc thư mục (sơ đồ cây)
+eduai-mvp/
+├── app/
+│   ├── (auth)/login/page.tsx, signup/page.tsx — form (RHF + zod); logic auth trong server actions `lib/actions/auth.ts`
+│   ├── auth/callback/route.ts — OAuth PKCE (Google), exchange code → session
+│   ├── (student)/dashboard/page.tsx, learn/[lessonId]/page.tsx, debug/page.tsx
+│   ├── admin/topics/page.tsx, users/page.tsx
+│   ├── teacher/students/page.tsx
+│   ├── api/run-code/route.ts, ai-suggest/route.ts
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/ui/ (shadcn)
+├── lib/supabase/client.ts, server.ts, browser.ts (OAuth / client-only)
+├── lib/actions/auth.ts (server actions: đăng nhập / đăng ký email)
+├── lib/validations/auth.ts (zod)
+├── supabase/migrations/*.sql (schema; áp dụng qua SQL Editor hoặc Supabase CLI)
+├── types/database.ts
+├── middleware.ts
+└── .env.local
+
+## Database (Supabase PostgreSQL)
+Các bảng chính:
+- **profiles**: mở rộng `auth.users` (role, full_name, goal, …); trigger `on_auth_user_created` tạo dòng khi đăng ký.
+- **topics**, **lessons**: nội dung khóa học; SELECT công khai chỉ khi `is_published = true` (cần thêm policy INSERT/UPDATE cho teacher/admin khi chỉnh sửa).
+- **learning_paths**: gán bài cho học sinh (`student_id`, `lesson_id`, `status`, …).
+- **code_submissions**: lịch sử code / debug theo `user_id`.
+
+RLS:
+- Luôn bật RLS trên mọi bảng mới; mọi truy cập phải có policy rõ ràng (không dựa vào “mặc định mở”).
+- Không bật quyền truy cập rộng (ví dụ `USING true` cho role authenticated) trừ khi có lý do và đã ghi chú.
+- Policy teacher/admin cho `topics` / `lessons` / `learning_paths`: thêm khi triển khai CMS (thường kiểm tra `profiles.role` qua subquery hoặc JWT claim).
+
+## Auth flow
+- **Email/password:** `lib/actions/auth.ts` — `createClient()` từ `@/lib/supabase/server` (SSR cookies). Sau đăng nhập thành công: `redirect('/dashboard')`. Đăng ký: nếu project bật xác nhận email và không có session ngay, trả message thay vì redirect; nếu có session (confirm tắt), redirect dashboard và log dòng `profiles`.
+- **Google:** chỉ UI client (`GoogleSignInButton`, `lib/supabase/browser.ts` — `createBrowserClient` từ `@supabase/ssr`). `redirectTo`: `{origin}/auth/callback?next=/dashboard`. Route `GET /auth/callback` gọi `exchangeCodeForSession` rồi redirect.
+- **Profile:** trigger `on_auth_user_created` tạo `profiles` với `role` mặc định `student`. Kiểm tra nhanh: terminal log từ server actions / callback; UI trên `/dashboard`.
+- **Middleware** chặn `/dashboard` (và /admin, /teacher) khi chưa có session; `/login`, `/signup`, `/auth/callback` mở.
+
+## Quy tắc code
+- Dùng server components mặc định; client component chỉ cho form (react-hook-form), nút OAuth, hoặc Monaco.
+- Xác thực: Supabase Auth (email + Google). Middleware bảo vệ /dashboard, /admin, /teacher.
+- Database: PostgreSQL trên Supabase. RLS bắt buộc.
+- **Mọi truy cập database đều phải qua Supabase client, không dùng fetch trực tiếp tới REST/PostgREST ngoài client chính thức.**
+- **RLS phải được bật cho mọi bảng** (và có policy phù hợp; không để bảng public không kiểm soát).
+- UI: shadcn/ui + Tailwind. Tuyệt đối không dùng CSS thuần.
+- Giới hạn AI: 5 câu hỏi/người/ngày (lưu trong bảng profiles hoặc bảng riêng).
+- Debugger: Monaco editor + Judge0 API + Deepseek gợi ý lỗi (không làm hộ).
+
+## Các lệnh thường dùng
+- Dev: npm run dev
+- Build: npm run build
+- Seed data: (sẽ tạo script sau)
+
+## Lưu ý đặc biệt
+- Không hardcode Supabase URL/key. Dùng biến môi trường.
+- Khi thêm bảng mới, luôn tạo RLS policy.
+- Commit sau mỗi chức năng hoàn chỉnh.
