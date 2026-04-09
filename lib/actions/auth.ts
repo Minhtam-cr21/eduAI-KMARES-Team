@@ -10,19 +10,68 @@ export type AuthActionResult = {
   needsEmailConfirmation?: boolean;
 };
 
-async function logProfileForUser(userId: string, label: string) {
+function translateAuthError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("invalid login credentials")) {
+    return "Email hoặc mật khẩu không đúng.";
+  }
+  if (lower.includes("email not confirmed")) {
+    return "Email chưa xác nhận. Vui lòng kiểm tra hộp thư (kể cả spam).";
+  }
+  if (lower.includes("user already registered") || lower.includes("already been registered")) {
+    return "Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.";
+  }
+  if (lower.includes("signup is disabled") || lower.includes("signups not allowed")) {
+    return "Chức năng đăng ký đang tắt. Liên hệ admin.";
+  }
+  if (lower.includes("rate limit") || lower.includes("too many requests")) {
+    return "Quá nhiều lần thử. Vui lòng đợi vài phút rồi thử lại.";
+  }
+  if (lower.includes("password") && lower.includes("weak")) {
+    return "Mật khẩu quá yếu. Hãy dùng ít nhất 6 ký tự, kết hợp chữ và số.";
+  }
+  if (lower.includes("email")) {
+    return `Lỗi email: ${raw}`;
+  }
+  return raw;
+}
+
+async function ensureProfileExists(
+  userId: string,
+  fullName: string | null
+): Promise<void> {
   const supabase = createClient();
-  const { data: profile, error } = await supabase
+  const { data: existing } = await supabase
     .from("profiles")
-    .select("id, role, full_name")
+    .select("id")
     .eq("id", userId)
     .maybeSingle();
 
+  if (existing) return;
+
+  const { error } = await supabase.from("profiles").insert({
+    id: userId,
+    full_name: fullName,
+    role: "student",
+  });
   if (error) {
-    console.error(`[auth:${label}] Lỗi đọc profiles:`, error.message);
-    return;
+    console.error("[auth] ensureProfileExists insert failed:", error.message);
   }
-  console.log(`[auth:${label}] profiles row:`, profile);
+}
+
+async function resolveRedirect(userId: string): Promise<string> {
+  const supabase = createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, onboarding_completed")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!profile) return "/student";
+  if (profile.role === "admin") return "/admin";
+  if (profile.role === "teacher") return "/teacher";
+  if (profile.onboarding_completed === true) return "/student";
+  return "/onboarding";
 }
 
 export async function loginAction(
@@ -37,23 +86,24 @@ export async function loginAction(
   }
 
   const supabase = createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error, data } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
 
   if (error) {
-    return { error: error.message };
+    console.error("[auth:login] signInWithPassword:", error.message);
+    return { error: translateAuthError(error.message) };
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user?.id) {
-    await logProfileForUser(user.id, "login");
+  const userId = data.user?.id;
+  if (userId) {
+    await ensureProfileExists(userId, data.user?.user_metadata?.full_name ?? null);
+    const dest = await resolveRedirect(userId);
+    redirect(dest);
   }
 
-  redirect("/dashboard");
+  redirect("/student");
 }
 
 export async function signupAction(
@@ -79,21 +129,24 @@ export async function signupAction(
   });
 
   if (error) {
-    return { error: error.message };
+    console.error("[auth:signup] signUp:", error.message);
+    return { error: translateAuthError(error.message) };
   }
 
   if (data.user && !data.session) {
     return {
       needsEmailConfirmation: true,
       success:
-        "Đăng ký thành công. Vui lòng kiểm tra email để xác nhận, sau đó đăng nhập.",
+        "Đăng ký thành công! Kiểm tra email để xác nhận, sau đó đăng nhập.",
     };
   }
 
   if (data.session?.user?.id) {
-    await logProfileForUser(data.session.user.id, "signup");
-    redirect("/dashboard");
+    const userId = data.session.user.id;
+    const fullName = parsed.data.full_name?.trim() || null;
+    await ensureProfileExists(userId, fullName);
+    redirect("/onboarding");
   }
 
-  return { error: "Không tạo được phiên đăng nhập. Thử lại sau." };
+  return { error: "Không tạo được phiên đăng nhập. Vui lòng thử lại." };
 }
