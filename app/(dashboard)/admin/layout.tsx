@@ -1,6 +1,7 @@
 import { AdminShellNav } from "@/components/admin/admin-shell-nav";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import Image from "next/image";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +19,9 @@ export default async function AdminDashboardLayout({
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
           <Link
             href="/admin"
-            className="text-sm font-semibold text-foreground hover:opacity-80"
+            className="flex items-center gap-2 text-sm font-semibold text-foreground hover:opacity-80"
           >
+            <Image src="/images/logo.png" alt="EduAI" width={28} height={28} className="h-7 w-7" />
             EduAI · Quản trị
           </Link>
           <div className="flex items-center gap-2">

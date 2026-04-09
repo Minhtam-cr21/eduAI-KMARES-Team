@@ -1,5 +1,6 @@
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { requireTeacherOrAdmin } from "@/lib/auth/require-teacher-or-admin";
+import Image from "next/image";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +18,9 @@ export default async function TeacherDashboardLayout({
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
           <Link
             href="/teacher"
-            className="text-sm font-semibold text-foreground hover:opacity-80"
+            className="flex items-center gap-2 text-sm font-semibold text-foreground hover:opacity-80"
           >
+            <Image src="/images/logo.png" alt="EduAI" width={28} height={28} className="h-7 w-7" />
             EduAI · Giáo viên
           </Link>
           <div className="flex items-center gap-2">
