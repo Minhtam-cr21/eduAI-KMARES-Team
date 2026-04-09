@@ -1,11 +1,40 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/admin", "/teacher", "/dashboard"] as const;
+/** Cần đăng nhập (mọi role): dashboard học sinh, học bài, khu vực student. */
+const PROTECTED_PREFIXES = [
+  "/admin",
+  "/teacher",
+  "/dashboard",
+  "/learn",
+  "/profile",
+  "/debug",
+  "/onboarding",
+] as const;
 
 function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+/** Trang và API admin — chỉ `profiles.role = 'admin'`. */
+function needsAdminRole(pathname: string): boolean {
+  return (
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/api/admin" ||
+    pathname.startsWith("/api/admin/")
+  );
+}
+
+/** `/teacher/*` và `/api/teacher/*` — `profiles.role` là `teacher` hoặc `admin`. */
+function needsTeacherOrAdminRole(pathname: string): boolean {
+  return (
+    pathname === "/teacher" ||
+    pathname.startsWith("/teacher/") ||
+    pathname === "/api/teacher" ||
+    pathname.startsWith("/api/teacher/")
   );
 }
 
@@ -52,6 +81,62 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getSession();
 
   const { pathname } = request.nextUrl;
+
+  if (needsAdminRole(pathname)) {
+    if (!session) {
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (profile?.role !== "admin") {
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      const dash = request.nextUrl.clone();
+      dash.pathname = "/dashboard";
+      dash.search = "";
+      return NextResponse.redirect(dash);
+    }
+  }
+
+  if (needsTeacherOrAdminRole(pathname)) {
+    if (!session) {
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (!profile || !["teacher", "admin"].includes(profile.role)) {
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      const dash = request.nextUrl.clone();
+      dash.pathname = "/dashboard";
+      dash.search = "";
+      return NextResponse.redirect(dash);
+    }
+  }
 
   if (isProtectedPath(pathname) && !session) {
     const loginUrl = request.nextUrl.clone();
