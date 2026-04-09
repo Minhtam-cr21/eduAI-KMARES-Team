@@ -83,3 +83,30 @@ export interface MbtiResult {
   mbti_type: string;
   test_date: string;
 }
+
+/** `practice_exercises` (migration 20250409000000). */
+export type PracticeExerciseLanguage = "cpp" | "java" | "python";
+export type PracticeExerciseDifficulty = "easy" | "medium" | "hard";
+
+export interface PracticeExercise {
+  id: string;
+  title: string;
+  description: string | null;
+  initial_code: string | null;
+  test_code: string | null;
+  language: PracticeExerciseLanguage | null;
+  difficulty: PracticeExerciseDifficulty | null;
+  created_at: string;
+}
+
+/** `practice_submissions`. */
+export interface PracticeSubmission {
+  id: string;
+  user_id: string;
+  exercise_id: string;
+  code: string | null;
+  output: string | null;
+  error: string | null;
+  ai_suggestion: string | null;
+  created_at: string;
+}

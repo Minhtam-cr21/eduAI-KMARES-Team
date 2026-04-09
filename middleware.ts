@@ -10,6 +10,8 @@ const PROTECTED_PREFIXES = [
   "/profile",
   "/debug",
   "/onboarding",
+  "/student",
+  "/practice",
 ] as const;
 
 function isProtectedPath(pathname: string): boolean {
