@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 
 type HubStats = {
   coursesCount: number | null;
+  enrolledPreview: Array<{ id: string; title: string }>;
   requestsCount: number | null;
   mbtiLabel: string;
   exercisesPreview: number | null;
@@ -21,6 +22,7 @@ type HubStats = {
 
 const INITIAL_STATS: HubStats = {
   coursesCount: null,
+  enrolledPreview: [],
   requestsCount: null,
   mbtiLabel: "\u2026",
   exercisesPreview: null,
@@ -28,6 +30,7 @@ const INITIAL_STATS: HubStats = {
 
 const ERROR_STATS: HubStats = {
   coursesCount: null,
+  enrolledPreview: [],
   requestsCount: null,
   mbtiLabel: "\u2014",
   exercisesPreview: null,
@@ -44,16 +47,23 @@ export default function StudentHubPage() {
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const [coursesRes, connRes, mbtiRes, exRes] = await Promise.all([
-          fetch("/api/courses?page=1&limit=1"),
-          fetch("/api/connection-requests/student"),
-          fetch("/api/mbti/status"),
-          fetch("/api/practice/exercises?page=1&limit=5"),
-        ]);
+        const [coursesRes, enrolledRes, connRes, mbtiRes, exRes] =
+          await Promise.all([
+            fetch("/api/courses?page=1&limit=1"),
+            fetch("/api/user/courses/enrolled"),
+            fetch("/api/connection-requests/student"),
+            fetch("/api/mbti/status"),
+            fetch("/api/practice/exercises?page=1&limit=5"),
+          ]);
 
         const coursesJson = coursesRes.ok
           ? ((await coursesRes.json()) as { count?: number })
           : {};
+        const enrolledJson = enrolledRes.ok
+          ? ((await enrolledRes.json()) as {
+              courses?: Array<{ course: { id: string; title?: string } }>;
+            })
+          : { courses: [] };
         const connJson = connRes.ok
           ? ((await connRes.json()) as unknown[])
           : [];
@@ -68,9 +78,16 @@ export default function StudentHubPage() {
           : {};
 
         if (cancelled) return;
+        const preview = (enrolledJson.courses ?? [])
+          .slice(0, 3)
+          .map((x) => ({
+            id: x.course.id,
+            title: x.course.title ?? "Khóa học",
+          }));
         setStats({
           coursesCount:
             typeof coursesJson.count === "number" ? coursesJson.count : null,
+          enrolledPreview: preview,
           requestsCount: Array.isArray(connJson) ? connJson.length : null,
           mbtiLabel: mbtiJson.last_test
             ? mbtiJson.can_retest
@@ -109,11 +126,13 @@ export default function StudentHubPage() {
     {
       title: "Kh\u00f3a h\u1ecdc c\u1ee7a t\u00f4i",
       description:
-        stats.coursesCount != null
-          ? `${stats.coursesCount} kh\u00f3a \u0111ang m\u1edf (\u0111\u00e3 xu\u1ea5t b\u1ea3n)`
-          : "Danh s\u00e1ch kh\u00f3a h\u1ecdc \u0111\u00e3 xu\u1ea5t b\u1ea3n",
+        stats.enrolledPreview.length > 0
+          ? `${stats.enrolledPreview.length} kh\u00f3a \u0111\u00e3 \u0111\u0103ng k\u00fd (xem nhanh b\u00ean d\u01b0\u1edbi)`
+          : stats.coursesCount != null
+            ? `${stats.coursesCount} kh\u00f3a \u0111ang m\u1edf tr\u00ean h\u1ec7 th\u1ed1ng`
+            : "\u0110\u0103ng k\u00fd kh\u00f3a h\u1ecdc \u0111\u1ec3 h\u1ecdc",
       href: "/student/courses",
-      cta: "Xem kh\u00f3a h\u1ecdc",
+      cta: "M\u1edf kh\u00f3a c\u1ee7a t\u00f4i",
     },
     {
       title: "K\u1ebft n\u1ed1i gi\u00e1o vi\u00ean",
@@ -165,28 +184,52 @@ export default function StudentHubPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {cards.map((c) => (
-          <Card key={c.href}>
+        {cards.map((c, index) => (
+          <Card key={c.title}>
             <CardHeader>
               <CardTitle className="text-lg">{c.title}</CardTitle>
               <CardDescription>{c.description}</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Link
-                href={c.href}
-                className={cn(buttonVariants({ size: "sm" }))}
-              >
-                {c.cta}
-              </Link>
-              {c.extraHref && c.extraLabel ? (
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
                 <Link
-                  href={c.extraHref}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" })
-                  )}
+                  href={c.href}
+                  className={cn(buttonVariants({ size: "sm" }))}
                 >
-                  {c.extraLabel}
+                  {c.cta}
                 </Link>
+                {c.extraHref && c.extraLabel ? (
+                  <Link
+                    href={c.extraHref}
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" })
+                    )}
+                  >
+                    {c.extraLabel}
+                  </Link>
+                ) : null}
+              </div>
+              {index === 0 && stats.enrolledPreview.length > 0 ? (
+                <ul className="border-border space-y-1 border-t pt-3 text-sm">
+                  {stats.enrolledPreview.map((row) => (
+                    <li key={row.id}>
+                      <Link
+                        href={`/student/courses/${row.id}`}
+                        className="text-primary font-medium underline-offset-4 hover:underline"
+                      >
+                        {row.title}
+                      </Link>
+                    </li>
+                  ))}
+                  <li>
+                    <Link
+                      href="/student/courses"
+                      className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
+                    >
+                      Xem tất cả khóa đã đăng ký →
+                    </Link>
+                  </li>
+                </ul>
               ) : null}
             </CardContent>
           </Card>

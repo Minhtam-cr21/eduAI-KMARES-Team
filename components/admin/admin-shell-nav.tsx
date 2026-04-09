@@ -9,6 +9,7 @@ const links = [
   { href: "/admin/lessons/pending", label: "Duyệt bài học" },
   { href: "/admin/reports", label: "Báo cáo" },
   { href: "/admin/users", label: "Người dùng" },
+  { href: "/admin/user-courses", label: "ĐK khóa & lộ trình" },
   { href: "/admin/topics", label: "Chủ đề" },
   { href: "/admin/practice-questions", label: "Practice" },
 ] as const;
