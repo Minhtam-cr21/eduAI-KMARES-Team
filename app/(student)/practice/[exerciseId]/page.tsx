@@ -14,7 +14,6 @@ import { toast } from "sonner";
 function monacoLang(lang: string | null): string {
   if (lang === "cpp") return "cpp";
   if (lang === "java") return "java";
-  if (lang === "javascript") return "javascript";
   return "python";
 }
 

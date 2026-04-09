@@ -1,6 +1,6 @@
 /**
- * Seed published courses + lessons (Bước 7b).
- * Cần SUPABASE_SERVICE_ROLE_KEY trong .env.local (hoặc env) để bỏ qua RLS.
+ * Seed 7 khóa học mẫu + bài học (C++, SQL, Prompt, Frontend, Backend, Fullstack, FullStack Vibe Coding).
+ * Cần NEXT_PUBLIC_SUPABASE_URL và SUPABASE_SERVICE_ROLE_KEY trong .env.local
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -33,182 +33,223 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!url || !key) {
   console.error(
-    "Cần NEXT_PUBLIC_SUPABASE_URL và SUPABASE_SERVICE_ROLE_KEY để seed khóa học."
+    "Cần NEXT_PUBLIC_SUPABASE_URL và SUPABASE_SERVICE_ROLE_KEY trong .env.local"
   );
   process.exit(1);
 }
 
-const supabase = createClient(url, key);
-
-type SeedCourse = {
-  title: string;
-  description: string;
-  category: string;
-  course_type: "skill" | "role";
-  lessons: { title: string; content: string; order_index: number }[];
-};
-
-const catalog: SeedCourse[] = [
-  {
-    title: "C++ cơ bản",
-    description: "Nhập môn C++: biến, vòng lặp, hàm.",
-    category: "C++",
-    course_type: "skill",
-    lessons: [
-      { title: "Giới thiệu", content: "C++ là gì, toolchain.", order_index: 0 },
-      { title: "Biến & kiểu", content: "int, float, string.", order_index: 1 },
-      { title: "Vòng lặp", content: "for, while.", order_index: 2 },
-      { title: "Hàm", content: "Định nghĩa và gọi hàm.", order_index: 3 },
-    ],
-  },
-  {
-    title: "Java OOP",
-    description: "Lớp, đối tượng, kế thừa.",
-    category: "Java",
-    course_type: "skill",
-    lessons: [
-      { title: "JVM & Hello World", content: "Chạy chương trình Java.", order_index: 0 },
-      { title: "Class & Object", content: "Thuộc tính, phương thức.", order_index: 1 },
-      { title: "Kế thừa", content: "extends, @Override.", order_index: 2 },
-    ],
-  },
-  {
-    title: "SQL thực hành",
-    description: "SELECT, JOIN, aggregate.",
-    category: "SQL",
-    course_type: "skill",
-    lessons: [
-      { title: "SELECT cơ bản", content: "WHERE, ORDER BY.", order_index: 0 },
-      { title: "JOIN", content: "INNER, LEFT.", order_index: 1 },
-      { title: "GROUP BY", content: "HAVING, COUNT.", order_index: 2 },
-      { title: "Subquery", content: "Truy vấn lồng.", order_index: 3 },
-    ],
-  },
-  {
-    title: "Python cho automation",
-    description: "Script, file, thư viện phổ biến.",
-    category: "Python",
-    course_type: "skill",
-    lessons: [
-      { title: "Cài đặt & pip", content: "Môi trường ảo.", order_index: 0 },
-      { title: "File & JSON", content: "Đọc ghi file.", order_index: 1 },
-      { title: "Requests", content: "Gọi HTTP đơn giản.", order_index: 2 },
-    ],
-  },
-  {
-    title: "Prompt engineering",
-    description: "Viết prompt rõ ràng, few-shot, chain-of-thought.",
-    category: "Prompt engineering",
-    course_type: "skill",
-    lessons: [
-      { title: "Nguyên tắc cơ bản", content: "Rõ vai trò, ngữ cảnh.", order_index: 0 },
-      { title: "Few-shot", content: "Cho ví dụ trong prompt.", order_index: 1 },
-      { title: "Đánh giá output", content: "Iterative refinement.", order_index: 2 },
-    ],
-  },
-  {
-    title: "Frontend hiện đại",
-    description: "HTML/CSS/JS, React cơ bản.",
-    category: "Frontend",
-    course_type: "role",
-    lessons: [
-      { title: "HTML & semantic", content: "Cấu trúc trang.", order_index: 0 },
-      { title: "CSS layout", content: "Flexbox.", order_index: 1 },
-      { title: "JavaScript ES6", content: "Arrow, destructuring.", order_index: 2 },
-      { title: "React components", content: "Props, state.", order_index: 3 },
-      { title: "Fetch API", content: "Gọi REST.", order_index: 4 },
-    ],
-  },
-  {
-    title: "Backend API",
-    description: "REST, validation, auth cơ bản.",
-    category: "Backend",
-    course_type: "role",
-    lessons: [
-      { title: "HTTP & REST", content: "Methods, status codes.", order_index: 0 },
-      { title: "Router & handler", content: "Tách route.", order_index: 1 },
-      { title: "Validation", content: "Input schema.", order_index: 2 },
-    ],
-  },
-  {
-    title: "Fullstack mini app",
-    description: "Kết nối FE + BE.",
-    category: "Fullstack",
-    course_type: "role",
-    lessons: [
-      { title: "Kiến trúc", content: "Tách layer.", order_index: 0 },
-      { title: "API contract", content: "JSON schema.", order_index: 1 },
-      { title: "Deploy gợi ý", content: "Env, build.", order_index: 2 },
-    ],
-  },
-];
+const supabase = createClient(url, key, {
+  auth: { persistSession: false },
+});
 
 async function seed() {
-  for (const c of catalog) {
-    const { data: existing } = await supabase
+  console.log("🌱 Bắt đầu seed dữ liệu khóa học...");
+
+  const { data: teacher } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("role", "teacher")
+    .limit(1)
+    .maybeSingle();
+
+  const { data: admin } = teacher
+    ? { data: null }
+    : await supabase
+        .from("profiles")
+        .select("id")
+        .eq("role", "admin")
+        .limit(1)
+        .maybeSingle();
+
+  const owner = teacher ?? admin ?? null;
+  if (!owner) {
+    throw new Error(
+      "Chưa có giáo viên hoặc admin. Hãy tạo ít nhất 1 tài khoản teacher hoặc admin trước."
+    );
+  }
+
+  const courses = [
+    {
+      title: "Lập trình C++ cơ bản",
+      description: "Nhập môn C++ từ zero đến hàm, con trỏ.",
+      course_type: "skill" as const,
+      category: "C++",
+      teacher_id: owner.id,
+      status: "published" as const,
+    },
+    {
+      title: "SQL từ cơ bản đến nâng cao",
+      description: "Truy vấn, JOIN, subquery, index.",
+      course_type: "skill",
+      category: "SQL",
+      teacher_id: owner.id,
+      status: "published",
+    },
+    {
+      title: "Prompt Engineering cơ bản",
+      description: "Cách viết prompt hiệu quả cho AI.",
+      course_type: "skill",
+      category: "Prompt engineering",
+      teacher_id: owner.id,
+      status: "published",
+    },
+    {
+      title: "Frontend cơ bản",
+      description: "HTML, CSS, JavaScript, React cơ bản.",
+      course_type: "role",
+      category: "Frontend",
+      teacher_id: owner.id,
+      status: "published",
+    },
+    {
+      title: "Backend cơ bản",
+      description: "Node.js, Express, REST API, Database.",
+      course_type: "role",
+      category: "Backend",
+      teacher_id: owner.id,
+      status: "published",
+    },
+    {
+      title: "Fullstack cơ bản",
+      description: "Kết hợp frontend + backend, dự án hoàn chỉnh.",
+      course_type: "role",
+      category: "Fullstack",
+      teacher_id: owner.id,
+      status: "published",
+    },
+    {
+      title: "FullStack Vibe Coding",
+      description:
+        "Làm fullstack theo phong cách vibe: mô tả ý tưởng, AI hỗ trợ code, lặp nhanh đến MVP.",
+      course_type: "role",
+      category: "Vibe Coding",
+      teacher_id: owner.id,
+      status: "published",
+    },
+  ];
+
+  for (const course of courses) {
+    const { data: existing, error: findError } = await supabase
       .from("courses")
       .select("id")
-      .eq("title", c.title)
+      .eq("title", course.title)
       .maybeSingle();
-
-    let courseId: string;
-    if (existing?.id) {
-      console.log("Skip (đã có):", c.title);
-      courseId = existing.id;
+    if (findError) throw findError;
+    if (!existing) {
+      const { error } = await supabase.from("courses").insert(course);
+      if (error) throw error;
+      console.log(`✅ Đã tạo khóa học: ${course.title}`);
     } else {
-      const { data: ins, error } = await supabase
-        .from("courses")
-        .insert({
-          title: c.title,
-          description: c.description,
-          course_type: c.course_type,
-          category: c.category,
-          teacher_id: null,
-          status: "published",
-        })
-        .select("id")
-        .single();
-      if (error || !ins) {
-        console.error("Insert course failed:", c.title, error?.message);
-        continue;
-      }
-      courseId = ins.id;
-      console.log("Created course:", c.title, courseId);
+      console.log(`⏩ Khóa học đã tồn tại: ${course.title}`);
     }
-
-    const { data: existingLessons } = await supabase
-      .from("course_lessons")
-      .select("id")
-      .eq("course_id", courseId)
-      .limit(1);
-
-    if (existingLessons && existingLessons.length > 0) {
-      console.log("  Lessons already exist, skip.");
-      continue;
-    }
-
-    for (const L of c.lessons) {
-      const { error: le } = await supabase.from("course_lessons").insert({
-        course_id: courseId,
-        title: L.title,
-        content: L.content,
-        order_index: L.order_index,
-        status: "published",
-        created_by: null,
-      });
-      if (le) {
-        console.error("  Lesson insert failed:", L.title, le.message);
-      }
-    }
-    console.log("  Inserted", c.lessons.length, "lessons.");
   }
+
+  const { data: createdCourses, error: listError } = await supabase
+    .from("courses")
+    .select("id, title")
+    .in(
+      "title",
+      courses.map((c) => c.title)
+    );
+  if (listError) throw listError;
+
+  const lessonsByCourse: Record<
+    string,
+    { title: string; content: string; order_index: number }[]
+  > = {
+    "Lập trình C++ cơ bản": [
+      {
+        title: "Bài 1: Biến, kiểu dữ liệu, nhập xuất",
+        content: "Nội dung bài 1: ...",
+        order_index: 1,
+      },
+      {
+        title: "Bài 2: Vòng lặp và câu điều kiện",
+        content: "Nội dung bài 2: ...",
+        order_index: 2,
+      },
+    ],
+    "SQL từ cơ bản đến nâng cao": [
+      {
+        title: "Bài 1: SELECT, WHERE, ORDER BY",
+        content: "Nội dung bài 1: ...",
+        order_index: 1,
+      },
+      {
+        title: "Bài 2: JOIN nhiều bảng",
+        content: "Nội dung bài 2: ...",
+        order_index: 2,
+      },
+    ],
+    "Prompt Engineering cơ bản": [
+      {
+        title: "Bài 1: Cấu trúc prompt hiệu quả",
+        content: "Nội dung bài 1: ...",
+        order_index: 1,
+      },
+    ],
+    "Frontend cơ bản": [
+      {
+        title: "Bài 1: HTML/CSS cơ bản",
+        content: "Nội dung bài 1: ...",
+        order_index: 1,
+      },
+    ],
+    "Backend cơ bản": [
+      {
+        title: "Bài 1: Node.js và Express",
+        content: "Nội dung bài 1: ...",
+        order_index: 1,
+      },
+    ],
+    "Fullstack cơ bản": [
+      {
+        title: "Bài 1: Kết nối frontend với backend",
+        content: "Nội dung bài 1: ...",
+        order_index: 1,
+      },
+    ],
+    "FullStack Vibe Coding": [
+      {
+        title: "Bài 1: Từ spec ngắn đến MVP với AI pair programming",
+        content: "Nội dung bài 1: ...",
+        order_index: 1,
+      },
+    ],
+  };
+
+  for (const course of createdCourses ?? []) {
+    const lessons = lessonsByCourse[course.title];
+    if (!lessons) continue;
+    for (const lesson of lessons) {
+      const { data: existingLesson } = await supabase
+        .from("course_lessons")
+        .select("id")
+        .eq("course_id", course.id)
+        .eq("title", lesson.title)
+        .maybeSingle();
+      if (!existingLesson) {
+        const { error } = await supabase.from("course_lessons").insert({
+          course_id: course.id,
+          title: lesson.title,
+          content: lesson.content,
+          order_index: lesson.order_index,
+          status: "published",
+          created_by: owner.id,
+        });
+        if (error) throw error;
+        console.log(`  ✅ Đã thêm bài: ${lesson.title} vào ${course.title}`);
+      } else {
+        console.log(`  ⏩ Bài đã tồn tại: ${lesson.title}`);
+      }
+    }
+  }
+
+  console.log("🎉 Seed hoàn tất!");
 }
 
 seed()
-  .then(() => {
-    console.log("Done seed-courses.");
-    process.exit(0);
-  })
+  .then(() => process.exit(0))
   .catch((e) => {
     console.error(e);
     process.exit(1);
