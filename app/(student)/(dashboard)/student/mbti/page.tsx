@@ -3,7 +3,7 @@
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 type Question = {
@@ -12,6 +12,20 @@ type Question = {
   options: { A: string; B: string };
   dimension: string;
 };
+
+const EXPECTED_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+
+function buildPayload(answers: Record<number, "A" | "B">):
+  | { ok: true; list: { questionId: number; answer: "A" | "B" }[] }
+  | { ok: false } {
+  const list: { questionId: number; answer: "A" | "B" }[] = [];
+  for (const id of EXPECTED_IDS) {
+    const a = answers[id];
+    if (a !== "A" && a !== "B") return { ok: false };
+    list.push({ questionId: id, answer: a });
+  }
+  return { ok: true, list };
+}
 
 export default function StudentMbtiPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -47,7 +61,7 @@ export default function StudentMbtiPage() {
           setStatus(s);
         }
       } catch {
-        if (!cancelled) toast.error("Không tải được bài test");
+        if (!cancelled) toast.error("Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c b\u00e0i test");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -57,22 +71,20 @@ export default function StudentMbtiPage() {
     };
   }, []);
 
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = EXPECTED_IDS.filter(
+    (id) => answers[id] === "A" || answers[id] === "B"
+  ).length;
+  const allAnswered = useMemo(() => buildPayload(answers).ok, [answers]);
   const canStart = !status?.last_test || status.can_retest === true;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (answeredCount !== 10) {
-      toast.error("Trả lời đủ 10 câu.");
+    const built = buildPayload(answers);
+    if (!built.ok) {
+      toast.error("Tr\u1ea3 l\u1eddi \u0111\u1ee7 10 c\u00e2u (id 1\u201310).");
       return;
     }
-    const payload = {
-      answers: Array.from({ length: 10 }, (_, i) => {
-        const questionId = i + 1;
-        const answer = answers[questionId];
-        return { questionId, answer: answer! };
-      }),
-    };
+    const payload = { answers: built.list };
     setSubmitting(true);
     setResult(null);
     try {
@@ -87,7 +99,7 @@ export default function StudentMbtiPage() {
         error?: string;
       };
       if (!res.ok) {
-        toast.error("Không nộp được", { description: data.error });
+        toast.error("Kh\u00f4ng n\u1ed9p \u0111\u01b0\u1ee3c", { description: data.error });
         return;
       }
       if (data.mbti_type && data.test_date) {
@@ -97,9 +109,9 @@ export default function StudentMbtiPage() {
       if (st.ok) {
         setStatus((await st.json()) as typeof status);
       }
-      toast.success("Đã lưu kết quả MBTI.");
+      toast.success("\u0110\u00e3 l\u01b0u k\u1ebft qu\u1ea3 MBTI.");
     } catch (err) {
-      toast.error("Lỗi mạng", {
+      toast.error("L\u1ed7i m\u1ea1ng", {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -110,7 +122,7 @@ export default function StudentMbtiPage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-12">
-        <p className="text-muted-foreground text-center text-sm">Đang tải…</p>
+        <p className="text-muted-foreground text-center text-sm">{"\u0110ang t\u1ea3i\u2026"}</p>
       </main>
     );
   }
@@ -122,28 +134,28 @@ export default function StudentMbtiPage() {
           <h1 className="text-2xl font-semibold text-foreground">MBTI</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {status?.last_test
-              ? `Lần làm gần nhất: ${status.last_test}`
-              : "Chưa có lần làm nào."}
+              ? `L\u1ea7n l\u00e0m g\u1ea7n nh\u1ea5t: ${status.last_test}`
+              : "Ch\u01b0a c\u00f3 l\u1ea7n l\u00e0m n\u00e0o."}
           </p>
         </div>
         <Link
           href="/student"
           className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >
-          ← Hub
+          &larr; Hub
         </Link>
       </div>
 
       {result ? (
         <div className="mb-6 rounded-xl border border-border bg-card p-4">
-          <p className="font-semibold">Kết quả: {result.mbti_type}</p>
+          <p className="font-semibold">{`K\u1ebft qu\u1ea3: ${result.mbti_type}`}</p>
           <p className="text-muted-foreground text-sm">{result.test_date}</p>
         </div>
       ) : null}
 
       {!canStart && status?.last_test ? (
         <p className="text-muted-foreground text-sm">
-          Bạn có thể làm lại sau 2 tháng kể từ lần test trước.
+          {`B\u1ea1n c\u00f3 th\u1ec3 l\u00e0m l\u1ea1i sau 2 th\u00e1ng k\u1ec3 t\u1eeb l\u1ea7n test tr\u01b0\u1edbc.`}
         </p>
       ) : (
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
@@ -182,14 +194,14 @@ export default function StudentMbtiPage() {
             </fieldset>
           ))}
           <p className="text-muted-foreground text-sm">
-            Đã trả lời: {answeredCount}/10
+            {`\u0110\u00e3 tr\u1ea3 l\u1eddi: ${answeredCount}/10`}
           </p>
           <button
             type="submit"
-            disabled={submitting || answeredCount !== 10}
+            disabled={submitting || !allAnswered}
             className={cn(buttonVariants(), "w-full sm:w-auto")}
           >
-            {submitting ? "Đang gửi…" : "Nộp bài"}
+            {submitting ? "\u0110ang g\u1eedi\u2026" : "N\u1ed9p b\u00e0i"}
           </button>
         </form>
       )}
