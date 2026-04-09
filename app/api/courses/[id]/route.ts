@@ -106,6 +106,39 @@ export async function DELETE(
     );
   }
 
+  const { data: lessonRows, error: lessonIdsErr } = await supabase
+    .from("course_lessons")
+    .select("id")
+    .eq("course_id", params.id);
+
+  if (lessonIdsErr) {
+    return NextResponse.json({ error: lessonIdsErr.message }, { status: 500 });
+  }
+
+  const lessonIds = (lessonRows ?? [])
+    .map((r) => r.id)
+    .filter((id): id is string => typeof id === "string");
+
+  if (lessonIds.length > 0) {
+    const { count: pathCount, error: pathErr } = await supabase
+      .from("learning_paths")
+      .select("*", { count: "exact", head: true })
+      .in("lesson_id", lessonIds);
+
+    if (pathErr) {
+      return NextResponse.json({ error: pathErr.message }, { status: 500 });
+    }
+    if (pathCount && pathCount > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot delete course because students have already started learning it",
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const { count, error: cntErr } = await supabase
     .from("course_lessons")
     .select("*", { count: "exact", head: true })

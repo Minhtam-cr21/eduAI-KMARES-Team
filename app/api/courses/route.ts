@@ -1,19 +1,8 @@
+import { courseSchema } from "@/lib/validations/course";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 export const dynamic = "force-dynamic";
-
-const createCourseSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().optional().nullable(),
-  course_type: z.enum(["skill", "role"]),
-  category: z.string().min(1),
-  thumbnail_url: z
-    .union([z.string().url(), z.literal("")])
-    .optional()
-    .nullable(),
-});
 
 /** POST — tạo khóa học (chỉ giáo viên). */
 export async function POST(request: Request) {
@@ -45,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = createCourseSchema.safeParse(body);
+  const parsed = courseSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid body", details: parsed.error.flatten() },
@@ -65,7 +54,7 @@ export async function POST(request: Request) {
       category,
       teacher_id: user.id,
       status: "pending",
-      thumbnail_url: thumbnail_url || null,
+      thumbnail_url: thumbnail_url ?? null,
     })
     .select()
     .single();
