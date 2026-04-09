@@ -4,10 +4,7 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Khu vực `/admin/*` (topics, lessons, …) — cùng shell với `app/(dashboard)/admin/`.
- */
-export default async function AdminLayout({
+export default async function AdminDashboardLayout({
   children,
 }: {
   children: React.ReactNode;

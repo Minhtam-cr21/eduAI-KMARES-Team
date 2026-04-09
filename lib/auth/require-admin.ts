@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 /**
  * Chỉ dùng trong Server Component / server actions.
  * Không phải admin → redirect `/dashboard`; chưa đăng nhập → `/login?next=...`.
- * @param loginNextPath — đường dẫn sau khi đăng nhập lại (mặc định `/admin/topics`).
+ * @param loginNextPath — đường dẫn sau khi đăng nhập lại (mặc định `/admin`).
  */
-export async function requireAdmin(loginNextPath = "/admin/topics") {
+export async function requireAdmin(loginNextPath = "/admin") {
   const supabase = createClient();
   const {
     data: { user },
