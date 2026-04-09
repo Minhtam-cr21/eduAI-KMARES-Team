@@ -2,6 +2,8 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -17,6 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { Search, UsersRound } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -41,6 +45,12 @@ type Props = {
 };
 
 const roles = ["student", "teacher", "admin"] as const;
+
+const ROLE_BADGE: Record<string, string> = {
+  student: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400",
+  teacher: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400",
+  admin: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-400",
+};
 
 export function AdminUsersTable({
   initialRows,
@@ -94,78 +104,89 @@ export function AdminUsersTable({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <form
-          className="flex flex-wrap gap-2"
-          action="/admin/users"
-          method="get"
-        >
+        <form className="flex flex-wrap gap-2" action="/admin/users" method="get">
           <input type="hidden" name="page" value="1" />
-          {roleFilter ? (
-            <input type="hidden" name="role" value={roleFilter} />
-          ) : null}
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Tìm theo tên..."
-            className="border-input bg-background h-8 min-w-[200px] rounded-md border px-2 text-sm"
-          />
+          {roleFilter ? <input type="hidden" name="role" value={roleFilter} /> : null}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              name="q"
+              defaultValue={q}
+              placeholder="Tìm theo tên..."
+              className="h-8 min-w-[200px] pl-8"
+            />
+          </div>
           <Button type="submit" size="sm" variant="secondary">
             Tìm
           </Button>
         </form>
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-sm">Vai trò:</span>
+          <span className="text-sm text-muted-foreground">Vai trò:</span>
           <Select
             value={roleFilter || "all"}
-            onValueChange={(v) =>
-              pushQuery({ role: v === "all" ? "" : v, page: "1" })
-            }
+            onValueChange={(v) => pushQuery({ role: v === "all" ? "" : v, page: "1" })}
           >
             <SelectTrigger className="h-8 w-[140px]">
               <SelectValue placeholder="Tất cả" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tất cả</SelectItem>
-              <SelectItem value="student">student</SelectItem>
-              <SelectItem value="teacher">teacher</SelectItem>
-              <SelectItem value="admin">admin</SelectItem>
+              <SelectItem value="student">Student</SelectItem>
+              <SelectItem value="teacher">Teacher</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="rounded-md border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tên</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Vai trò</TableHead>
-              <TableHead>MBTI</TableHead>
-              <TableHead>Ngày tạo</TableHead>
-              <TableHead className="text-right">Đổi role</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {initialRows.length === 0 ? (
+      {initialRows.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center py-12 text-center">
+            <UsersRound className="mb-3 h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">Không có người dùng.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground">
-                  Không có người dùng.
-                </TableCell>
+                <TableHead>Tên</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Vai trò</TableHead>
+                <TableHead>MBTI</TableHead>
+                <TableHead>Ngày tạo</TableHead>
+                <TableHead className="text-right">Đổi role</TableHead>
               </TableRow>
-            ) : (
-              initialRows.map((u) => (
+            </TableHeader>
+            <TableBody>
+              {initialRows.map((u) => (
                 <TableRow key={u.id}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-foreground">
                     {u.full_name ?? "—"}
                   </TableCell>
-                  <TableCell className="text-sm">{u.email ?? "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{u.role}</Badge>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {u.email ?? "—"}
                   </TableCell>
-                  <TableCell className="text-sm">{u.mbti_type ?? "—"}</TableCell>
-                  <TableCell className="whitespace-nowrap text-xs">
-                    {new Date(u.created_at).toLocaleString("vi-VN")}
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={cn("text-xs font-semibold capitalize", ROLE_BADGE[u.role] ?? "")}
+                    >
+                      {u.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {u.mbti_type ? (
+                      <Badge className="bg-violet-600 text-[10px] text-white hover:bg-violet-700">
+                        {u.mbti_type}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    {new Date(u.created_at).toLocaleDateString("vi-VN")}
                   </TableCell>
                   <TableCell className="text-right">
                     <Select
@@ -186,14 +207,14 @@ export function AdminUsersTable({
                     </Select>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           {total} người — trang {page} / {totalPages}
         </p>
         <div className="flex gap-2">
@@ -204,7 +225,7 @@ export function AdminUsersTable({
             disabled={page <= 1 || pending}
             onClick={() => pushQuery({ page: String(page - 1) })}
           >
-            Trước
+            ← Trước
           </Button>
           <Button
             type="button"
@@ -213,7 +234,7 @@ export function AdminUsersTable({
             disabled={page >= totalPages || pending}
             onClick={() => pushQuery({ page: String(page + 1) })}
           >
-            Sau
+            Sau →
           </Button>
         </div>
       </div>

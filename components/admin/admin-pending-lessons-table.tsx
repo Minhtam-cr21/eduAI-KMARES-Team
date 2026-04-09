@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -102,67 +104,63 @@ export function AdminPendingLessonsTable({
     }
   }
 
+  if (initialRows.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center py-12 text-center">
+          <FileText className="mb-3 h-10 w-10 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">Không có bài học chờ duyệt.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-border">
+      <Card>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Tiêu đề bài</TableHead>
               <TableHead>Khóa học</TableHead>
               <TableHead>Giáo viên</TableHead>
-              <TableHead>Thứ tự</TableHead>
+              <TableHead className="w-16">Thứ tự</TableHead>
               <TableHead>Ngày tạo</TableHead>
               <TableHead className="text-right">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {initialRows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground">
-                  Không có bài học chờ duyệt.
-                </TableCell>
-              </TableRow>
-            ) : (
-              initialRows.map((row) => {
-                const tid = row.course?.teacher_id ?? "";
-                return (
-                  <TableRow key={row.id}>
-                    <TableCell className="max-w-xs font-medium">
-                      <span className="line-clamp-2">{row.title}</span>
-                    </TableCell>
-                    <TableCell>{row.course?.title ?? "—"}</TableCell>
-                    <TableCell>{tid ? names[tid] ?? tid.slice(0, 8) : "—"}</TableCell>
-                    <TableCell className="tabular-nums">{row.order_index ?? "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">
-                      {new Date(row.created_at).toLocaleString("vi-VN")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="sm"
-                          disabled={loading}
-                          onClick={() => void approve(row.id)}
-                        >
-                          Duyệt
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={loading}
-                          onClick={() => setRejectId(row.id)}
-                        >
-                          Từ chối
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
+            {initialRows.map((row) => {
+              const tid = row.course?.teacher_id ?? "";
+              return (
+                <TableRow key={row.id}>
+                  <TableCell className="max-w-xs font-medium text-foreground">
+                    <span className="line-clamp-2">{row.title}</span>
+                  </TableCell>
+                  <TableCell className="text-sm">{row.course?.title ?? "—"}</TableCell>
+                  <TableCell className="text-sm">
+                    {tid ? names[tid] ?? tid.slice(0, 8) : "—"}
+                  </TableCell>
+                  <TableCell className="tabular-nums">{row.order_index ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    {new Date(row.created_at).toLocaleDateString("vi-VN")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button size="sm" disabled={loading} onClick={() => void approve(row.id)}>
+                        Duyệt
+                      </Button>
+                      <Button size="sm" variant="destructive" disabled={loading} onClick={() => setRejectId(row.id)}>
+                        Từ chối
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
-      </div>
+      </Card>
 
       <Dialog open={!!rejectId} onOpenChange={(o) => !o && setRejectId(null)}>
         <DialogContent>
@@ -170,15 +168,9 @@ export function AdminPendingLessonsTable({
             <DialogHeader>
               <DialogTitle>Từ chối bài học</DialogTitle>
             </DialogHeader>
-            <div className="py-2">
-              <Label htmlFor="lr">Lý do</Label>
-              <Input
-                id="lr"
-                name="rejection_reason"
-                required
-                className="mt-1"
-                placeholder="Nhập lý do..."
-              />
+            <div className="space-y-1.5 py-3">
+              <Label htmlFor="lr">Lý do từ chối</Label>
+              <Input id="lr" name="rejection_reason" required placeholder="Nhập lý do..." />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setRejectId(null)}>

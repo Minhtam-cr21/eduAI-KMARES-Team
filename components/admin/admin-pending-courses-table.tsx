@@ -1,6 +1,8 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -88,9 +91,20 @@ export function AdminPendingCoursesTable({ initialRows }: Props) {
     }
   }
 
+  if (initialRows.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center py-12 text-center">
+          <BookOpen className="mb-3 h-10 w-10 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">Không có khóa học chờ duyệt.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-border">
+      <Card>
         <Table>
           <TableHeader>
             <TableRow>
@@ -103,49 +117,39 @@ export function AdminPendingCoursesTable({ initialRows }: Props) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {initialRows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground">
-                  Không có khóa học chờ duyệt.
+            {initialRows.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell className="max-w-xs">
+                  <p className="line-clamp-2 font-medium text-foreground">{c.title}</p>
+                  {c.description && (
+                    <p className="line-clamp-1 text-xs text-muted-foreground">{c.description}</p>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm">{c.teacher?.full_name ?? "—"}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="text-xs">{c.course_type}</Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-xs capitalize">{c.category}</Badge>
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                  {new Date(c.created_at).toLocaleDateString("vi-VN")}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-1">
+                    <Button size="sm" disabled={loading} onClick={() => void approve(c.id)}>
+                      Duyệt
+                    </Button>
+                    <Button size="sm" variant="destructive" disabled={loading} onClick={() => setRejectId(c.id)}>
+                      Từ chối
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
-            ) : (
-              initialRows.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="max-w-xs font-medium">
-                    <span className="line-clamp-2">{c.title}</span>
-                  </TableCell>
-                  <TableCell>{c.teacher?.full_name ?? "—"}</TableCell>
-                  <TableCell>{c.course_type}</TableCell>
-                  <TableCell>{c.category}</TableCell>
-                  <TableCell className="whitespace-nowrap text-sm">
-                    {new Date(c.created_at).toLocaleString("vi-VN")}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        size="sm"
-                        disabled={loading}
-                        onClick={() => void approve(c.id)}
-                      >
-                        Duyệt
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        disabled={loading}
-                        onClick={() => setRejectId(c.id)}
-                      >
-                        Từ chối
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+            ))}
           </TableBody>
         </Table>
-      </div>
+      </Card>
 
       <Dialog open={!!rejectId} onOpenChange={(o) => !o && setRejectId(null)}>
         <DialogContent>
@@ -153,15 +157,9 @@ export function AdminPendingCoursesTable({ initialRows }: Props) {
             <DialogHeader>
               <DialogTitle>Từ chối khóa học</DialogTitle>
             </DialogHeader>
-            <div className="py-2">
-              <Label htmlFor="rej">Lý do</Label>
-              <Input
-                id="rej"
-                name="rejection_reason"
-                required
-                className="mt-1"
-                placeholder="Nhập lý do..."
-              />
+            <div className="space-y-1.5 py-3">
+              <Label htmlFor="rej">Lý do từ chối</Label>
+              <Input id="rej" name="rejection_reason" required placeholder="Nhập lý do..." />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setRejectId(null)}>
