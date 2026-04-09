@@ -1,8 +1,9 @@
 "use client";
 
+import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
 
 type UserInfo = { name: string | null; loggedIn: boolean } | null;
 
@@ -52,9 +53,9 @@ export function LandingHeader() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="text-xl font-bold tracking-tight text-neutral-900">
+        <Link href="/" className="text-xl font-bold tracking-tight text-foreground">
           EduAI
         </Link>
 
@@ -64,7 +65,7 @@ export function LandingHeader() {
               key={item.label}
               type="button"
               onClick={item.action}
-              className="text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {item.label}
             </button>
@@ -72,14 +73,15 @@ export function LandingHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
+          <ThemeToggle />
           {user?.loggedIn ? (
             <>
-              <span className="text-sm text-neutral-600">
+              <span className="text-sm text-muted-foreground">
                 {user.name ?? "User"}
               </span>
               <Link
                 href="/student"
-                className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-800"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
               >
                 Dashboard
               </Link>
@@ -88,13 +90,13 @@ export function LandingHeader() {
             <>
               <Link
                 href="/login"
-                className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
               >
                 Đăng nhập
               </Link>
               <Link
                 href="/signup"
-                className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-800"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
               >
                 Đăng ký
               </Link>
@@ -102,25 +104,27 @@ export function LandingHeader() {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setMobileOpen((o) => !o)}
-          className="md:hidden"
-          aria-label="Menu"
-        >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+        <div className="flex items-center gap-2 md:hidden">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label="Menu"
+          >
+            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
-        <div className="border-t border-neutral-200 bg-white px-4 pb-4 md:hidden">
+        <div className="border-t border-border bg-card px-4 pb-4 md:hidden">
           <nav className="flex flex-col gap-3 pt-3">
             {navItems.map((item) => (
               <button
                 key={item.label}
                 type="button"
                 onClick={item.action}
-                className="text-left text-sm font-medium text-neutral-700"
+                className="text-left text-sm font-medium text-foreground"
               >
                 {item.label}
               </button>
@@ -130,7 +134,7 @@ export function LandingHeader() {
             {user?.loggedIn ? (
               <Link
                 href="/student"
-                className="rounded-lg bg-neutral-900 px-4 py-2.5 text-center text-sm font-medium text-white"
+                className="rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground"
               >
                 Dashboard
               </Link>
@@ -138,13 +142,13 @@ export function LandingHeader() {
               <>
                 <Link
                   href="/login"
-                  className="rounded-lg border border-neutral-300 px-4 py-2.5 text-center text-sm font-medium text-neutral-700"
+                  className="rounded-lg border border-border px-4 py-2.5 text-center text-sm font-medium text-foreground"
                 >
                   Đăng nhập
                 </Link>
                 <Link
                   href="/signup"
-                  className="rounded-lg bg-neutral-900 px-4 py-2.5 text-center text-sm font-medium text-white"
+                  className="rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground"
                 >
                   Đăng ký
                 </Link>

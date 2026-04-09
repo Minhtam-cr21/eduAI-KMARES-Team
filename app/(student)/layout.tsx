@@ -1,4 +1,5 @@
 import { StudentNav } from "@/components/student/student-nav";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import Link from "next/link";
 
 export default function StudentLayout({
@@ -16,7 +17,10 @@ export default function StudentLayout({
           >
             EduAI
           </Link>
-          <StudentNav />
+          <div className="flex items-center gap-2">
+            <StudentNav />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       {children}

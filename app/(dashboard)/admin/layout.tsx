@@ -1,4 +1,5 @@
 import { AdminShellNav } from "@/components/admin/admin-shell-nav";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import Link from "next/link";
 
@@ -21,12 +22,15 @@ export default async function AdminDashboardLayout({
           >
             EduAI · Quản trị
           </Link>
-          <Link
-            href="/dashboard"
-            className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-          >
-            Về học sinh
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard"
+              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+            >
+              Về học sinh
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <AdminShellNav />
