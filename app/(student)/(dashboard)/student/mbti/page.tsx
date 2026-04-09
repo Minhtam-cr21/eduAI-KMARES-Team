@@ -1,9 +1,18 @@
 "use client";
 
 import { BackButton } from "@/components/ui/back-button";
-import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
+import { Brain, CheckCircle2, Clock } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -26,6 +35,21 @@ function buildPayload(answers: Record<number, "A" | "B">):
     list.push({ questionId: id, answer: a });
   }
   return { ok: true, list };
+}
+
+function MbtiSkeleton() {
+  return (
+    <main className="mx-auto max-w-2xl px-4 py-8">
+      <Skeleton className="mb-4 h-8 w-24" />
+      <Skeleton className="mb-2 h-8 w-48" />
+      <Skeleton className="mb-8 h-4 w-64" />
+      <div className="space-y-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full rounded-xl" />
+        ))}
+      </div>
+    </main>
+  );
 }
 
 export default function StudentMbtiPage() {
@@ -62,7 +86,7 @@ export default function StudentMbtiPage() {
           setStatus(s);
         }
       } catch {
-        if (!cancelled) toast.error("Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c b\u00e0i test");
+        if (!cancelled) toast.error("Không tải được bài test");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -77,22 +101,22 @@ export default function StudentMbtiPage() {
   ).length;
   const allAnswered = useMemo(() => buildPayload(answers).ok, [answers]);
   const canStart = !status?.last_test || status.can_retest === true;
+  const progressPct = Math.round((answeredCount / 10) * 100);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const built = buildPayload(answers);
     if (!built.ok) {
-      toast.error("Tr\u1ea3 l\u1eddi \u0111\u1ee7 10 c\u00e2u (id 1\u201310).");
+      toast.error("Trả lời đủ 10 câu (id 1–10).");
       return;
     }
-    const payload = { answers: built.list };
     setSubmitting(true);
     setResult(null);
     try {
       const res = await fetch("/api/mbti/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ answers: built.list }),
       });
       const data = (await res.json()) as {
         mbti_type?: string;
@@ -100,7 +124,7 @@ export default function StudentMbtiPage() {
         error?: string;
       };
       if (!res.ok) {
-        toast.error("Kh\u00f4ng n\u1ed9p \u0111\u01b0\u1ee3c", { description: data.error });
+        toast.error("Không nộp được", { description: data.error });
         return;
       }
       if (data.mbti_type && data.test_date) {
@@ -110,9 +134,9 @@ export default function StudentMbtiPage() {
       if (st.ok) {
         setStatus((await st.json()) as typeof status);
       }
-      toast.success("\u0110\u00e3 l\u01b0u k\u1ebft qu\u1ea3 MBTI.");
+      toast.success("Đã lưu kết quả MBTI.");
     } catch (err) {
-      toast.error("L\u1ed7i m\u1ea1ng", {
+      toast.error("Lỗi mạng", {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -120,90 +144,119 @@ export default function StudentMbtiPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <main className="mx-auto max-w-2xl px-4 py-12">
-        <p className="text-muted-foreground text-center text-sm">{"\u0110ang t\u1ea3i\u2026"}</p>
-      </main>
-    );
-  }
+  if (loading) return <MbtiSkeleton />;
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <BackButton fallbackHref="/student" className="mb-4" />
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">MBTI</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {status?.last_test
-              ? `L\u1ea7n l\u00e0m g\u1ea7n nh\u1ea5t: ${status.last_test}`
-              : "Ch\u01b0a c\u00f3 l\u1ea7n l\u00e0m n\u00e0o."}
-          </p>
+
+      <div className="mb-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
+            <Brain className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Bài test MBTI</h1>
+            <p className="text-sm text-muted-foreground">
+              {status?.last_test
+                ? `Lần làm gần nhất: ${status.last_test}`
+                : "Chưa có lần làm nào."}
+            </p>
+          </div>
         </div>
-        <Link
-          href="/student"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          &larr; Hub
-        </Link>
       </div>
 
-      {result ? (
-        <div className="mb-6 rounded-xl border border-border bg-card p-4">
-          <p className="font-semibold">{`K\u1ebft qu\u1ea3: ${result.mbti_type}`}</p>
-          <p className="text-muted-foreground text-sm">{result.test_date}</p>
-        </div>
-      ) : null}
+      {result && (
+        <Card className="mb-6 border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div>
+                <CardTitle className="text-lg">Kết quả MBTI</CardTitle>
+                <CardDescription>{result.test_date}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Badge className="bg-violet-600 px-4 py-1.5 text-lg font-bold text-white hover:bg-violet-700">
+              {result.mbti_type}
+            </Badge>
+          </CardContent>
+        </Card>
+      )}
 
       {!canStart && status?.last_test ? (
-        <p className="text-muted-foreground text-sm">
-          {`B\u1ea1n c\u00f3 th\u1ec3 l\u00e0m l\u1ea1i sau 2 th\u00e1ng k\u1ec3 t\u1eeb l\u1ea7n test tr\u01b0\u1edbc.`}
-        </p>
-      ) : (
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
-          {questions.map((q) => (
-            <fieldset
-              key={q.id}
-              className="rounded-lg border border-border bg-card p-4"
-            >
-              <legend className="text-sm font-medium">
-                {q.id}. {q.text}
-              </legend>
-              <div className="mt-3 flex flex-wrap gap-4">
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name={`q${q.id}`}
-                    checked={answers[q.id] === "A"}
-                    onChange={() =>
-                      setAnswers((a) => ({ ...a, [q.id]: "A" }))
-                    }
-                  />
-                  {q.options.A}
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name={`q${q.id}`}
-                    checked={answers[q.id] === "B"}
-                    onChange={() =>
-                      setAnswers((a) => ({ ...a, [q.id]: "B" }))
-                    }
-                  />
-                  {q.options.B}
-                </label>
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div>
+                <CardTitle className="text-base">Chưa đến hạn làm lại</CardTitle>
+                <CardDescription>
+                  Bạn có thể làm lại sau 2 tháng kể từ lần test trước.
+                </CardDescription>
               </div>
-            </fieldset>
+            </div>
+          </CardHeader>
+        </Card>
+      ) : (
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+          <Card className="mb-2">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Đã trả lời: <span className="font-semibold text-foreground">{answeredCount}</span>/10
+                </span>
+                <span className="font-medium text-foreground">{progressPct}%</span>
+              </div>
+              <Progress value={progressPct} className="mt-2 h-2" />
+            </CardContent>
+          </Card>
+
+          {questions.map((q, idx) => (
+            <Card key={q.id} className="transition hover:shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Câu {idx + 1} / 10
+                </CardTitle>
+                <CardDescription className="text-base font-medium text-foreground">
+                  {q.text}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                {(["A", "B"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() =>
+                      setAnswers((a) => ({ ...a, [q.id]: opt }))
+                    }
+                    className={cn(
+                      "flex-1 rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition",
+                      answers[q.id] === opt
+                        ? "border-violet-500 bg-violet-50 text-violet-700 dark:border-violet-400 dark:bg-violet-950/40 dark:text-violet-300"
+                        : "border-border bg-card text-foreground hover:border-muted-foreground/30 hover:bg-muted/50"
+                    )}
+                  >
+                    <span className="mr-2 font-bold">{opt}.</span>
+                    {q.options[opt]}
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
           ))}
-          <p className="text-muted-foreground text-sm">
-            {`\u0110\u00e3 tr\u1ea3 l\u1eddi: ${answeredCount}/10`}
-          </p>
+
           <button
             type="submit"
             disabled={submitting || !allAnswered}
-            className={cn(buttonVariants(), "w-full sm:w-auto")}
+            className={cn(
+              "w-full rounded-xl px-6 py-3 text-sm font-semibold transition sm:w-auto",
+              allAnswered
+                ? "bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60"
+                : "cursor-not-allowed bg-muted text-muted-foreground"
+            )}
           >
-            {submitting ? "\u0110ang g\u1eedi\u2026" : "N\u1ed9p b\u00e0i"}
+            {submitting ? "Đang gửi…" : "Nộp bài"}
           </button>
         </form>
       )}
