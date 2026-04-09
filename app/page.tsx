@@ -19,7 +19,7 @@ export default function HomePage() {
           Đăng ký
         </Link>
         <Link
-          href="/dashboard"
+          href="/student"
           className="font-medium text-neutral-600 underline underline-offset-4"
         >
           Dashboard
