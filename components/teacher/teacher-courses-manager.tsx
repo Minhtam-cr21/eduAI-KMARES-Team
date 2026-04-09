@@ -1,6 +1,14 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -21,10 +29,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { TeacherCourseRow } from "@/lib/teacher/courses-with-counts";
 import { cn } from "@/lib/utils";
+import { BookOpen, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+const STATUS_BADGE: Record<string, string> = {
+  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400",
+  published: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400",
+  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400",
+};
 
 type Props = { initialCourses: TeacherCourseRow[] };
 
@@ -35,6 +50,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
   useEffect(() => {
     setCourses(initialCourses);
   }, [initialCourses]);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -123,45 +139,65 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted-foreground text-sm">
-          Khóa học của bạn (mọi trạng thái).
-        </p>
-        <Button type="button" onClick={() => setCreateOpen(true)}>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-muted-foreground">
+            Quản lý tất cả khóa học của bạn.
+          </p>
+        </div>
+        <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
+          <Plus className="h-4 w-4" />
           Tạo khóa học mới
         </Button>
       </div>
 
-      <div className="rounded-md border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tên</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead className="text-right">Bài học</TableHead>
-              <TableHead className="text-right">Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {courses.length === 0 ? (
+      {courses.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center py-12 text-center">
+            <BookOpen className="mb-3 h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">Chưa có khóa học.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
-                  Chưa có khóa học.
-                </TableCell>
+                <TableHead>Tên khóa</TableHead>
+                <TableHead>Danh mục</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead className="text-right">Bài học</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
-            ) : (
-              courses.map((c) => (
+            </TableHeader>
+            <TableBody>
+              {courses.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell>
                     <div className="max-w-xs">
-                      <p className="font-medium">{c.title}</p>
-                      <p className="text-muted-foreground line-clamp-2 text-xs">
+                      <p className="font-medium text-foreground">{c.title}</p>
+                      <p className="line-clamp-1 text-xs text-muted-foreground">
                         {c.description ?? "—"}
                       </p>
                     </div>
                   </TableCell>
-                  <TableCell>{c.status}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {c.category || "—"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs font-semibold capitalize",
+                        STATUS_BADGE[c.status ?? ""] ?? ""
+                      )}
+                    >
+                      {c.status ?? "—"}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {c.lesson_count}
                   </TableCell>
@@ -173,7 +209,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                           buttonVariants({ variant: "outline", size: "sm" })
                         )}
                       >
-                        Xem bài học
+                        Bài học
                       </Link>
                       <Button
                         variant="secondary"
@@ -192,46 +228,47 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
 
+      {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Tạo khóa học</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => void submitCreate(e)} className="space-y-3">
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="c-title">Tiêu đề</Label>
-              <Input id="c-title" name="title" required className="mt-1" />
+              <Input id="c-title" name="title" required />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="c-desc">Mô tả</Label>
-              <Textarea id="c-desc" name="description" className="mt-1" rows={3} />
+              <Textarea id="c-desc" name="description" rows={3} />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="c-type">Loại</Label>
               <select
                 id="c-type"
                 name="course_type"
                 required
                 defaultValue="skill"
-                className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
               >
                 <option value="skill">Kỹ năng</option>
                 <option value="role">Vai trò</option>
               </select>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="c-cat">Danh mục</Label>
-              <Input id="c-cat" name="category" required className="mt-1" />
+              <Input id="c-cat" name="category" required />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="c-thumb">Thumbnail URL (tuỳ chọn)</Label>
-              <Input id="c-thumb" name="thumbnail_url" type="url" className="mt-1" />
+              <Input id="c-thumb" name="thumbnail_url" type="url" />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
@@ -245,6 +282,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Dialog */}
       <Dialog open={!!editId} onOpenChange={(o) => !o && setEditId(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
@@ -252,59 +290,34 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
           </DialogHeader>
           {editing ? (
             <form onSubmit={(e) => void submitEdit(e)} className="space-y-3">
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="e-title">Tiêu đề</Label>
-                <Input
-                  id="e-title"
-                  name="title"
-                  required
-                  className="mt-1"
-                  defaultValue={editing.title}
-                />
+                <Input id="e-title" name="title" required defaultValue={editing.title} />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="e-desc">Mô tả</Label>
-                <Textarea
-                  id="e-desc"
-                  name="description"
-                  className="mt-1"
-                  rows={3}
-                  defaultValue={editing.description ?? ""}
-                />
+                <Textarea id="e-desc" name="description" rows={3} defaultValue={editing.description ?? ""} />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="e-type">Loại</Label>
                 <select
                   id="e-type"
                   name="course_type"
                   required
                   defaultValue={editing.course_type}
-                  className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
                 >
                   <option value="skill">Kỹ năng</option>
                   <option value="role">Vai trò</option>
                 </select>
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="e-cat">Danh mục</Label>
-                <Input
-                  id="e-cat"
-                  name="category"
-                  required
-                  className="mt-1"
-                  defaultValue={editing.category}
-                />
+                <Input id="e-cat" name="category" required defaultValue={editing.category} />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="e-thumb">Thumbnail URL</Label>
-                <Input
-                  id="e-thumb"
-                  name="thumbnail_url"
-                  type="url"
-                  className="mt-1"
-                  defaultValue={editing.thumbnail_url ?? ""}
-                  placeholder="https://..."
-                />
+                <Input id="e-thumb" name="thumbnail_url" type="url" defaultValue={editing.thumbnail_url ?? ""} placeholder="https://..." />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditId(null)}>
@@ -319,24 +332,20 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirm */}
       <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Xóa khóa học?</DialogTitle>
           </DialogHeader>
-          <p className="text-muted-foreground text-sm">
-            Chỉ xóa được khi không có bài học đã xuất bản và không có học sinh gắn lộ
-            trình qua bài học của khóa.
+          <p className="text-sm text-muted-foreground">
+            Chỉ xóa được khi không có bài học đã xuất bản và không có học sinh gắn lộ trình qua bài học của khóa.
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>
               Huỷ
             </Button>
-            <Button
-              variant="destructive"
-              disabled={loading}
-              onClick={() => void confirmDelete()}
-            >
+            <Button variant="destructive" disabled={loading} onClick={() => void confirmDelete()}>
               Xóa
             </Button>
           </DialogFooter>

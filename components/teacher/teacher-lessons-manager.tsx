@@ -1,6 +1,8 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { FileText, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -33,6 +37,12 @@ type Lesson = {
   order_index: number | null;
   status: string | null;
   created_at: string;
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400",
+  published: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400",
+  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400",
 };
 
 type Props = {
@@ -161,18 +171,26 @@ export function TeacherLessonsManager({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">{courseTitle}</h1>
-        <p className="text-muted-foreground text-sm">
-          Trạng thái khóa: {courseStatus ?? "—"}
-          {!canAddLesson ? (
-            <span className="text-destructive">
-              {" "}
+        <h1 className="text-2xl font-bold text-foreground">{courseTitle}</h1>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span>Trạng thái khóa:</span>
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-xs font-semibold capitalize",
+              STATUS_BADGE[courseStatus ?? ""] ?? ""
+            )}
+          >
+            {courseStatus ?? "—"}
+          </Badge>
+          {!canAddLesson && (
+            <span className="text-xs text-destructive">
               — Cần admin duyệt khóa (published) để thêm bài học mới.
             </span>
-          ) : null}
-        </p>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end">
@@ -180,36 +198,51 @@ export function TeacherLessonsManager({
           type="button"
           onClick={() => setCreateOpen(true)}
           disabled={!canAddLesson}
+          className="gap-1.5"
         >
-          Thêm bài học mới
+          <Plus className="h-4 w-4" />
+          Thêm bài học
         </Button>
       </div>
 
-      <div className="rounded-md border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Thứ tự</TableHead>
-              <TableHead>Tiêu đề</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead className="text-right">Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {lessons.length === 0 ? (
+      {lessons.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center py-12 text-center">
+            <FileText className="mb-3 h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">Chưa có bài học.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
-                  Chưa có bài học.
-                </TableCell>
+                <TableHead className="w-16">Thứ tự</TableHead>
+                <TableHead>Tiêu đề</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
-            ) : (
-              lessons.map((l) => (
+            </TableHeader>
+            <TableBody>
+              {lessons.map((l) => (
                 <TableRow key={l.id}>
-                  <TableCell className="tabular-nums">
+                  <TableCell className="tabular-nums font-medium">
                     {l.order_index ?? 0}
                   </TableCell>
-                  <TableCell className="font-medium">{l.title}</TableCell>
-                  <TableCell>{l.status}</TableCell>
+                  <TableCell>
+                    <span className="font-medium text-foreground">{l.title}</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs font-semibold capitalize",
+                        STATUS_BADGE[l.status ?? ""] ?? ""
+                      )}
+                    >
+                      {l.status ?? "—"}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button
@@ -233,44 +266,38 @@ export function TeacherLessonsManager({
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
 
+      {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Thêm bài học</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => void submitCreate(e)} className="space-y-3">
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="ltitle">Tiêu đề</Label>
-              <Input id="ltitle" name="title" required className="mt-1" />
+              <Input id="ltitle" name="title" required />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="lorder">Thứ tự</Label>
-              <Input
-                id="lorder"
-                name="order_index"
-                type="number"
-                min={0}
-                className="mt-1"
-                defaultValue={0}
-              />
+              <Input id="lorder" name="order_index" type="number" min={0} defaultValue={0} />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="lcontent">Nội dung</Label>
-              <Textarea id="lcontent" name="content" className="mt-1" rows={4} />
+              <Textarea id="lcontent" name="content" rows={4} />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="lvideo">Video URL</Label>
-              <Input id="lvideo" name="video_url" type="url" className="mt-1" />
+              <Input id="lvideo" name="video_url" type="url" />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="lcode">Code template</Label>
-              <Textarea id="lcode" name="code_template" className="mt-1" rows={4} />
+              <Textarea id="lcode" name="code_template" rows={4} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
@@ -284,6 +311,7 @@ export function TeacherLessonsManager({
         </DialogContent>
       </Dialog>
 
+      {/* Edit Dialog */}
       <Dialog open={!!editLesson} onOpenChange={(o) => !o && setEditLesson(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
@@ -291,56 +319,25 @@ export function TeacherLessonsManager({
           </DialogHeader>
           {editLesson ? (
             <form onSubmit={(e) => void submitEdit(e)} className="space-y-3">
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="etitle">Tiêu đề</Label>
-                <Input
-                  id="etitle"
-                  name="title"
-                  required
-                  className="mt-1"
-                  defaultValue={editLesson.title}
-                />
+                <Input id="etitle" name="title" required defaultValue={editLesson.title} />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="eorder">Thứ tự</Label>
-                <Input
-                  id="eorder"
-                  name="order_index"
-                  type="number"
-                  min={0}
-                  className="mt-1"
-                  defaultValue={editLesson.order_index ?? 0}
-                />
+                <Input id="eorder" name="order_index" type="number" min={0} defaultValue={editLesson.order_index ?? 0} />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="econtent">Nội dung</Label>
-                <Textarea
-                  id="econtent"
-                  name="content"
-                  className="mt-1"
-                  rows={4}
-                  defaultValue={editLesson.content ?? ""}
-                />
+                <Textarea id="econtent" name="content" rows={4} defaultValue={editLesson.content ?? ""} />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="evideo">Video URL</Label>
-                <Input
-                  id="evideo"
-                  name="video_url"
-                  type="url"
-                  className="mt-1"
-                  defaultValue={editLesson.video_url ?? ""}
-                />
+                <Input id="evideo" name="video_url" type="url" defaultValue={editLesson.video_url ?? ""} />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="ecode">Code template</Label>
-                <Textarea
-                  id="ecode"
-                  name="code_template"
-                  className="mt-1"
-                  rows={4}
-                  defaultValue={editLesson.code_template ?? ""}
-                />
+                <Textarea id="ecode" name="code_template" rows={4} defaultValue={editLesson.code_template ?? ""} />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditLesson(null)}>
@@ -355,20 +352,18 @@ export function TeacherLessonsManager({
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirm */}
       <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Xóa bài học?</DialogTitle>
           </DialogHeader>
+          <p className="text-sm text-muted-foreground">Hành động này không thể hoàn tác.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>
               Huỷ
             </Button>
-            <Button
-              variant="destructive"
-              disabled={loading}
-              onClick={() => void confirmDelete()}
-            >
+            <Button variant="destructive" disabled={loading} onClick={() => void confirmDelete()}>
               Xóa
             </Button>
           </DialogFooter>

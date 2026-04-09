@@ -1,6 +1,8 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -10,14 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -31,6 +27,12 @@ export type ConnectionRow = {
   created_at: string;
   responded_at: string | null;
   student_name: string | null;
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400",
+  accepted: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400",
+  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400",
 };
 
 type Props = { initialRows: ConnectionRow[] };
@@ -62,10 +64,7 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
       const res = await fetch(`/api/connection-requests/${respondId}/respond`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "accepted",
-          teacher_response: link,
-        }),
+        body: JSON.stringify({ status: "accepted", teacher_response: link }),
       });
       const j = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -87,10 +86,7 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
       const res = await fetch(`/api/connection-requests/${rejectId}/respond`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "rejected",
-          teacher_response: null,
-        }),
+        body: JSON.stringify({ status: "rejected", teacher_response: null }),
       });
       const j = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -106,66 +102,68 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-md border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Học sinh</TableHead>
-              <TableHead>Mục tiêu</TableHead>
-              <TableHead>Thời gian rảnh</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead className="text-right">Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
-                  Chưa có yêu cầu.
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">
-                    {r.student_name ?? r.student_id}
-                  </TableCell>
-                  <TableCell className="max-w-xs">
-                    <span className="line-clamp-3 text-sm">{r.goal}</span>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {r.available_time ?? "—"}
-                  </TableCell>
-                  <TableCell>{r.status}</TableCell>
-                  <TableCell className="text-right">
-                    {r.status === "pending" ? (
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="sm"
-                          onClick={() => setRespondId(r.id)}
-                        >
-                          Chấp nhận
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => setRejectId(r.id)}
-                        >
-                          Từ chối
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
+    <div className="space-y-6">
+      {rows.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center py-12 text-center">
+            <Users className="mb-3 h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">Chưa có yêu cầu kết nối.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {rows.map((r) => (
+            <Card key={r.id} className="transition hover:shadow-md">
+              <CardContent className="space-y-3 pt-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {r.student_name ?? r.student_id.slice(0, 8) + "…"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleDateString("vi-VN")}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs font-semibold capitalize",
+                      STATUS_BADGE[r.status] ?? ""
                     )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  >
+                    {r.status}
+                  </Badge>
+                </div>
 
+                <p className="line-clamp-3 text-sm text-foreground">{r.goal}</p>
+
+                {r.available_time && (
+                  <p className="text-xs text-muted-foreground">
+                    Thời gian rảnh: {r.available_time}
+                  </p>
+                )}
+
+                {r.status === "pending" && (
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={() => setRespondId(r.id)}>
+                      Chấp nhận
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setRejectId(r.id)}
+                    >
+                      Từ chối
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Accept Dialog */}
       <Dialog open={!!respondId} onOpenChange={(o) => !o && setRespondId(null)}>
         <DialogContent>
           <DialogHeader>
@@ -173,16 +171,10 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
           </DialogHeader>
           {responding ? (
             <form onSubmit={(e) => void submitAccept(e)} className="space-y-3">
-              <p className="text-muted-foreground text-sm">{responding.goal}</p>
-              <div>
+              <p className="text-sm text-muted-foreground">{responding.goal}</p>
+              <div className="space-y-1.5">
                 <Label htmlFor="link">Link liên hệ (Zalo / Meet / …)</Label>
-                <Input
-                  id="link"
-                  name="teacher_response"
-                  required
-                  placeholder="https://..."
-                  className="mt-1"
-                />
+                <Input id="link" name="teacher_response" required placeholder="https://..." />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setRespondId(null)}>
@@ -197,20 +189,20 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
         </DialogContent>
       </Dialog>
 
+      {/* Reject Confirm */}
       <Dialog open={!!rejectId} onOpenChange={(o) => !o && setRejectId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Từ chối yêu cầu?</DialogTitle>
           </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Yêu cầu sẽ được đánh dấu là &quot;rejected&quot;. Bạn có chắc?
+          </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectId(null)}>
               Huỷ
             </Button>
-            <Button
-              variant="destructive"
-              disabled={loading}
-              onClick={() => void confirmReject()}
-            >
+            <Button variant="destructive" disabled={loading} onClick={() => void confirmReject()}>
               Từ chối
             </Button>
           </DialogFooter>
