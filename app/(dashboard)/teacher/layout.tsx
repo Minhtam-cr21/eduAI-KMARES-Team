@@ -3,12 +3,7 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Khu vực `/teacher/*`: middleware + layout kiểm tra role teacher hoặc admin.
- * (Dùng `app/teacher/` thay vì route group `(teacher)` để URL đúng `/teacher/...`,
- * tránh trùng `/dashboard` của học sinh.)
- */
-export default async function TeacherLayout({
+export default async function TeacherDashboardLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -20,15 +15,15 @@ export default async function TeacherLayout({
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
           <Link
-            href="/"
+            href="/teacher"
             className="text-sm font-semibold text-foreground hover:opacity-80"
           >
-            EduAI
+            EduAI · Giáo viên
           </Link>
           <nav className="flex flex-wrap gap-1 sm:gap-4">
             <Link
               href="/teacher"
-              className="text-foreground rounded-md px-2 py-1 text-sm font-medium"
+              className="text-foreground hover:text-foreground rounded-md px-2 py-1 text-sm font-medium transition-colors"
             >
               Tổng quan
             </Link>

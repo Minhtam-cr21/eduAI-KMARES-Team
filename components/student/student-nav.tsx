@@ -37,7 +37,7 @@ export async function StudentNav() {
       ))}
       {showTeacher ? (
         <Link
-          href="/teacher/dashboard"
+          href="/teacher"
           className="text-primary rounded-md px-2 py-1 text-sm font-medium"
         >
           Giáo viên

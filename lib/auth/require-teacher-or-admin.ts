@@ -5,9 +5,7 @@ import { redirect } from "next/navigation";
  * Server Component / server actions: chỉ teacher hoặc admin.
  * Không phải → redirect `/dashboard`; chưa đăng nhập → `/login?next=...`.
  */
-export async function requireTeacherOrAdmin(
-  loginNextPath = "/teacher/dashboard"
-) {
+export async function requireTeacherOrAdmin(loginNextPath = "/teacher") {
   const supabase = createClient();
   const {
     data: { user },

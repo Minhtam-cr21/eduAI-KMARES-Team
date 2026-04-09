@@ -1,5 +1,5 @@
-import { TeacherDashboardClient } from "@/components/teacher/teacher-dashboard-client";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function TeacherDashboardPage() {
-  return <TeacherDashboardClient />;
+  redirect("/teacher");
 }
