@@ -2,6 +2,7 @@ import {
   TeacherConnectionsManager,
   type ConnectionRow,
 } from "@/components/teacher/teacher-connections-manager";
+import { BackButton } from "@/components/ui/back-button";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
 import Link from "next/link";
 
@@ -22,6 +23,7 @@ export default async function TeacherConnectionsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
+      <BackButton fallbackHref="/teacher" className="mb-2" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Yêu cầu kết nối</h1>
@@ -29,12 +31,6 @@ export default async function TeacherConnectionsPage() {
             Phản hồi yêu cầu từ học sinh.
           </p>
         </div>
-        <Link
-          href="/teacher"
-          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-        >
-          ← Tổng quan
-        </Link>
       </div>
       <TeacherConnectionsManager initialRows={initialRows} />
     </div>

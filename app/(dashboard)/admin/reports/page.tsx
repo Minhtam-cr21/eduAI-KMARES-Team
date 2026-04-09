@@ -1,4 +1,5 @@
 import { AdminReportsTable } from "@/components/admin/admin-reports-table";
+import { BackButton } from "@/components/ui/back-button";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
 import { createClient } from "@/lib/supabase/server";
 import type { Report } from "@/types/database";
@@ -48,6 +49,7 @@ export default async function AdminReportsPage({
 
   return (
     <div className="space-y-6">
+      <BackButton fallbackHref="/admin" className="mb-2" />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Báo cáo sự cố</h1>
@@ -69,12 +71,6 @@ export default async function AdminReportsPage({
             Từ chối
           </FilterLink>
         </div>
-        <Link
-          href="/admin"
-          className="text-muted-foreground hover:text-foreground w-full text-sm underline-offset-4 hover:underline sm:w-auto"
-        >
-          ← Tổng quan
-        </Link>
       </div>
       <AdminReportsTable initialRows={initialRows} />
     </div>

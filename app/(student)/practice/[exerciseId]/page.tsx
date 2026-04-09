@@ -1,6 +1,7 @@
 "use client";
 
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
+import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PracticeExercise } from "@/types/database";
@@ -142,6 +143,7 @@ export default function PracticeExercisePage() {
 
   return (
     <main className="mx-auto max-w-[1600px] px-4 py-6">
+      <BackButton fallbackHref="/student/practice" className="mb-4" />
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">

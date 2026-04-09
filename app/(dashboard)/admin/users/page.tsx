@@ -1,5 +1,6 @@
 import { AdminUsersTable } from "@/components/admin/admin-users-table";
 import type { AdminUserRow } from "@/components/admin/admin-users-table";
+import { BackButton } from "@/components/ui/back-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
 import Link from "next/link";
@@ -42,6 +43,7 @@ export default async function AdminUsersPage({
 
   return (
     <div className="space-y-6">
+      <BackButton fallbackHref="/admin" className="mb-2" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Người dùng</h1>
@@ -49,12 +51,6 @@ export default async function AdminUsersPage({
             Phân trang, tìm kiếm và gán vai trò.
           </p>
         </div>
-        <Link
-          href="/admin"
-          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-        >
-          ← Tổng quan
-        </Link>
       </div>
       <Suspense
         fallback={

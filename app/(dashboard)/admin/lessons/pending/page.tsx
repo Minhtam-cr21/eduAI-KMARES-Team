@@ -2,6 +2,7 @@ import {
   AdminPendingLessonsTable,
   type PendingLessonRow,
 } from "@/components/admin/admin-pending-lessons-table";
+import { BackButton } from "@/components/ui/back-button";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -40,6 +41,7 @@ export default async function AdminPendingLessonsPage() {
 
   return (
     <div className="space-y-6">
+      <BackButton fallbackHref="/admin" className="mb-2" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Duyệt bài học (khóa học)</h1>
@@ -47,12 +49,6 @@ export default async function AdminPendingLessonsPage() {
             Các bài trong course_lessons đang chờ duyệt.
           </p>
         </div>
-        <Link
-          href="/admin"
-          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-        >
-          ← Tổng quan
-        </Link>
       </div>
       <AdminPendingLessonsTable
         initialRows={initialRows}

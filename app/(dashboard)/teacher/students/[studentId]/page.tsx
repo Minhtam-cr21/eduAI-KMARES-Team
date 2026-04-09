@@ -1,5 +1,6 @@
 "use client";
 
+import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -100,6 +101,7 @@ export default function TeacherStudentDetailPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
+      <BackButton fallbackHref="/teacher/students" className="mb-2" />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">

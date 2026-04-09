@@ -1,4 +1,5 @@
 import { TeacherStudentsTable } from "@/components/teacher/teacher-students-table";
+import { BackButton } from "@/components/ui/back-button";
 import type { TeacherStudentRow } from "@/lib/types/teacher";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
 import Link from "next/link";
@@ -21,6 +22,7 @@ export default async function TeacherStudentsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
+      <BackButton fallbackHref="/teacher" className="mb-2" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Học sinh</h1>
@@ -28,12 +30,6 @@ export default async function TeacherStudentsPage() {
             Danh sách học sinh và tiến độ lộ trình (bài học được giao).
           </p>
         </div>
-        <Link
-          href="/teacher"
-          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-        >
-          ← Tổng quan
-        </Link>
       </div>
       <TeacherStudentsTable students={students} />
     </div>

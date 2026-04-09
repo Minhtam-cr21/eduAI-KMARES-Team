@@ -1,6 +1,7 @@
 "use client";
 
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
+import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -62,15 +63,7 @@ export default function StudentCourseLessonPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <Link
-        href={`/student/courses/${courseId}`}
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
-          "mb-4 -ml-2"
-        )}
-      >
-        ← Về khóa học
-      </Link>
+      <BackButton fallbackHref={`/student/courses/${courseId}`} label="Về khóa học" className="mb-4" />
       <h1 className="text-2xl font-semibold">{title}</h1>
       <div className="mt-6 rounded-xl border border-border bg-card p-6">
         {content ? (

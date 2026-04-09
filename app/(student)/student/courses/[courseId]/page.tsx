@@ -3,10 +3,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { BackButton } from "@/components/ui/back-button";
 import {
   BookOpen,
   CheckCircle2,
-  ChevronLeft,
   Clock,
   Layers,
   Play,
@@ -176,14 +176,7 @@ export default function StudentCourseDetailPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
-      {/* Back link */}
-      <Link
-        href="/student/courses"
-        className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Danh sách khóa học
-      </Link>
+      <BackButton fallbackHref="/student/courses" label="Danh sách khóa học" className="mb-6" />
 
       {/* Course header */}
       <section className="rounded-2xl border border-border bg-gradient-to-br from-card to-muted/30 p-6 md:p-8">

@@ -2,6 +2,7 @@ import {
   AdminPendingCoursesTable,
   type PendingCourseRow,
 } from "@/components/admin/admin-pending-courses-table";
+import { BackButton } from "@/components/ui/back-button";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
 import Link from "next/link";
 
@@ -20,6 +21,7 @@ export default async function AdminPendingCoursesPage() {
 
   return (
     <div className="space-y-6">
+      <BackButton fallbackHref="/admin" className="mb-2" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Duyệt khóa học</h1>
@@ -27,12 +29,6 @@ export default async function AdminPendingCoursesPage() {
             Các khóa ở trạng thái pending.
           </p>
         </div>
-        <Link
-          href="/admin"
-          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-        >
-          ← Tổng quan
-        </Link>
       </div>
       <AdminPendingCoursesTable initialRows={initialRows} />
     </div>

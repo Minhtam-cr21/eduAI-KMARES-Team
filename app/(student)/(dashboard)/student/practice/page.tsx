@@ -1,5 +1,6 @@
 "use client";
 
+import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -168,6 +169,7 @@ export default function StudentPracticeListPage() {
 
   return (
     <main className="mx-auto max-w-[1600px] px-4 py-6">
+      <BackButton fallbackHref="/student" className="mb-4" />
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">

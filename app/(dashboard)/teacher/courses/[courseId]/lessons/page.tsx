@@ -1,4 +1,5 @@
 import { TeacherLessonsManager } from "@/components/teacher/teacher-lessons-manager";
+import { BackButton } from "@/components/ui/back-button";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -37,14 +38,7 @@ export default async function TeacherCourseLessonsPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6">
-        <Link
-          href="/teacher/courses"
-          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-        >
-          ← Danh sách khóa học
-        </Link>
-      </div>
+      <BackButton fallbackHref="/teacher/courses" label="Danh sách khóa học" className="mb-6" />
       <TeacherLessonsManager
         courseId={course.id}
         courseTitle={course.title}
