@@ -28,7 +28,9 @@ export async function GET() {
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, goal, hours_per_day, preferred_learning, full_name, role")
+    .select(
+      "id, goal, hours_per_day, preferred_learning, full_name, role, onboarding_completed, onboarding_completed_at, birth_year, school, class, mbti_type, learning_style, preferred_pace, challenge_level, reminder_method"
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -82,7 +84,9 @@ export async function PUT(request: Request) {
     .from("profiles")
     .update(patch)
     .eq("id", user.id)
-    .select("id, goal, hours_per_day, preferred_learning, full_name, role")
+    .select(
+      "id, goal, hours_per_day, preferred_learning, full_name, role, onboarding_completed, birth_year, school, class"
+    )
     .single();
 
   if (error) {

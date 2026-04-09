@@ -66,12 +66,20 @@ export default function ExploreCoursesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ courseId }),
       });
-      const j = (await res.json()) as { error?: string };
+      const j = (await res.json()) as {
+        error?: string;
+        syncWarning?: string;
+        progress_synced?: boolean;
+      };
       if (!res.ok) {
         toast.error(j.error ?? "Không đăng ký được");
         return;
       }
-      toast.success("Đăng ký thành công");
+      if (j.syncWarning) {
+        toast.success("Đăng ký thành công", { description: j.syncWarning });
+      } else {
+        toast.success("Đăng ký thành công — lộ trình đã đồng bộ.");
+      }
       setEnrolledIds((prev) => new Set(prev).add(courseId));
     } finally {
       setEnrolling(null);
@@ -87,8 +95,8 @@ export default function ExploreCoursesPage() {
         <div>
           <h1 className="text-2xl font-semibold">Khám phá khóa học</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Các khóa đã xuất bản — đăng ký để học (cần admin đồng bộ lộ trình sau
-            khi đăng ký).
+            Các khóa đã xuất bản — đăng ký để học; tiến độ bài học được đồng bộ tự
+            động.
           </p>
         </div>
         <Link

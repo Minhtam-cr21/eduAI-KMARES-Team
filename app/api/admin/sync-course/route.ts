@@ -1,4 +1,5 @@
 import { getAdminSupabase } from "@/lib/auth/assert-admin-api";
+import { syncCourseProgress } from "@/lib/user-courses/sync-course-progress";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -75,51 +76,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { error: delErr } = await supabase
-    .from("user_course_progress")
-    .delete()
-    .eq("user_id", userId)
-    .eq("course_id", courseId);
-
-  if (delErr) {
-    return NextResponse.json({ error: delErr.message }, { status: 500 });
-  }
-
-  const { data: lessons, error: lErr } = await supabase
-    .from("course_lessons")
-    .select("id")
-    .eq("course_id", courseId)
-    .eq("status", "published")
-    .order("order_index", { ascending: true });
-
-  if (lErr) {
-    return NextResponse.json({ error: lErr.message }, { status: 500 });
-  }
-
-  const lessonList = lessons ?? [];
-  if (lessonList.length === 0) {
-    return NextResponse.json({
-      created: 0,
-      message: "Khóa không có bài học đã xuất bản.",
-      user_course_id: userCourseId,
-    });
-  }
-
-  const inserts = lessonList.map((l) => ({
-    user_id: userId,
-    course_id: courseId,
-    lesson_id: l.id as string,
-    status: "pending" as const,
-  }));
-
-  const { error: insErr } = await supabase.from("user_course_progress").insert(inserts);
-
-  if (insErr) {
-    return NextResponse.json({ error: insErr.message }, { status: 500 });
+  const result = await syncCourseProgress(supabase, userId, courseId);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
   return NextResponse.json({
-    created: inserts.length,
+    created: result.created,
     user_course_id: userCourseId,
+    message:
+      result.created === 0
+        ? "Khóa không có bài học đã xuất bản."
+        : undefined,
   });
 }

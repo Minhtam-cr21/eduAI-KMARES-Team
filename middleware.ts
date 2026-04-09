@@ -147,6 +147,36 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  const skipOnboardingRedirect =
+    !session ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname.startsWith("/auth") ||
+    pathname === "/onboarding" ||
+    pathname.startsWith("/onboarding/");
+
+  if (!skipOnboardingRedirect) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, onboarding_completed")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (profile?.role === "student" && profile.onboarding_completed !== true) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      url.search = "";
+      const redirectResponse = NextResponse.redirect(url);
+      response.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value);
+      });
+      return redirectResponse;
+    }
+  }
+
   return response;
 }
 

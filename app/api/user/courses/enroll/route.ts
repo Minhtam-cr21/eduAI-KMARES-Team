@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { ensureEnrollmentAndSyncProgress } from "@/lib/user-courses/enroll-and-sync";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -92,5 +93,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
-  return NextResponse.json(row, { status: 201 });
+  const sync = await ensureEnrollmentAndSyncProgress(user.id, courseId);
+  const syncWarning =
+    !sync.ok && sync.error
+      ? `Đăng ký OK nhưng chưa đồng bộ lộ trình: ${sync.error}`
+      : undefined;
+
+  return NextResponse.json(
+    { ...row, progress_synced: sync.ok, sync_created: sync.ok ? sync.created : 0, syncWarning },
+    { status: 201 }
+  );
 }
