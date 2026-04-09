@@ -1,250 +1,258 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import {
+  BookOpen,
+  BrainCircuit,
+  Bug,
+  CalendarDays,
+  Code2,
+  LayoutDashboard,
+  User,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-type HubStats = {
-  coursesCount: number | null;
-  enrolledPreview: Array<{ id: string; title: string }>;
-  requestsCount: number | null;
-  mbtiLabel: string;
-  exercisesPreview: number | null;
+type EnrolledCourse = {
+  course: {
+    id: string;
+    title: string;
+    description: string | null;
+    category: string | null;
+    course_type: string | null;
+  };
+  status: string;
 };
 
-const INITIAL_STATS: HubStats = {
-  coursesCount: null,
-  enrolledPreview: [],
-  requestsCount: null,
-  mbtiLabel: "\u2026",
-  exercisesPreview: null,
-};
+const NAV_ITEMS = [
+  { label: "Dashboard", href: "/student", icon: LayoutDashboard },
+  { label: "Debugger", href: "/debug", icon: Bug },
+  { label: "Profile", href: "/profile", icon: User },
+  { label: "MBTI Test", href: "/student/mbti", icon: BrainCircuit },
+  { label: "Kết nối GV", href: "/student/connections", icon: Users },
+  { label: "Luyện code", href: "/student/practice", icon: Code2 },
+];
 
-const ERROR_STATS: HubStats = {
-  coursesCount: null,
-  enrolledPreview: [],
-  requestsCount: null,
-  mbtiLabel: "\u2014",
-  exercisesPreview: null,
-};
+const MOCK_SCHEDULE = [
+  { day: "06", label: "T2", course: "English", progress: "10/20 chapters", time: "15:00 – 16:30" },
+  { day: "07", label: "T3", course: "Business Strategy", progress: "9/30 chapters", time: "10:00 – 11:00" },
+  { day: "08", label: "T4", course: "Python", progress: "4/15 chapters", time: "14:00 – 15:30" },
+  { day: "09", label: "T5", course: "Algorithms", progress: "7/25 chapters", time: "09:00 – 10:30" },
+  { day: "10", label: "T6", course: "SQL Practice", progress: "12/18 chapters", time: "16:00 – 17:00" },
+];
 
-export default function StudentHubPage() {
-  const [stats, setStats] = useState<HubStats>(INITIAL_STATS);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState<string | null>(null);
+function CourseCard({ c }: { c: EnrolledCourse }) {
+  const tags = [c.course.category, c.course.course_type].filter(Boolean);
+  return (
+    <div className="group rounded-xl border border-border bg-card p-5 transition hover:border-primary/30 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+            {c.course.title}
+          </h3>
+          {c.course.description && (
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+              {c.course.description}
+            </p>
+          )}
+        </div>
+        <Badge
+          variant={c.status === "active" ? "success" : "secondary"}
+          className="shrink-0"
+        >
+          {c.status === "active" ? "Active" : c.status}
+        </Badge>
+      </div>
+      {tags.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {tags.map((t) => (
+            <Badge key={t} variant="outline" className="text-xs">
+              {t}
+            </Badge>
+          ))}
+        </div>
+      )}
+      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <CalendarDays className="h-3.5 w-3.5" />
+          Đã đăng ký
+        </span>
+        <Link
+          href={`/student/courses/${c.course.id}`}
+          className="font-medium text-primary hover:underline"
+        >
+          View More →
+        </Link>
+      </div>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setStatsLoading(true);
-      setStatsError(null);
-      try {
-        const [coursesRes, enrolledRes, connRes, mbtiRes, exRes] =
-          await Promise.all([
-            fetch("/api/courses?page=1&limit=1"),
-            fetch("/api/user/courses/enrolled"),
-            fetch("/api/connection-requests/student"),
-            fetch("/api/mbti/status"),
-            fetch("/api/practice/exercises?page=1&limit=5"),
-          ]);
+function CourseSkeleton() {
+  return (
+    <div className="space-y-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="rounded-xl border border-border p-5">
+          <Skeleton className="h-5 w-3/4" />
+          <Skeleton className="mt-2 h-4 w-full" />
+          <Skeleton className="mt-3 h-3 w-1/4" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
-        const coursesJson = coursesRes.ok
-          ? ((await coursesRes.json()) as { count?: number })
-          : {};
-        const enrolledJson = enrolledRes.ok
-          ? ((await enrolledRes.json()) as {
-              courses?: Array<{ course: { id: string; title?: string } }>;
-            })
-          : { courses: [] };
-        const connJson = connRes.ok
-          ? ((await connRes.json()) as unknown[])
-          : [];
-        const mbtiJson = mbtiRes.ok
-          ? ((await mbtiRes.json()) as {
-              can_retest?: boolean;
-              last_test?: string | null;
-            })
-          : {};
-        const exJson = exRes.ok
-          ? ((await exRes.json()) as { count?: number })
-          : {};
+export default function StudentDashboardPage() {
+  const [courses, setCourses] = useState<EnrolledCourse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("all");
 
-        if (cancelled) return;
-        const preview = (enrolledJson.courses ?? [])
-          .slice(0, 3)
-          .map((x) => ({
-            id: x.course.id,
-            title: x.course.title ?? "Khóa học",
-          }));
-        setStats({
-          coursesCount:
-            typeof coursesJson.count === "number" ? coursesJson.count : null,
-          enrolledPreview: preview,
-          requestsCount: Array.isArray(connJson) ? connJson.length : null,
-          mbtiLabel: mbtiJson.last_test
-            ? mbtiJson.can_retest
-              ? "C\u00f3 th\u1ec3 l\u00e0m l\u1ea1i"
-              : "\u0110\u00e3 l\u00e0m g\u1ea7n \u0111\u00e2y"
-            : "Ch\u01b0a l\u00e0m",
-          exercisesPreview:
-            typeof exJson.count === "number" ? exJson.count : null,
-        });
-      } catch (err) {
-        if (!cancelled) {
-          setStats(ERROR_STATS);
-          setStatsError(
-            err instanceof Error ? err.message : "L\u1ed7i t\u1ea3i d\u1eef li\u1ec7u"
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setStatsLoading(false);
-        }
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/user/courses/enrolled");
+      if (!res.ok) {
+        setCourses([]);
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      const json = (await res.json()) as {
+        courses?: EnrolledCourse[];
+      };
+      setCourses(json.courses ?? []);
+    } catch {
+      setCourses([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const cards: {
-    title: string;
-    description: string;
-    href: string;
-    cta: string;
-    extraHref?: string;
-    extraLabel?: string;
-  }[] = [
-    {
-      title: "Kh\u00f3a h\u1ecdc c\u1ee7a t\u00f4i",
-      description:
-        stats.enrolledPreview.length > 0
-          ? `${stats.enrolledPreview.length} kh\u00f3a \u0111\u00e3 \u0111\u0103ng k\u00fd (xem nhanh b\u00ean d\u01b0\u1edbi)`
-          : stats.coursesCount != null
-            ? `${stats.coursesCount} kh\u00f3a \u0111ang m\u1edf tr\u00ean h\u1ec7 th\u1ed1ng`
-            : "\u0110\u0103ng k\u00fd kh\u00f3a h\u1ecdc \u0111\u1ec3 h\u1ecdc",
-      href: "/student/courses",
-      cta: "M\u1edf kh\u00f3a c\u1ee7a t\u00f4i",
-    },
-    {
-      title: "K\u1ebft n\u1ed1i gi\u00e1o vi\u00ean",
-      description:
-        stats.requestsCount != null
-          ? `${stats.requestsCount} y\u00eau c\u1ea7u \u0111\u00e3 g\u1eedi`
-          : "G\u1eedi ho\u1eb7c theo d\u00f5i y\u00eau c\u1ea7u k\u1ebft n\u1ed1i",
-      href: "/student/connections",
-      cta: "M\u1edf",
-    },
-    {
-      title: "MBTI test",
-      description: stats.mbtiLabel,
-      href: "/student/mbti",
-      cta: "L\u00e0m b\u00e0i",
-    },
-    {
-      title: "Ph\u00f2ng luy\u1ec7n code",
-      description:
-        stats.exercisesPreview != null
-          ? `${stats.exercisesPreview} b\u00e0i trong kho \u2014 random t\u1ea1i ph\u00f2ng luy\u1ec7n ho\u1eb7c ch\u1ecdn \u0111\u1ec1 c\u1ee5 th\u1ec3.`
-          : "Luy\u1ec7n t\u1eadp ng\u1eabu nhi\u00ean ho\u1eb7c ch\u1ecdn b\u00e0i theo danh s\u00e1ch.",
-      href: "/practice",
-      cta: "V\u00e0o ph\u00f2ng luy\u1ec7n",
-      extraHref: "/student/practice",
-      extraLabel: "Danh s\u00e1ch b\u00e0i",
-    },
-    {
-      title: "Profile",
-      description: "Th\u00f4ng tin c\u00e1 nh\u00e2n v\u00e0 c\u00e0i \u0111\u1eb7t",
-      href: "/profile",
-      cta: "M\u1edf profile",
-    },
-  ];
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filtered =
+    tab === "all"
+      ? courses
+      : tab === "active"
+        ? courses.filter((c) => c.status === "active")
+        : tab === "completed"
+          ? courses.filter((c) => c.status === "completed")
+          : courses;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          {`B\u1ea3ng \u0111i\u1ec1u khi\u1ec3n h\u1ecdc sinh`}
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {statsLoading
-            ? "\u0110ang t\u1ea3i s\u1ed1 li\u1ec7u\u2026"
-            : statsError
-              ? statsError
-              : "Truy c\u1eadp nhanh c\u00e1c khu v\u1ef1c h\u1ecdc t\u1eadp v\u00e0 luy\u1ec7n t\u1eadp."}
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {cards.map((c, index) => (
-          <Card key={c.title}>
-            <CardHeader>
-              <CardTitle className="text-lg">{c.title}</CardTitle>
-              <CardDescription>{c.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={c.href}
-                  className={cn(buttonVariants({ size: "sm" }))}
-                >
-                  {c.cta}
-                </Link>
-                {c.extraHref && c.extraLabel ? (
-                  <Link
-                    href={c.extraHref}
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" })
-                    )}
-                  >
-                    {c.extraLabel}
-                  </Link>
-                ) : null}
-              </div>
-              {index === 0 && stats.enrolledPreview.length > 0 ? (
-                <ul className="border-border space-y-1 border-t pt-3 text-sm">
-                  {stats.enrolledPreview.map((row) => (
-                    <li key={row.id}>
-                      <Link
-                        href={`/student/courses/${row.id}`}
-                        className="text-primary font-medium underline-offset-4 hover:underline"
-                      >
-                        {row.title}
-                      </Link>
-                    </li>
-                  ))}
-                  <li>
-                    <Link
-                      href="/student/courses"
-                      className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
-                    >
-                      Xem tất cả khóa đã đăng ký →
-                    </Link>
-                  </li>
-                </ul>
-              ) : null}
-            </CardContent>
-          </Card>
+    <main className="mx-auto max-w-7xl px-4 py-6">
+      {/* Sub-nav */}
+      <nav className="mb-8 flex flex-wrap gap-1 rounded-xl border border-border bg-muted/50 p-1.5">
+        {NAV_ITEMS.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              item.href === "/student"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
+            )}
+          >
+            <item.icon className="h-4 w-4" />
+            <span className="hidden sm:inline">{item.label}</span>
+          </Link>
         ))}
-      </div>
+      </nav>
 
-      <p className="text-muted-foreground mt-8 text-center text-sm">
-        {`L\u1ed9 tr\u00ecnh h\u1ecdc t\u1eadp chi ti\u1ebft: `}
-        <Link
-          href="/dashboard"
-          className="text-primary font-medium underline-offset-4 hover:underline"
-        >
-          {`Dashboard l\u1ed9 tr\u00ecnh`}
-        </Link>
-      </p>
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        {/* Left column: My Courses */}
+        <section>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <BookOpen className="h-6 w-6 text-primary" />
+              My Courses
+            </h1>
+            <Link
+              href="/student/courses/explore"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+            >
+              + Khám phá khóa học
+            </Link>
+          </div>
+
+          <Tabs value={tab} onValueChange={setTab} className="w-full">
+            <TabsList className="mb-4 w-full justify-start">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+              <TabsTrigger value="completed">Completed</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value={tab}>
+              {loading ? (
+                <CourseSkeleton />
+              ) : filtered.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center">
+                  <BookOpen className="mx-auto h-10 w-10 text-muted-foreground/50" />
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {courses.length === 0
+                      ? "Bạn chưa đăng ký khóa học nào."
+                      : "Không có khóa học ở trạng thái này."}
+                  </p>
+                  {courses.length === 0 && (
+                    <Link
+                      href="/student/courses/explore"
+                      className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
+                    >
+                      Khám phá khóa học →
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filtered.map((c) => (
+                    <CourseCard key={c.course.id} c={c} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </section>
+
+        {/* Right column: Schedule */}
+        <aside>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              Schedule
+            </h2>
+            <button
+              type="button"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              See All
+            </button>
+          </div>
+          <div className="space-y-3">
+            {MOCK_SCHEDULE.map((s) => (
+              <div
+                key={s.day}
+                className="flex items-start gap-4 rounded-xl border border-border bg-card p-4 transition hover:shadow-sm"
+              >
+                <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <span className="text-lg font-bold leading-none">{s.day}</span>
+                  <span className="text-[10px] font-medium">{s.label}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground">{s.course}</p>
+                  <p className="text-xs text-muted-foreground">{s.progress}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{s.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+      </div>
     </main>
   );
 }
