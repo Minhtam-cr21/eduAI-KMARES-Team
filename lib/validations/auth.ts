@@ -6,6 +6,7 @@ export const loginSchema = z.object({
     .string()
     .min(1, "Nhập mật khẩu")
     .min(6, "Mật khẩu tối thiểu 6 ký tự"),
+  selectedRole: z.enum(["student", "teacher"]),
 });
 
 export const signupSchema = z.object({

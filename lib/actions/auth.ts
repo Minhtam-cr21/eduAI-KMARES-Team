@@ -59,14 +59,22 @@ async function ensureProfileExists(
   }
 }
 
-async function resolveRedirect(userId: string): Promise<string> {
+type ProfileRow = {
+  role: string;
+  onboarding_completed: boolean | null;
+} | null;
+
+async function getProfile(userId: string): Promise<ProfileRow> {
   const supabase = createClient();
-  const { data: profile } = await supabase
+  const { data } = await supabase
     .from("profiles")
     .select("role, onboarding_completed")
     .eq("id", userId)
     .maybeSingle();
+  return data;
+}
 
+function resolveRedirectFromProfile(profile: ProfileRow): string {
   if (!profile) return "/student";
   if (profile.role === "admin") return "/admin";
   if (profile.role === "teacher") return "/teacher";
@@ -85,6 +93,8 @@ export async function loginAction(
     return { error: msg };
   }
 
+  const selectedRole = parsed.data.selectedRole ?? "student";
+
   const supabase = createClient();
   const { error, data } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
@@ -99,7 +109,27 @@ export async function loginAction(
   const userId = data.user?.id;
   if (userId) {
     await ensureProfileExists(userId, data.user?.user_metadata?.full_name ?? null);
-    const dest = await resolveRedirect(userId);
+
+    const profile = await getProfile(userId);
+
+    if (profile && profile.role !== "admin") {
+      if (selectedRole === "teacher" && profile.role !== "teacher") {
+        await supabase.auth.signOut();
+        return {
+          error:
+            "Tài khoản này không phải là giáo viên. Vui lòng chọn đúng cổng đăng nhập hoặc liên hệ admin.",
+        };
+      }
+      if (selectedRole === "student" && profile.role === "teacher") {
+        await supabase.auth.signOut();
+        return {
+          error:
+            "Tài khoản này là giáo viên. Vui lòng chọn cổng \"Giáo viên\" để đăng nhập.",
+        };
+      }
+    }
+
+    const dest = resolveRedirectFromProfile(profile);
     redirect(dest);
   }
 
