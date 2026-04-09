@@ -46,3 +46,40 @@ export interface CourseWithTeacher extends Course {
   teacher?: CourseTeacherPreview | null;
   profiles?: CourseTeacherPreview | null;
 }
+
+/** `connection_requests` (migration 20250409000000). */
+export type ConnectionRequestStatus = "pending" | "accepted" | "rejected";
+
+export interface ConnectionRequest {
+  id: string;
+  student_id: string;
+  teacher_id: string;
+  goal: string;
+  available_time: string | null;
+  status: ConnectionRequestStatus;
+  teacher_response: string | null;
+  created_at: string;
+  responded_at: string | null;
+}
+
+/** `reports`. */
+export type ReportType = "bug" | "content" | "other";
+export type ReportStatus = "pending" | "resolved" | "rejected";
+
+export interface Report {
+  id: string;
+  user_id: string;
+  type: ReportType | null;
+  description: string;
+  status: ReportStatus;
+  admin_note: string | null;
+  created_at: string;
+}
+
+/** `mbti_results`. */
+export interface MbtiResult {
+  id: string;
+  user_id: string;
+  mbti_type: string;
+  test_date: string;
+}
