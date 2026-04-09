@@ -64,6 +64,7 @@ export default function StudentConnectionsPage() {
         return;
       }
       toast.success("Đã gửi yêu cầu.");
+      setTeacherId("");
       setGoal("");
       setAvailable("");
       await load();
