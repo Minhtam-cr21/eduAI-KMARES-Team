@@ -114,7 +114,7 @@ export async function executeCode(params: {
   stdin: string;
 }): Promise<{ output: string; error: string; exit_code: number }> {
   const { code, language, stdin } = params;
-  const rawKey = process.env["x-rapidapi-key"];
+  const rawKey = process.env["x_rapidapi_key"];
   const apiKey = typeof rawKey === "string" ? rawKey.trim() : "";
   const languageId = mapLanguageToJudge0Id(language);
 

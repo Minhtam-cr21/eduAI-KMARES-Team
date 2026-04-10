@@ -56,7 +56,7 @@ RLS:
 
 ### Debugger & API bảo mật (bắt buộc)
 - **Không** gọi API bên thứ ba (Judge0, OpenAI, …) từ component client hoặc `fetch` trình duyệt trực tiếp tới provider.
-- **Mọi** gọi chạy code / LLM chỉ trong **Route Handlers** (`app/api/...`) hoặc server actions: biến môi trường `x-rapidapi-key` (RapidAPI → Judge0 CE) cho `/api/run-code`, đọc qua `process.env['x-rapidapi-key']`; `OPENAI_API_KEY` cho `/api/ai-suggest`; **không** `NEXT_PUBLIC_*` cho secret.
+- **Mọi** gọi chạy code / LLM chỉ trong **Route Handlers** (`app/api/...`) hoặc server actions: biến môi trường `x_rapidapi_key` (RapidAPI → Judge0 CE) cho `/api/run-code`, đọc qua `process.env['x_rapidapi_key']`; `OPENAI_API_KEY` cho `/api/ai-suggest`; **không** `NEXT_PUBLIC_*` cho secret.
 - Client chỉ `fetch('/api/run-code', …)` và `fetch('/api/ai-suggest', …)` với `{ code, language, stdin?, error? }` — **không** gửi API key.
 - Debugger UI: Monaco (`@monaco-editor/react`) + output; chạy code qua **Judge0 CE** (`judge0-ce.p.rapidapi.com`, `wait=true`); gợi ý lỗi qua **OpenAI Chat Completions** (`gpt-3.5-turbo-0125`) trên server qua `fetch` (không đưa code hoàn chỉnh trong prompt — đã nêu trong prompt hệ thống).
 
@@ -69,3 +69,21 @@ RLS:
 - Không hardcode Supabase URL/key. Dùng biến môi trường.
 - Khi thêm bảng mới, luôn tạo RLS policy.
 - Commit sau mỗi chức năng hoàn chỉnh.
+
+## Quy tắc bổ sung cho Onboarding & Course Enrollment (Bước 7b)
+
+- **Bảng mới được phép tạo:** `onboarding_answers`, `user_courses`, `user_course_progress` (nếu chưa có). Không sửa bảng `profiles` hiện có ngoài việc thêm cột mới (nullable, có default).
+- **API cũ không được động đến:** `/api/user/learning-paths` (vẫn dùng cho dữ liệu cũ). Hệ thống mới dùng `user_courses` và `user_course_progress` hoàn toàn độc lập.
+- **Middleware chuyển hướng:** Khi thêm logic redirect `/onboarding` cho user chưa hoàn thành, phải kiểm tra `onboarding_completed` trong `profiles`, không được dùng bảng khác. Ưu tiên dùng `createClient` trong middleware.
+- **Edge Function:** Phải đặt trong thư mục `supabase/functions/analyze-onboarding`. Không được xóa hoặc sửa các Edge Function khác nếu có.
+- **Gọi API nội bộ:** Khi gọi `/api/admin/sync-course` từ Edge Function hoặc từ server action, dùng `fetch` với `Authorization: Bearer <service_role_key>` hoặc dùng `createClient` với service role để tránh vòng lặp RLS.
+- **Seed dữ liệu:** Script seed chỉ chạy trong môi trường development, không ảnh hưởng production. Dữ liệu mẫu cho các khóa học C++, Java, SQL, Prompt, Frontend, Backend, Fullstack phải có `status = 'published'` để hiển thị.
+- **Không xóa bất kỳ API, component, hoặc trang nào hiện có.** Chỉ thêm mới hoặc mở rộng an toàn.
+
+## Quy tắc nâng cấp UI/UX cho My Courses và Course Detail
+
+- **Được phép tạo API mới**: `GET /api/courses/[id]` (lấy chi tiết một khóa học) vì API này chưa tồn tại và cần thiết cho trang chi tiết khóa học. Không ảnh hưởng đến API cũ.
+- **Không sửa các API đã có**: `/api/courses`, `/api/courses/teacher`, `/api/courses/[id]/lessons`, `/api/user/courses/enrolled`, `/api/user/courses/[courseId]/progress`.
+- **Khi thêm component mới** (accordion, progress bar), sử dụng shadcn/ui có sẵn (Collapsible, Accordion, Progress). Không cài đặt thêm thư viện nếu chưa có.
+- **Giữ nguyên cấu trúc responsive**: trên mobile, các cột xếp chồng, sidebar ẩn/hiện nếu cần.
+- **Tất cả dữ liệu hiển thị phải đến từ API thật, không mock** (trừ Schedule tạm thời). Đối với số bài học, gọi API `/api/courses/[courseId]/lessons` chỉ lấy count (có thể dùng `head: true`).

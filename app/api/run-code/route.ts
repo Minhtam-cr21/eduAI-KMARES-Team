@@ -9,8 +9,8 @@ import { z } from "zod";
 export const runtime = "nodejs";
 
 console.log(
-  "x-rapidapi-key from env:",
-  process.env["x-rapidapi-key"] ? "exists" : "missing"
+  "x_rapidapi_key from env:",
+  process.env["x_rapidapi_key"] ? "exists" : "missing"
 );
 
 const bodySchema = z.object({
@@ -120,7 +120,7 @@ async function runWithPiston(
 }
 
 export async function POST(request: Request) {
-  const rawKey = process.env["x-rapidapi-key"];
+  const rawKey = process.env["x_rapidapi_key"];
   const apiKey = typeof rawKey === "string" ? rawKey.trim() : "";
 
   const supabase = createClient();
@@ -230,7 +230,7 @@ export async function POST(request: Request) {
     }
   } else {
     console.warn(
-      "[run-code] x-rapidapi-key missing, skipping Judge0 → Piston"
+      "[run-code] x_rapidapi_key missing, skipping Judge0 → Piston"
     );
   }
 
