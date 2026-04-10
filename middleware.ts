@@ -40,6 +40,7 @@ function needsTeacherOrAdminRole(pathname: string): boolean {
   );
 }
 
+/** Redirect luôn dựa trên request.nextUrl (cùng host với request), không hardcode localhost. */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {

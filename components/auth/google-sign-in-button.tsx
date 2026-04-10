@@ -9,7 +9,9 @@ type Props = {
 export function GoogleSignInButton({ label = "Đăng nhập bằng Google" }: Props) {
   async function handleClick() {
     const supabase = createSupabaseBrowserClient();
-    const origin = window.location.origin;
+    const origin =
+      process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ||
+      window.location.origin;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

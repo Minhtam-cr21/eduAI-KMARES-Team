@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getSiteOrigin } from "@/lib/site-origin";
 import { loginSchema, signupSchema } from "@/lib/validations/auth";
 import { redirect } from "next/navigation";
 
@@ -152,6 +153,7 @@ export async function signupAction(
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
+      emailRedirectTo: `${getSiteOrigin()}/auth/callback`,
       data: {
         full_name: parsed.data.full_name?.trim() || null,
       },

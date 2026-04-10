@@ -1,14 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSiteOrigin } from "@/lib/site-origin";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const next = url.searchParams.get("next");
+  const origin = getSiteOrigin();
 
   if (!code) {
     return NextResponse.redirect(
-      new URL("/login?error=oauth_missing_code", url.origin)
+      new URL("/login?error=oauth_missing_code", origin)
     );
   }
 
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(
       new URL(
         `/login?error=${encodeURIComponent(error.message)}`,
-        url.origin
+        origin
       )
     );
   }
@@ -51,26 +53,26 @@ export async function GET(request: Request) {
       }
 
       if (next) {
-        return NextResponse.redirect(new URL(next, url.origin));
+        return NextResponse.redirect(new URL(next, origin));
       }
-      return NextResponse.redirect(new URL("/onboarding", url.origin));
+      return NextResponse.redirect(new URL("/onboarding", origin));
     }
 
     if (next) {
-      return NextResponse.redirect(new URL(next, url.origin));
+      return NextResponse.redirect(new URL(next, origin));
     }
 
     if (profile.role === "admin") {
-      return NextResponse.redirect(new URL("/admin", url.origin));
+      return NextResponse.redirect(new URL("/admin", origin));
     }
     if (profile.role === "teacher") {
-      return NextResponse.redirect(new URL("/teacher", url.origin));
+      return NextResponse.redirect(new URL("/teacher", origin));
     }
     if (profile.onboarding_completed === true) {
-      return NextResponse.redirect(new URL("/student", url.origin));
+      return NextResponse.redirect(new URL("/student", origin));
     }
-    return NextResponse.redirect(new URL("/onboarding", url.origin));
+    return NextResponse.redirect(new URL("/onboarding", origin));
   }
 
-  return NextResponse.redirect(new URL(next ?? "/student", url.origin));
+  return NextResponse.redirect(new URL(next ?? "/student", origin));
 }
