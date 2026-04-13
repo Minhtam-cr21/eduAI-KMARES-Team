@@ -40,6 +40,7 @@ export default function StudentCourseLessonPage() {
         if (!cancelled && j.lesson) {
           setTitle(j.lesson.title);
           setContent(j.lesson.content ?? "");
+          void fetch("/api/user/activity", { method: "POST" }).catch(() => {});
         }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Lỗi mạng");

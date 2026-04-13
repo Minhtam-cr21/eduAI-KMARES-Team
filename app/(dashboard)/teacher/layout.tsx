@@ -50,6 +50,12 @@ export default async function TeacherDashboardLayout({
                 Học sinh
               </Link>
               <Link
+                href="/teacher/personalized-paths"
+                className="text-muted-foreground hover:text-foreground rounded-md px-2 py-1 text-sm font-medium transition-colors"
+              >
+                Lộ trình CH
+              </Link>
+              <Link
                 href="/dashboard"
                 className="text-muted-foreground hover:text-foreground rounded-md px-2 py-1 text-sm font-medium transition-colors"
               >
