@@ -46,8 +46,9 @@ jobs:
           esac
           REF="$(printf '%s' "$REF" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           test -n "$REF" && test -n "$ANON" || { echo "Thiếu secrets SUPABASE_PROJECT_REF hoặc SUPABASE_ANON_KEY"; exit 1; }
-          if printf '%s' "$REF" | grep -qE '[/:<>\ ]'; then
-            echo "::error::SUPABASE_PROJECT_REF vẫn không hợp lệ sau khi chuẩn hoá. Chỉ dán **Project ID** (chuỗi ~20 ký tự), không dán URL."
+          # Chỉ chấp nhận Reference ID kiểu Supabase (chữ thường, số, gạch ngang; không / URL)
+          if ! printf '%s' "$REF" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'; then
+            echo "::error::SUPABASE_PROJECT_REF không hợp lệ. Dán đúng Reference ID trong Dashboard (General), không dán URL."
             exit 1
           fi
           URL="https://${REF}.supabase.co/functions/v1/handle-missed-deadlines"
