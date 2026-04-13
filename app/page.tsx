@@ -5,8 +5,8 @@ import Link from "next/link";
 const features = [
   {
     icon: Brain,
-    title: "30 câu đánh giá + MBTI",
-    desc: "Hệ thống phân tích phong cách học, mục tiêu và tính cách để gợi ý lộ trình chính xác nhất.",
+    title: "Trắc nghiệm định hướng (50 câu)",
+    desc: "20 câu MBTI + 30 câu mở rộng: phân tích phong cách, mục tiêu và gợi ý nghề nghiệp, khóa học.",
   },
   {
     icon: BookOpen,
@@ -79,8 +79,8 @@ export default function HomePage() {
               Lộ trình có độ chính xác cao
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-              30 câu hỏi đánh giá + MBTI — phân tích chính xác phong cách học,
-              gợi ý khóa học phù hợp mục tiêu và thời gian của bạn.
+              50 câu trắc nghiệm định hướng (MBTI + mở rộng) — phân tích phong
+              cách học, gợi ý khóa học phù hợp mục tiêu và thời gian của bạn.
             </p>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

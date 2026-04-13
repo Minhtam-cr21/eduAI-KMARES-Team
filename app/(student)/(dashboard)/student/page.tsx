@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
-  BrainCircuit,
   CalendarDays,
   ClipboardList,
   Code2,
@@ -33,7 +32,6 @@ const NAV_ITEMS = [
   { label: "Luyện code", href: "/student/practice", icon: Code2 },
   { label: "Trắc nghiệm", href: "/assessment", icon: ClipboardList },
   { label: "Profile", href: "/profile", icon: User },
-  { label: "MBTI Test", href: "/student/mbti", icon: BrainCircuit },
   { label: "Kết nối GV", href: "/student/connections", icon: Users },
 ];
 
