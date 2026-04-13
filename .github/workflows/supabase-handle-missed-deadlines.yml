@@ -4,6 +4,10 @@
 #   SUPABASE_PROJECT_REF, SUPABASE_ANON_KEY  — bắt buộc để gọi function
 #   SUPABASE_ACCESS_TOKEN — chỉ cần khi bật "Deploy function trước" (lần đầu / sau 404)
 #
+# ANON_KEY phải là JWT anon public (thường bắt đầu eyJ...), copy tại Settings → API.
+# Không dùng: service_role, Access Token (sbp_...), key dạng sb_publishable_... nếu gây 401.
+# Không thêm tiền tố "Bearer " trong secret — workflow tự thêm.
+#
 # Lỗi 404 = function chưa deploy. Cách 1: máy local chạy npm run supabase:deploy:deadlines
 # Cách 2: Run workflow, bật "Deploy function trước", thêm SUPABASE_ACCESS_TOKEN.
 
@@ -77,6 +81,18 @@ jobs:
           esac
           REF="$(printf '%s' "$REF" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           test -n "$REF" && test -n "$ANON" || { echo "Thiếu secrets SUPABASE_PROJECT_REF hoặc SUPABASE_ANON_KEY"; exit 1; }
+          # Chuẩn hoá JWT anon (tránh 401 Invalid Token / Protected Header)
+          while printf '%s' "$ANON" | grep -qi '^[Bb]earer[[:space:]]'; do
+            ANON="$(printf '%s' "$ANON" | sed 's/^[Bb]earer[[:space:]]\{1,\}//')"
+          done
+          ANON="$(printf '%s' "$ANON" | tr -d '[:space:]')"
+          if printf '%s' "$ANON" | grep -qE '^sbp_'; then
+            echo "::error::SUPABASE_ANON_KEY đang giống Access Token (sbp_...). Cần JWT **anon public** (eyJ...) tại Project Settings → API."
+            exit 1
+          fi
+          if ! printf '%s' "$ANON" | grep -qE '^eyJ[^.]+\.[^.]+\.[^.]+$'; then
+            echo "::warning::ANON_KEY không giống JWT 3 phần (eyJ...). Nếu 401, copy lại **anon public** tại Settings → API."
+          fi
           if ! printf '%s' "$REF" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'; then
             echo "::error::SUPABASE_PROJECT_REF không hợp lệ."
             exit 1
@@ -85,6 +101,7 @@ jobs:
           echo "POST $URL"
           http_code=$(curl -sS -o /tmp/curl_body -w "%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer ${ANON}" \
+            -H "apikey: ${ANON}" \
             -H "Content-Type: application/json" \
             -d '{}')
           echo "HTTP $http_code"
@@ -95,6 +112,8 @@ jobs:
           fi
           if [ "$http_code" = "404" ]; then
             echo "::error::404 — Function chưa deploy lên Supabase. Cách A: máy local chạy npm run supabase:deploy:deadlines (file .env.supabase.deploy). Cách B: Actions → Run workflow → bật \"Deploy function trước\" + thêm secret SUPABASE_ACCESS_TOKEN rồi chạy lại."
+          elif [ "$http_code" = "401" ]; then
+            echo "::error::401 — Sửa secret SUPABASE_ANON_KEY: chỉ JWT anon public (eyJ...), Project Settings → API. Xóa secret cũ, tạo lại, dán một dòng không \"Bearer \", không sbp_."
           else
             echo "::error::Gọi function thất bại (HTTP $http_code)."
           fi
