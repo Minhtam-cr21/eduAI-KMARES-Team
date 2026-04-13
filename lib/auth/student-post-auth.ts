@@ -1,13 +1,10 @@
 /**
  * Đích điều hướng học sinh sau đăng nhập / OAuth / đăng ký.
- * Ưu tiên `assessment_completed`; giữ `onboarding_completed` (legacy DB) để user cũ vẫn vào /student.
+ * Luôn về dashboard; chưa làm trắc nghiệm thì các module lộ trình / định hướng sẽ gợi ý qua dialog (Bước 3).
  */
-export function studentPostAuthPath(profile: {
+export function studentPostAuthPath(_profile: {
   assessment_completed?: boolean | null;
   onboarding_completed?: boolean | null;
-} | null): "/student" | "/assessment" {
-  if (!profile) return "/assessment";
-  if (profile.assessment_completed === true) return "/student";
-  if (profile.onboarding_completed === true) return "/student";
-  return "/assessment";
+} | null): "/student" {
+  return "/student";
 }

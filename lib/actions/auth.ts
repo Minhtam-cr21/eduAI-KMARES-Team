@@ -78,7 +78,7 @@ async function getProfile(userId: string): Promise<ProfileRow> {
 }
 
 function resolveRedirectFromProfile(profile: ProfileRow): string {
-  if (!profile) return "/assessment";
+  if (!profile) return "/student";
   if (profile.role === "admin") return "/admin";
   if (profile.role === "teacher") return "/teacher";
   return studentPostAuthPath(profile);
@@ -205,7 +205,8 @@ export async function signupAction(
     const userId = data.session.user.id;
     const fullName = parsed.data.full_name?.trim() || null;
     await ensureProfileExists(userId, fullName);
-    redirect("/assessment");
+    const profile = await getProfile(userId);
+    redirect(resolveRedirectFromProfile(profile));
   }
 
   return { error: "Không tạo được phiên đăng nhập. Vui lòng thử lại." };

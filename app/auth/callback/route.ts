@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       new URL(`/login?error=${encodeURIComponent(msg)}`, origin)
     );
 
-  let redirectTarget = new URL(next?.startsWith("/") ? next : "/assessment", origin);
+  let redirectTarget = new URL(next?.startsWith("/") ? next : "/student", origin);
 
   let response = NextResponse.redirect(redirectTarget);
 
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         console.error("[auth/callback] profiles insert:", insErr.message);
       }
 
-      redirectTarget = new URL("/assessment", origin);
+      redirectTarget = new URL("/student", origin);
     } else if (next?.startsWith("/")) {
       redirectTarget = new URL(next, origin);
     } else if (profile.role === "admin") {
