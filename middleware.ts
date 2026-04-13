@@ -9,6 +9,8 @@ const PROTECTED_PREFIXES = [
   "/learn",
   "/profile",
   "/assessment",
+  "/personalized-roadmap",
+  "/career",
   "/onboarding",
   "/student",
   "/practice",

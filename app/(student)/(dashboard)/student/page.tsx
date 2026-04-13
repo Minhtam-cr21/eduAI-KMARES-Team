@@ -1,5 +1,6 @@
 "use client";
 
+import { StudentDashboardModules } from "@/components/student/student-dashboard-modules";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -161,6 +162,8 @@ export default function StudentDashboardPage() {
           </Link>
         ))}
       </nav>
+
+      <StudentDashboardModules />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* Left column: My Courses */}

@@ -49,6 +49,9 @@ export default function ExploreCoursesPage() {
   const [enrolling, setEnrolling] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [highlightCourseId, setHighlightCourseId] = useState<string | null>(
+    null
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,6 +87,12 @@ export default function ExploreCoursesPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = new URLSearchParams(window.location.search).get("courseId");
+    setHighlightCourseId(id);
+  }, []);
 
   async function enroll(courseId: string) {
     setEnrolling(courseId);
@@ -136,6 +145,16 @@ export default function ExploreCoursesPage() {
     }
     return list;
   }, [catalog, enrolledIds, search, activeCategory]);
+
+  useEffect(() => {
+    if (!highlightCourseId || loading) return;
+    const t = window.setTimeout(() => {
+      document
+        .getElementById(`course-card-${highlightCourseId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [highlightCourseId, loading, visible]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -230,8 +249,13 @@ export default function ExploreCoursesPage() {
               "bg-muted text-muted-foreground";
             return (
               <Card
+                id={`course-card-${c.id}`}
                 key={c.id}
-                className="flex flex-col transition hover:shadow-md"
+                className={cn(
+                  "flex flex-col transition hover:shadow-md",
+                  highlightCourseId === c.id &&
+                    "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                )}
               >
                 <div
                   className={cn(
