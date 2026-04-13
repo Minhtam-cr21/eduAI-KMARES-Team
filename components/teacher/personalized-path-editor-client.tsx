@@ -146,7 +146,7 @@ export function PersonalizedPathEditorClient({
             recommended_due_date_offset_days: number;
           }>;
           reasoning: string;
-        };
+        } | null;
         courses?: CourseOpt[];
         error?: string;
       };
@@ -155,7 +155,33 @@ export function PersonalizedPathEditorClient({
         return;
       }
       setCourses(j.courses ?? []);
-      setReasoning(j.suggested?.reasoning ?? null);
+
+      let suggested = j.suggested;
+      if (!j.path) {
+        const sugRes = await fetch(
+          `/api/personalized-path/suggest?studentId=${encodeURIComponent(studentId)}`
+        );
+        const sugJson = (await sugRes.json()) as {
+          courseSequence?: Array<{
+            course_id: string;
+            order_index: number;
+            recommended_due_date_offset_days: number;
+          }>;
+          reasoning?: string;
+          error?: string;
+        };
+        if (!sugRes.ok) {
+          toast.error(sugJson.error ?? "Không lấy được gợi ý AI");
+          suggested = null;
+        } else {
+          suggested = {
+            courseSequence: sugJson.courseSequence ?? [],
+            reasoning: sugJson.reasoning ?? "",
+          };
+        }
+      }
+
+      setReasoning(suggested?.reasoning ?? null);
 
       if (j.path) {
         setPathId(j.path.id);
@@ -179,12 +205,12 @@ export function PersonalizedPathEditorClient({
         } else {
           setRows([]);
         }
-      } else if (j.suggested?.courseSequence) {
+      } else if (suggested?.courseSequence?.length) {
         setPathId(null);
         setPathStatus(null);
         setStudentFeedback(null);
         setRows(
-          j.suggested.courseSequence.map((r, i) => ({
+          suggested.courseSequence.map((r, i) => ({
             course_id: r.course_id,
             order_index: i,
             due_date_offset_days:

@@ -5,6 +5,7 @@ import { computeMBTI, computeTraits, type TraitScores } from "./analyzer";
 
 export type CourseSequenceItem = {
   course_id: string;
+  title: string;
   order_index: number;
   recommended_due_date_offset_days: number;
 };
@@ -16,7 +17,7 @@ const openAiResponseSchema = z.object({
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
-type PublishedCourse = { id: string; category: string };
+type PublishedCourse = { id: string; category: string; title?: string };
 
 function normalizeGoalFromA1(answers: Record<string, string>): string {
   return (answers.A1 ?? "").trim().toLowerCase() || "other";
@@ -79,6 +80,7 @@ function ruleBasedCourseOrder(
 
 function buildSequenceFromIds(
   orderedIds: string[],
+  titleById: Map<string, string>,
   daysPerCourse = 7
 ): CourseSequenceItem[] {
   let cumulative = 0;
@@ -86,6 +88,7 @@ function buildSequenceFromIds(
     cumulative += daysPerCourse;
     return {
       course_id,
+      title: titleById.get(course_id) ?? "",
       order_index: i,
       recommended_due_date_offset_days: cumulative,
     };
@@ -261,7 +264,11 @@ export async function generatePathFromAssessment(
   }
 
   const validIds = orderedIds.filter((id) => courses.some((c) => c.id === id));
-  const courseSequence = buildSequenceFromIds(validIds);
+  const titleById = new Map<string, string>();
+  for (const c of courses) {
+    titleById.set(c.id, (c as { title?: string }).title?.trim() || c.category || c.id);
+  }
+  const courseSequence = buildSequenceFromIds(validIds, titleById);
 
   return { courseSequence, reasoning };
 }

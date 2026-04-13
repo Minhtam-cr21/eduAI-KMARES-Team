@@ -38,7 +38,9 @@ function needsTeacherOrAdminRole(pathname: string): boolean {
     pathname === "/teacher" ||
     pathname.startsWith("/teacher/") ||
     pathname === "/api/teacher" ||
-    pathname.startsWith("/api/teacher/")
+    pathname.startsWith("/api/teacher/") ||
+    pathname === "/api/notifications" ||
+    pathname.startsWith("/api/notifications/")
   );
 }
 

@@ -21,8 +21,9 @@ export default function TeacherPersonalizedPathStudentPage() {
         <CardHeader>
           <CardTitle>Chỉnh sửa lộ trình</CardTitle>
           <CardDescription>
-            Kéo thả để đổi thứ tự khóa, chỉnh ngày tích luỹ, rồi lưu hoặc gửi
-            cho học sinh.
+            Khi mở trang, hệ thống gọi gợi ý AI (API suggest) nếu chưa có lộ
+            trình. Bạn có thể kéo thả đổi thứ tự, chỉnh hạn ngày, rồi lưu hoặc
+            gửi cho học sinh.
           </CardDescription>
         </CardHeader>
         <CardContent>

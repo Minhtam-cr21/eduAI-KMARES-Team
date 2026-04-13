@@ -3,6 +3,7 @@ import {
   ASSESSMENT_QUESTION_CODES,
   ASSESSMENT_QUESTIONS,
 } from "@/lib/assessment/questions";
+import { notifyAssessmentCompletedForStudent } from "@/lib/notifications/assessment-complete";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -176,6 +177,22 @@ export async function POST(request: Request) {
     await supabase.from("career_orientations").delete().eq("user_id", user.id);
     return NextResponse.json({ error: profErr.message }, { status: 500 });
   }
+
+  const { data: nameRow } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+  const fn = (nameRow?.full_name as string | null)?.trim();
+  const studentDisplayName =
+    fn ||
+    (user.email ? user.email.split("@")[0]?.trim() : null) ||
+    "Học sinh";
+
+  void notifyAssessmentCompletedForStudent({
+    studentId: user.id,
+    studentDisplayName,
+  });
 
   return NextResponse.json(analysis);
 }

@@ -1,4 +1,3 @@
-import { generatePathFromAssessment } from "@/lib/assessment/path-generator";
 import { getTeacherOrAdminSupabase } from "@/lib/auth/assert-teacher-api";
 import { NextResponse } from "next/server";
 
@@ -46,20 +45,11 @@ export async function GET(_request: Request, { params }: Ctx) {
     .order("title", { ascending: true });
 
   if (!path) {
-    try {
-      const { courseSequence, reasoning } = await generatePathFromAssessment(
-        studentId,
-        supabase
-      );
-      return NextResponse.json({
-        path: null,
-        suggested: { courseSequence, reasoning },
-        courses: courses ?? [],
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Không tạo được gợi ý";
-      return NextResponse.json({ error: msg }, { status: 500 });
-    }
+    return NextResponse.json({
+      path: null,
+      suggested: null,
+      courses: courses ?? [],
+    });
   }
 
   return NextResponse.json({
