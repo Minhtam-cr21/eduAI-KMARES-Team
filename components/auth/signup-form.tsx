@@ -1,12 +1,30 @@
 "use client";
 
-import { signupAction } from "@/lib/actions/auth";
+import { finalizePasswordSignupAction } from "@/lib/actions/auth";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { signupSchema, type SignupInput } from "@/lib/validations/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { GoogleSignInButton } from "./google-sign-in-button";
+
+function translateSignupError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("user already registered") || lower.includes("already been registered")) {
+    return "Email này đã được đăng ký. Hãy đăng nhập hoặc dùng email khác.";
+  }
+  if (lower.includes("signup is disabled") || lower.includes("signups not allowed")) {
+    return "Chức năng đăng ký đang tắt. Liên hệ admin.";
+  }
+  if (lower.includes("rate limit") || lower.includes("too many requests")) {
+    return "Quá nhiều lần thử. Vui lòng đợi vài phút rồi thử lại.";
+  }
+  if (lower.includes("password") && lower.includes("weak")) {
+    return "Mật khẩu quá yếu. Hãy dùng ít nhất 6 ký tự, kết hợp chữ và số.";
+  }
+  return raw;
+}
 
 export function SignupForm() {
   const [serverError, setServerError] = useState<string | null>(null);
@@ -22,14 +40,40 @@ export function SignupForm() {
     setServerError(null);
     setInfo(null);
     startTransition(async () => {
-      const result = await signupAction(data);
-      if (result?.error) {
-        setServerError(result.error);
+      const supabase = createSupabaseBrowserClient();
+      const origin =
+        process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ||
+        (typeof window !== "undefined" ? window.location.origin : "");
+
+      const { data: signData, error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          emailRedirectTo: `${origin}/auth/callback`,
+          data: {
+            full_name: data.full_name?.trim() || null,
+          },
+        },
+      });
+
+      if (error) {
+        setServerError(translateSignupError(error.message));
         return;
       }
-      if (result?.needsEmailConfirmation && result.success) {
-        setInfo(result.success);
+
+      if (signData.user && !signData.session) {
+        setInfo(
+          "Đăng ký thành công! Kiểm tra email để xác nhận, sau đó đăng nhập."
+        );
+        return;
       }
+
+      if (signData.session?.user) {
+        await finalizePasswordSignupAction(data.full_name?.trim() || null);
+        return;
+      }
+
+      setServerError("Không tạo được phiên đăng nhập. Vui lòng thử lại.");
     });
   }
 

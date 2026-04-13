@@ -1,5 +1,6 @@
 "use server";
 
+import { studentPostAuthPath } from "@/lib/auth/student-post-auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { loginSchema, signupSchema } from "@/lib/validations/auth";
@@ -62,6 +63,7 @@ async function ensureProfileExists(
 
 type ProfileRow = {
   role: string;
+  assessment_completed: boolean | null;
   onboarding_completed: boolean | null;
 } | null;
 
@@ -69,18 +71,17 @@ async function getProfile(userId: string): Promise<ProfileRow> {
   const supabase = createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("role, onboarding_completed")
+    .select("role, assessment_completed, onboarding_completed")
     .eq("id", userId)
     .maybeSingle();
   return data;
 }
 
 function resolveRedirectFromProfile(profile: ProfileRow): string {
-  if (!profile) return "/student";
+  if (!profile) return "/assessment";
   if (profile.role === "admin") return "/admin";
   if (profile.role === "teacher") return "/teacher";
-  if (profile.onboarding_completed === true) return "/student";
-  return "/onboarding";
+  return studentPostAuthPath(profile);
 }
 
 export async function loginAction(
@@ -137,6 +138,33 @@ export async function loginAction(
   redirect("/student");
 }
 
+/**
+ * Sau khi `signUp` trên **client** (createBrowserClient) có session ngay (email không bắt xác nhận):
+ * tạo profile và redirect. Phải gọi từ Server Action để `createClient()` đọc cookie session vừa set.
+ */
+export async function finalizePasswordSignupAction(
+  fullName: string | null
+): Promise<void> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/login?error=" + encodeURIComponent("Phiên đăng ký không hợp lệ."));
+  }
+  const name =
+    fullName?.trim() ||
+    (user.user_metadata?.full_name as string | null | undefined) ||
+    null;
+  await ensureProfileExists(user.id, name);
+  const profile = await getProfile(user.id);
+  redirect(resolveRedirectFromProfile(profile));
+}
+
+/**
+ * @deprecated Dùng đăng ký trên client (`SignupForm` + `finalizePasswordSignupAction`) để PKCE/code verifier
+ * lưu đúng cookie trình duyệt. Giữ lại nếu cần gọi từ nơi khác.
+ */
 export async function signupAction(
   input: unknown
 ): Promise<AuthActionResult | void> {
@@ -177,7 +205,7 @@ export async function signupAction(
     const userId = data.session.user.id;
     const fullName = parsed.data.full_name?.trim() || null;
     await ensureProfileExists(userId, fullName);
-    redirect("/onboarding");
+    redirect("/assessment");
   }
 
   return { error: "Không tạo được phiên đăng nhập. Vui lòng thử lại." };

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   let query = admin.supabase
     .from("profiles")
     .select(
-      "id, full_name, role, created_at, mbti_type, mbti_last_test, avatar_url, goal",
+      "id, full_name, role, created_at, mbti_type, mbti_last_test, avatar_url, goal, assessment_completed",
       { count: "exact" }
     );
 

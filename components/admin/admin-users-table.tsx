@@ -33,6 +33,7 @@ export type AdminUserRow = {
   created_at: string;
   mbti_type: string | null;
   mbti_last_test: string | null;
+  assessment_completed: boolean | null;
 };
 
 type Props = {
@@ -155,6 +156,7 @@ export function AdminUsersTable({
                 <TableHead>Email</TableHead>
                 <TableHead>Vai trò</TableHead>
                 <TableHead>MBTI</TableHead>
+                <TableHead>Trắc nghiệm</TableHead>
                 <TableHead>Ngày tạo</TableHead>
                 <TableHead className="text-right">Đổi role</TableHead>
               </TableRow>
@@ -183,6 +185,15 @@ export function AdminUsersTable({
                       </Badge>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {u.assessment_completed === true ? (
+                      <Badge variant="outline" className="text-[10px] text-emerald-700">
+                        Đã làm
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Chưa</span>
                     )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">

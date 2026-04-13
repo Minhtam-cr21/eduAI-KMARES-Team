@@ -11,7 +11,7 @@ const LABEL_TO_SLUG: Record<string, GoalSlug> = {
 };
 
 /**
- * Map `profiles.goal` (onboarding) → slug. Không khớp → `other`.
+ * Map `profiles.goal` (mục tiêu hồ sơ) → slug. Không khớp → `other`.
  */
 export function mapProfileGoalToSlug(
   goal: string | null | undefined

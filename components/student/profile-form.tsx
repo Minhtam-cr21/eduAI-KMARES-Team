@@ -38,7 +38,6 @@ interface ProfileData {
   className: string | null;
   mbtiType: string | null;
   learningStyle: string | null;
-  onboardingCompleted: boolean;
   careerOrientation: string | null;
   assessmentCompleted: boolean;
   strengths: string[] | null;
@@ -161,9 +160,6 @@ export function ProfileForm({ data }: { data: ProfileData }) {
                   {data.mbtiType}
                 </Badge>
               )}
-              {data.onboardingCompleted && (
-                <Badge variant="secondary">Onboarding ✓</Badge>
-              )}
               {data.assessmentCompleted && (
                 <Badge variant="outline" className="border-emerald-500/50 text-emerald-700 dark:text-emerald-400">
                   Đã làm trắc nghiệm
@@ -212,7 +208,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
             <Pencil className="h-4 w-4" />
             Thông tin cá nhân
           </CardTitle>
-          <CardDescription>Chỉ đọc — cập nhật qua onboarding hoặc admin.</CardDescription>
+          <CardDescription>Chỉ đọc — cập nhật qua trắc nghiệm / admin.</CardDescription>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

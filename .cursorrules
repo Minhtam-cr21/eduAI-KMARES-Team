@@ -70,12 +70,12 @@ RLS:
 - Khi thêm bảng mới, luôn tạo RLS policy.
 - Commit sau mỗi chức năng hoàn chỉnh.
 
-## Quy tắc bổ sung cho Onboarding & Course Enrollment (Bước 7b)
+## Quy tắc bổ sung cho Course Enrollment & định hướng (Bước 7b / Bước 8)
 
-- **Bảng mới được phép tạo:** `onboarding_answers`, `user_courses`, `user_course_progress` (nếu chưa có). Không sửa bảng `profiles` hiện có ngoài việc thêm cột mới (nullable, có default).
+- **Bảng:** `onboarding_answers` (legacy, không còn UI), `user_courses`, `user_course_progress`. Học sinh mới dùng **Trắc nghiệm 50 câu** (`assessment_completed`); có thể giữ `onboarding_completed` trên DB cho dữ liệu cũ.
 - **API cũ không được động đến:** `/api/user/learning-paths` (vẫn dùng cho dữ liệu cũ). Hệ thống mới dùng `user_courses` và `user_course_progress` hoàn toàn độc lập.
-- **Middleware chuyển hướng:** Khi thêm logic redirect `/onboarding` cho user chưa hoàn thành, phải kiểm tra `onboarding_completed` trong `profiles`, không được dùng bảng khác. Ưu tiên dùng `createClient` trong middleware.
-- **Edge Function:** Phải đặt trong thư mục `supabase/functions/analyze-onboarding`. Không được xóa hoặc sửa các Edge Function khác nếu có.
+- **Middleware:** Không redirect bắt buộc tới `/onboarding` (đã loại bỏ). Các module dùng `assessment_completed` như đã thiết kế (dashboard, lộ trình cá nhân hóa).
+- **Edge Function:** `supabase/functions/handle-missed-deadlines` (lịch học). Không bắt buộc `analyze-onboarding`.
 - **Gọi API nội bộ:** Khi gọi `/api/admin/sync-course` từ Edge Function hoặc từ server action, dùng `fetch` với `Authorization: Bearer <service_role_key>` hoặc dùng `createClient` với service role để tránh vòng lặp RLS.
 - **Seed dữ liệu:** Script seed chỉ chạy trong môi trường development, không ảnh hưởng production. Dữ liệu mẫu cho các khóa học C++, Java, SQL, Prompt, Frontend, Backend, Fullstack phải có `status = 'published'` để hiển thị.
 - **Không xóa bất kỳ API, component, hoặc trang nào hiện có.** Chỉ thêm mới hoặc mở rộng an toàn.
@@ -87,3 +87,116 @@ RLS:
 - **Khi thêm component mới** (accordion, progress bar), sử dụng shadcn/ui có sẵn (Collapsible, Accordion, Progress). Không cài đặt thêm thư viện nếu chưa có.
 - **Giữ nguyên cấu trúc responsive**: trên mobile, các cột xếp chồng, sidebar ẩn/hiện nếu cần.
 - **Tất cả dữ liệu hiển thị phải đến từ API thật, không mock** (trừ Schedule tạm thời). Đối với số bài học, gọi API `/api/courses/[courseId]/lessons` chỉ lấy count (có thể dùng `head: true`).
+
+## Quy tắc mới cho Phase 2: Cá nhân hóa nâng cao (Personalized Learning)
+
+### 1. Các module mới trên dashboard học sinh (thay thế cấu trúc cũ)
+- **Xóa hoàn toàn module Debugger cũ** (`/debug`). Mọi link đến `/debug` phải chuyển sang `/practice` (phòng luyện code).
+- **Dashboard học sinh mới** gồm 6 module chính:
+  1. **Lộ trình cơ bản** (Basic Roadmap) – hiển thị các khóa học có sẵn (C++, Java, Python, SQL, Frontend, Backend, Fullstack).
+  2. **Lộ trình cá nhân hóa** (Personalized Roadmap) – **chỉ mở khi người dùng đã hoàn thành bài test**. Nếu chưa, hiển thị popup yêu cầu làm test.
+  3. **Trắc nghiệm định hướng** (Assessment) – tên giao diện: "Trắc nghiệm định hướng". Gồm 50 câu (20 MBTI + 30 mở rộng).
+  4. **Kết nối giáo viên** (Connect Mentor) – giữ nguyên chức năng hiện tại.
+  5. **Phòng luyện code** (Code Practice) – gồm 2 chế độ: Random & Bài tập theo khóa.
+  6. **Profile** (Hồ sơ) – giữ nguyên.
+
+### 2. Bộ câu hỏi mới (50 câu) và xử lý
+- **Lưu câu hỏi** trong file `lib/assessment/questions.ts` (TypeScript) để dễ quản lý, không cần bảng database.
+- **API**:
+  - `GET /api/assessment/questions` – trả về mảng 50 câu hỏi (bao gồm MBTI và mở rộng).
+  - `POST /api/assessment/submit` – nhận mảng câu trả lời, lưu vào bảng `assessment_responses`, gọi AI agent phân tích, lưu kết quả vào `career_orientations` và cập nhật `profiles`.
+- **Các bảng mới được phép tạo**:
+  - `assessment_responses` (lưu câu trả lời)
+  - `career_orientations` (lưu kết quả phân tích, định hướng nghề)
+  - `personalized_paths` (lộ trình cá nhân hóa do giáo viên tạo/duyệt)
+  - `study_schedule` (lịch trình chi tiết theo ngày, hỗ trợ deadline trượt/đóng băng)
+- **Không sửa** các bảng cũ (`onboarding_answers`, `profiles`, `user_courses`, ...). Chỉ thêm cột mới vào `profiles` nếu cần (nullable).
+
+### 3. Lộ trình cá nhân hóa (Personalized Roadmap)
+- **Cơ chế**:
+  - Sau khi có kết quả test, AI (Agent 2) đề xuất `course_sequence` (mảng {course_id, order_index, due_date}) dựa trên profile + career_orientations.
+  - Giáo viên được phân công (hoặc admin) xem đề xuất, có thể chỉnh sửa (thêm/bớt khóa học, sắp xếp lại) trong trang `teacher/personalized-paths`.
+  - Sau khi giáo viên duyệt (status = 'approved'), hệ thống tạo `study_schedule` (các lesson của từng khóa học theo thứ tự và due_date).
+  - Học sinh nhận lộ trình, có thể gửi feedback (yêu cầu chỉnh sửa) qua API `PUT /api/personalized-path/student/feedback`.
+- **API cần tạo mới**:
+  - `POST /api/personalized-path/generate` – gọi AI đề xuất (chỉ dùng nội bộ, hoặc gọi từ admin/teacher).
+  - `GET /api/personalized-path/teacher` – danh sách path cần duyệt (teacher).
+  - `PUT /api/personalized-path/teacher/:id` – duyệt/từ chối/chỉnh sửa.
+  - `GET /api/personalized-path/student` – học sinh xem path của mình.
+  - `PUT /api/personalized-path/student/feedback` – gửi phản hồi.
+
+### 4. Calendar lịch trình và cơ chế deadline trượt/đóng băng
+- **Trang lịch trình** riêng: `app/(student)/student/calendar/page.tsx` (chỉ hiển thị khi có personalized path approved). Dạng lịch tự xây (grid, tuần/tháng), không dùng Google Calendar API.
+- **Hiển thị các bài học** từ `study_schedule` theo ngày, với trạng thái (pending/completed/missed/frozen).
+- **Cơ chế tự động**:
+  - Nếu đến due_date mà chưa đánh dấu completed → tự động chuyển status = 'missed' và dời deadline +1 ngày (cập nhật due_date).
+  - Nếu học sinh không tương tác (không có submission hoặc không đánh dấu) trong 3 ngày liên tiếp → chuyển status = 'frozen', tạm dừng lộ trình, gửi email thông báo cho giáo viên.
+  - Giáo viên có thể "đóng băng" thủ công hoặc "kích hoạt lại" qua API.
+- **API**:
+  - `GET /api/study-schedule` – lấy lịch trình của user.
+  - `PUT /api/study-schedule/:id/complete` – đánh dấu bài hoàn thành.
+  - (Có thể có cron job hoặc Edge Function chạy định kỳ để xử lý missed/frozen, nhưng trong MVP có thể xử lý khi user login hoặc gọi API).
+
+### 5. Phòng luyện code thông minh (Code Practice)
+- **Thay thế hoàn toàn debugger cũ**: xóa file `app/debug/page.tsx` và các route liên quan.
+- **2 chế độ**:
+  - **Random**: Chọn ngôn ngữ (Java/Python/C++), độ khó (easy/medium/hard). Gọi API `POST /api/practice/random` để lấy bài tập (có thể sinh mới bằng AI hoặc lấy từ seed có sẵn). Lưu bài tập vào bảng `practice_exercises` nếu chưa có.
+  - **Bài tập theo khóa**: Hiển thị danh sách bài tập từ các `course_lessons` có `code_template` không null, thuộc các khóa học mà học sinh đã đăng ký (`user_courses`).
+- **AI gợi ý bài tiếp theo**: Gọi `GET /api/practice/next-suggestion` trả về exercise_id dựa trên lịch sử submissions (ưu tiên bài chưa làm, bài sai nhiều).
+- **Giữ nguyên** API `/api/practice/run` (chạy code) và `/api/practice/submissions` (lịch sử).
+
+### 6. Định hướng nghề nghiệp (Career Orientation)
+- **Trang riêng**: `app/(student)/student/career/page.tsx`. Chỉ hiển thị nếu đã hoàn thành bài test (kiểm tra `career_orientations` có bản ghi không). Nếu chưa, hiển thị popup yêu cầu làm test.
+- **Nội dung** (lấy từ `career_orientations`):
+  - MBTI type và giải thích.
+  - Điểm mạnh, điểm yếu.
+  - Gợi ý nghề nghiệp (suggested_careers) kèm giải thích ngắn.
+  - Đề xuất khóa học bổ trợ (suggested_courses) – link đến các khóa học trong lộ trình cơ bản.
+  - Lưu ý: "Đây chỉ là gợi ý, không ép buộc. Hãy phát huy điểm mạnh hiện tại."
+
+### 7. Agent AI (3 agent dùng chung API key)
+- **Agent 1 (Assessment Analyzer)**: Phân tích 50 câu trả lời, tính MBTI, điểm các trụ cột (động lực, phong cách học, kỹ năng nền, ...), sinh `career_orientations`.
+- **Agent 2 (Path Generator)**: Đề xuất `course_sequence` dựa trên profile và career_orientation.
+- **Agent 3 (Practice Suggester)**: Gợi ý bài tập tiếp theo dựa trên lịch sử submissions.
+- **Cách tích hợp**: Tạo các hàm trong `lib/ai/agents.ts`, mỗi agent gọi OpenAI API với prompt riêng. Fallback rule-based khi hết quota (dùng mapping đơn giản).
+
+### 8. Mail notification (Resend hoặc Supabase Edge Functions)
+- **Gửi mail** khi:
+  - Giáo viên duyệt/từ chối personalized path.
+  - Học sinh gửi feedback yêu cầu chỉnh sửa path.
+  - Hệ thống tự động đóng băng lộ trình (thông báo cho giáo viên và học sinh).
+  - Deadline trượt (nhắc nhở).
+- **Cấu hình**: Dùng Resend (dễ dùng) hoặc Supabase Edge Functions với SMTP. Thêm biến môi trường `RESEND_API_KEY`.
+
+### 9. Xóa bỏ hoàn toàn Debugger cũ
+- **Xóa thư mục** `app/debug` (nếu tồn tại).
+- **Xóa route** `/debug` khỏi middleware nếu có.
+- **Tìm và thay thế** tất cả link `href="/debug"` trong codebase (navigation, buttons) chuyển thành `/practice` (hoặc `/student/practice`).
+- **Xóa các API liên quan** nếu không còn dùng (`/api/run-code`, `/api/ai-suggest`? Thực tế phòng luyện code vẫn cần chạy code, nên giữ lại `/api/practice/run` và có thể dùng lại logic cũ). **Không xóa** nếu chưa chắc.
+
+### 10. Tách biệt lộ trình cơ bản và lộ trình cá nhân hóa
+- **Lộ trình cơ bản**: Hiển thị danh sách khóa học từ bảng `courses` với `course_type` bất kỳ (skill/role), do giáo viên tạo và admin duyệt. Học sinh có thể tự đăng ký (enroll) bất kỳ lúc nào. Không liên quan đến kết quả test.
+- **Lộ trình cá nhân hóa**: Chỉ xuất hiện sau test, do giáo viên tạo riêng cho từng học sinh dựa trên đề xuất AI. Lộ trình này có thể bao gồm các khóa học từ lộ trình cơ bản nhưng được sắp xếp theo thứ tự và thời gian biểu riêng.
+
+### 11. Các bước ưu tiên thực hiện (theo yêu cầu "hoàn thành hôm nay")
+1. **Tạo database migrations** cho các bảng mới (`assessment_responses`, `career_orientations`, `personalized_paths`, `study_schedule`).
+2. **Xóa module debugger cũ** và cập nhật routing/link.
+3. **Xây dựng bộ câu hỏi 50 câu** + API submit + agent 1 (phân tích).
+4. **Giao diện bài test** (2 bước: 50 câu).
+5. **Trang định hướng nghề nghiệp**.
+6. **Module lộ trình cá nhân hóa** (AI đề xuất, GV duyệt, HS nhận).
+7. **Calendar lịch trình** + cơ chế deadline trượt/đóng băng.
+8. **Phòng luyện code thông minh** (random + bài tập theo khóa + gợi ý AI).
+9. **Tích hợp mail notification**.
+
+### 12. Lưu ý bổ sung cho Cursor
+- Khi tạo API mới, luôn kiểm tra xem API đó đã tồn tại chưa (tìm kiếm trong codebase). Nếu đã có, tái sử dụng hoặc mở rộng an toàn.
+- **Không xóa** các API cũ liên quan đến practice (như `/api/practice/run`, `/api/practice/exercises`) vì chúng vẫn được dùng.
+- **Thêm các trường mới vào `profiles`** (nếu cần) bằng migration, với giá trị default null.
+- **Kiểm tra build** sau mỗi lần thay đổi lớn: `npm run build`.
+- **Commit thường xuyên** với message rõ ràng.
+
+## Quy tắc an toàn bổ sung
+- **Tuyệt đối không hardcode secret** (API key, service role key) trong client component. Chỉ dùng trên server (API routes, server actions, edge functions).
+- **Không gọi trực tiếp OpenAI/Deepseek từ client**. Luôn qua API route hoặc server action.
+- **Kiểm tra RLS** cho các bảng mới: đảm bảo học sinh chỉ xem/ghi dữ liệu của mình, giáo viên và admin có quyền cao hơn.

@@ -18,7 +18,7 @@ export default async function StudentProfilePage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, role, full_name, created_at, goal, hours_per_day, preferred_learning, birth_year, school, class, mbti_type, learning_style, onboarding_completed, career_orientation, assessment_completed, strengths, weaknesses"
+      "id, role, full_name, created_at, goal, hours_per_day, preferred_learning, birth_year, school, class, mbti_type, learning_style, career_orientation, assessment_completed, strengths, weaknesses"
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -49,7 +49,6 @@ export default async function StudentProfilePage() {
           className: profile?.class ?? null,
           mbtiType: profile?.mbti_type ?? null,
           learningStyle: profile?.learning_style ?? null,
-          onboardingCompleted: profile?.onboarding_completed ?? false,
           careerOrientation: profile?.career_orientation ?? null,
           assessmentCompleted: profile?.assessment_completed === true,
           strengths: (profile?.strengths as string[] | null) ?? null,

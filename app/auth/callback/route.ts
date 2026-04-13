@@ -1,12 +1,24 @@
-import { createClient } from "@/lib/supabase/server";
-import { getSiteOrigin } from "@/lib/site-origin";
-import { NextResponse } from "next/server";
+import { studentPostAuthPath } from "@/lib/auth/student-post-auth";
+import { getRequestOrigin } from "@/lib/site-origin";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { type NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+/**
+ * PKCE + session cookies phải gắn trực tiếp lên NextResponse.redirect.
+ * Dùng `cookies()` từ next/headers trong Route Handler có thể không đồng bộ
+ * với response redirect → lỗi "PKCE code verifier not found in storage".
+ */
+function copyCookies(from: NextResponse, to: NextResponse) {
+  from.cookies.getAll().forEach((c) => {
+    to.cookies.set(c.name, c.value, c);
+  });
+}
+
+export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const next = url.searchParams.get("next");
-  const origin = getSiteOrigin();
+  const origin = getRequestOrigin(request);
 
   if (!code) {
     return NextResponse.redirect(
@@ -14,17 +26,43 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = createClient();
+  const errorRedirect = (msg: string) =>
+    NextResponse.redirect(
+      new URL(`/login?error=${encodeURIComponent(msg)}`, origin)
+    );
+
+  let redirectTarget = new URL(next?.startsWith("/") ? next : "/assessment", origin);
+
+  let response = NextResponse.redirect(redirectTarget);
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options: CookieOptions;
+          }[]
+        ) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     console.error("[auth/callback] exchangeCodeForSession:", error.message);
-    return NextResponse.redirect(
-      new URL(
-        `/login?error=${encodeURIComponent(error.message)}`,
-        origin
-      )
-    );
+    return errorRedirect(error.message);
   }
 
   const {
@@ -34,7 +72,7 @@ export async function GET(request: Request) {
   if (user?.id) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, role, onboarding_completed")
+      .select("id, role, assessment_completed, onboarding_completed")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -52,27 +90,31 @@ export async function GET(request: Request) {
         console.error("[auth/callback] profiles insert:", insErr.message);
       }
 
-      if (next) {
-        return NextResponse.redirect(new URL(next, origin));
-      }
-      return NextResponse.redirect(new URL("/onboarding", origin));
+      redirectTarget = new URL("/assessment", origin);
+    } else if (next?.startsWith("/")) {
+      redirectTarget = new URL(next, origin);
+    } else if (profile.role === "admin") {
+      redirectTarget = new URL("/admin", origin);
+    } else if (profile.role === "teacher") {
+      redirectTarget = new URL("/teacher", origin);
+    } else {
+      redirectTarget = new URL(
+        studentPostAuthPath({
+          assessment_completed: profile.assessment_completed as boolean | null,
+          onboarding_completed: profile.onboarding_completed as boolean | null,
+        }),
+        origin
+      );
     }
 
-    if (next) {
-      return NextResponse.redirect(new URL(next, origin));
-    }
-
-    if (profile.role === "admin") {
-      return NextResponse.redirect(new URL("/admin", origin));
-    }
-    if (profile.role === "teacher") {
-      return NextResponse.redirect(new URL("/teacher", origin));
-    }
-    if (profile.onboarding_completed === true) {
-      return NextResponse.redirect(new URL("/student", origin));
-    }
-    return NextResponse.redirect(new URL("/onboarding", origin));
+    const finalResponse = NextResponse.redirect(redirectTarget);
+    copyCookies(response, finalResponse);
+    return finalResponse;
   }
 
-  return NextResponse.redirect(new URL(next ?? "/student", origin));
+  const fallback = NextResponse.redirect(
+    new URL(next?.startsWith("/") ? next : "/student", origin)
+  );
+  copyCookies(response, fallback);
+  return fallback;
 }

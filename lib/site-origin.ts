@@ -1,3 +1,5 @@
+import type { NextRequest } from "next/server";
+
 /**
  * Origin công khai của app (OAuth redirect, email xác nhận, callback).
  * Production: đặt NEXT_PUBLIC_APP_URL trên Vercel (vd: https://edu-ai-kmares-team.vercel.app).
@@ -7,4 +9,20 @@ export function getSiteOrigin(): string {
   if (explicit) return explicit;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
+}
+
+/**
+ * Origin của **request hiện tại** — dùng cho redirect sau `/auth/callback`.
+ * Tránh redirect sang host khác `NEXT_PUBLIC_APP_URL` (custom domain, preview Vercel)
+ * khiến cookie session không khớp domain → không giữ đăng nhập.
+ */
+export function getRequestOrigin(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-host");
+  const proto =
+    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? "https";
+  if (forwarded) {
+    const host = forwarded.split(",")[0]!.trim();
+    return `${proto}://${host}`;
+  }
+  return request.nextUrl.origin;
 }
