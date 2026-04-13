@@ -1,230 +1,170 @@
-"use client";
-
+import {
+  LessonActivityPing,
+  LessonScheduleCompleteSection,
+} from "@/components/student/lesson-learn-client";
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { BackButton } from "@/components/ui/back-button";
+import { buttonVariants } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/server";
+import { normalizeVideoEmbedUrl } from "@/lib/video-embed-url";
 import { cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { notFound, redirect } from "next/navigation";
 
-type LessonPayload = {
-  id: string;
-  title: string;
-  content: string | null;
-  video_url: string | null;
-  topic_id: string;
-  topic: { title: string };
-};
+export const dynamic = "force-dynamic";
 
-export default function LearnLessonPage() {
-  const params = useParams();
-  const router = useRouter();
-  const lessonId = params.lessonId as string;
+export default async function LearnCourseLessonPage({
+  params,
+}: {
+  params: { lessonId: string };
+}) {
+  const { lessonId } = params;
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const [loading, setLoading] = useState(true);
-  const [lesson, setLesson] = useState<LessonPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const [pathId, setPathId] = useState<string | null>(null);
-  const [completed, setCompleted] = useState(false);
-  const [firstExerciseId, setFirstExerciseId] = useState<string | null>(null);
-
-  const loadLesson = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/lessons/${lessonId}`);
-      const data = (await res.json()) as {
-        lesson?: LessonPayload;
-        error?: string;
-      };
-      if (!res.ok) {
-        setError(data.error ?? res.statusText);
-        setLesson(null);
-        return;
-      }
-      if (!data.lesson) {
-        setError("Không có dữ liệu.");
-        setLesson(null);
-        return;
-      }
-      setLesson(data.lesson);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Lỗi mạng");
-      setLesson(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [lessonId]);
-
-  const loadPathAndExercises = useCallback(async () => {
-    try {
-      const [pathsRes, exRes] = await Promise.all([
-        fetch("/api/user/learning-paths"),
-        fetch(`/api/exercises?lessonId=${encodeURIComponent(lessonId)}`),
-      ]);
-      const pathsData = await pathsRes.json();
-      if (pathsRes.ok && Array.isArray(pathsData)) {
-        const row = (
-          pathsData as {
-            id: string;
-            lesson: { id: string };
-            status: string;
-          }[]
-        ).find((p) => p.lesson.id === lessonId);
-        if (row) {
-          setPathId(row.id);
-          setCompleted(row.status === "completed");
-        } else {
-          setPathId(null);
-          setCompleted(false);
-        }
-      }
-      const exJson = (await exRes.json()) as {
-        exercises?: { id: string }[];
-        error?: string;
-      };
-      if (exRes.ok && exJson.exercises?.length) {
-        setFirstExerciseId(exJson.exercises[0].id);
-      } else {
-        setFirstExerciseId(null);
-      }
-    } catch {
-      setPathId(null);
-      setCompleted(false);
-      setFirstExerciseId(null);
-    }
-  }, [lessonId]);
-
-  useEffect(() => {
-    void loadLesson();
-  }, [loadLesson]);
-
-  useEffect(() => {
-    if (!lesson) return;
-    void loadPathAndExercises();
-  }, [lesson, loadPathAndExercises]);
-
-  async function markComplete() {
-    if (!pathId) {
-      toast.error("Không tìm thấy mục lộ trình cho bài này.");
-      return;
-    }
-    try {
-      const res = await fetch(`/api/user/learning-paths/${pathId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "completed" }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        toast.error("Không cập nhật được", {
-          description: data.error ?? res.statusText,
-        });
-        return;
-      }
-      setCompleted(true);
-      toast.success("Đã đánh dấu hoàn thành.");
-    } catch (e) {
-      toast.error("Lỗi mạng", {
-        description: e instanceof Error ? e.message : String(e),
-      });
-    }
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(`/learn/${lessonId}`)}`);
   }
 
-  if (loading) {
+  const { data: lesson, error: lErr } = await supabase
+    .from("course_lessons")
+    .select("id, title, content, video_url, code_template, course_id, status")
+    .eq("id", lessonId)
+    .maybeSingle();
+
+  if (lErr || !lesson) {
+    notFound();
+  }
+
+  if (lesson.status !== "published") {
+    notFound();
+  }
+
+  const { data: course } = await supabase
+    .from("courses")
+    .select("title, category")
+    .eq("id", lesson.course_id as string)
+    .maybeSingle();
+
+  const { data: enroll } = await supabase
+    .from("user_courses")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("course_id", lesson.course_id as string)
+    .maybeSingle();
+
+  if (!enroll) {
     return (
-      <article className="mx-auto max-w-3xl px-4 py-12">
-        <p className="text-muted-foreground text-center text-sm">Đang tải…</p>
-      </article>
+      <>
+        <LessonActivityPing />
+        <article className="mx-auto max-w-3xl px-4 py-8">
+          <BackButton fallbackHref="/student/courses/explore" className="mb-4" />
+          <h1 className="text-xl font-semibold text-foreground">Chưa ghi danh</h1>
+          <p className="text-muted-foreground mt-2 text-sm">
+            Bạn cần đăng ký khóa học này để xem bài học.
+          </p>
+          <Link
+            href="/student/courses/explore"
+            className={cn(buttonVariants(), "mt-6 inline-flex")}
+          >
+            Khám phá khóa học
+          </Link>
+        </article>
+      </>
     );
   }
 
-  if (error || !lesson) {
-    return (
-      <article className="mx-auto max-w-3xl px-4 py-12">
-        <p className="text-destructive text-sm">{error ?? "Không tìm thấy bài học."}</p>
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-4"
-          onClick={() => router.push("/dashboard")}
-        >
-          Về dashboard
-        </Button>
-      </article>
-    );
-  }
+  const { data: schedRows } = await supabase
+    .from("study_schedule")
+    .select("id, status")
+    .eq("user_id", user.id)
+    .eq("lesson_id", lessonId)
+    .order("updated_at", { ascending: false });
 
-  const content = lesson.content?.trim() ?? "";
+  const list = schedRows ?? [];
+  const pending = list.find((r) => r.status === "pending");
+  const completed = list.find((r) => r.status === "completed");
+  const chosen = pending ?? completed ?? list[0] ?? null;
+  const scheduleId = chosen?.id ? String(chosen.id) : null;
+  const scheduleStatus = chosen?.status ? String(chosen.status) : null;
+
+  const videoSrc = normalizeVideoEmbedUrl(lesson.video_url as string | null);
+  const content = (lesson.content as string | null)?.trim() ?? "";
+  const codeTemplate = (lesson.code_template as string | null)?.trim();
 
   return (
-    <article className="mx-auto max-w-3xl px-4 py-8">
-      <p className="text-muted-foreground text-sm">
-        <Link href="/dashboard" className="hover:text-foreground underline">
-          ← Dashboard
-        </Link>
-        <span className="mx-2">·</span>
-        <span>{lesson.topic.title}</span>
-      </p>
+    <>
+      <LessonActivityPing />
+      <article className="mx-auto max-w-3xl px-4 py-8">
+        <BackButton fallbackHref="/study-schedule" className="mb-4" />
 
-      <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
-        {lesson.title}
-      </h1>
+        <p className="text-muted-foreground text-sm">
+          {course?.title ? <span>{String(course.title)}</span> : null}
+          {course?.category ? (
+            <span className="text-muted-foreground/80">
+              {course?.title ? " · " : null}
+              {String(course.category)}
+            </span>
+          ) : null}
+        </p>
 
-      {lesson.video_url ? (
-        <div className="mt-6 aspect-video w-full overflow-hidden rounded-xl border border-border bg-muted">
-          <iframe
-            title="Video bài học"
-            src={lesson.video_url}
-            className="h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        </div>
-      ) : null}
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
+          {lesson.title as string}
+        </h1>
 
-      <div className="mt-8">
-        {content ? (
-          <LessonMarkdown content={content} />
-        ) : (
-          <p className="text-muted-foreground text-sm italic">
-            Bài học chưa có nội dung văn bản.
-          </p>
-        )}
-      </div>
-
-      <div className="mt-10 flex flex-col gap-4 border-t border-border pt-6 sm:flex-row sm:flex-wrap sm:items-center">
-        {pathId ? (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="done-lesson"
-              checked={completed}
-              disabled={completed}
-              onCheckedChange={(v) => {
-                if (v === true && !completed) void markComplete();
-              }}
+        {videoSrc ? (
+          <div className="mt-6 aspect-video w-full overflow-hidden rounded-xl border border-border bg-muted">
+            <iframe
+              title="Video bài học"
+              src={videoSrc}
+              className="h-full w-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
             />
-            <Label htmlFor="done-lesson" className="cursor-pointer font-normal">
-              Đánh dấu hoàn thành
-            </Label>
           </div>
         ) : null}
 
-        {firstExerciseId ? (
+        <div className="mt-8">
+          {content ? (
+            <LessonMarkdown content={content} />
+          ) : (
+            <p className="text-muted-foreground text-sm italic">
+              Bài học chưa có nội dung văn bản.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-10 flex flex-col gap-4 border-t border-border pt-6 sm:flex-row sm:flex-wrap sm:items-center">
+          <LessonScheduleCompleteSection
+            scheduleId={scheduleId}
+            initialStatus={scheduleStatus}
+          />
+
+          {codeTemplate ? (
+            <Link
+              href={`/practice/lesson/${lessonId}`}
+              className={cn(
+                buttonVariants({ variant: "default" }),
+                "inline-flex"
+              )}
+            >
+              Thực hành
+            </Link>
+          ) : null}
+
           <Link
-            href="/practice"
-            className={cn(buttonVariants())}
+            href={`/student/courses/${String(lesson.course_id)}`}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "inline-flex"
+            )}
           >
-            Thực hành
+            Về khóa học
           </Link>
-        ) : (
-          <p className="text-muted-foreground text-sm">Chưa có bài tập</p>
-        )}
-      </div>
-    </article>
+        </div>
+      </article>
+    </>
   );
 }
