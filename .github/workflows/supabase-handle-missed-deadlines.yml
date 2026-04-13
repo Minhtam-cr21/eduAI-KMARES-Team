@@ -1,25 +1,59 @@
-# Gọi Edge Function hằng ngày (UTC) + deploy thủ công.
+# Gọi Edge Function hằng ngày (UTC).
 #
-# GitHub → Settings → Secrets and variables → Actions, thêm:
-#   SUPABASE_PROJECT_REF   (ví dụ abcdefghijklmnop)
-#   SUPABASE_ANON_KEY      (Settings → API → anon public)
-# Tuỳ chọn (chỉ khi dùng job deploy):
-#   SUPABASE_ACCESS_TOKEN  (Account → Access Tokens)
-#   SUPABASE_SERVICE_ROLE_KEY
-#   RESEND_API_KEY
-#   RESEND_FROM_EMAIL
+# Secrets (Actions → Repository secrets):
+#   SUPABASE_PROJECT_REF, SUPABASE_ANON_KEY  — bắt buộc để gọi function
+#   SUPABASE_ACCESS_TOKEN — chỉ cần khi bật "Deploy function trước" (lần đầu / sau 404)
+#
+# Lỗi 404 = function chưa deploy. Cách 1: máy local chạy npm run supabase:deploy:deadlines
+# Cách 2: Run workflow, bật "Deploy function trước", thêm SUPABASE_ACCESS_TOKEN.
 
 name: Supabase handle-missed-deadlines
 
 on:
   workflow_dispatch:
+    inputs:
+      deploy_first:
+        description: "Deploy function trước (bật khi gặp 404 — cần secret SUPABASE_ACCESS_TOKEN)"
+        required: false
+        default: false
+        type: boolean
   schedule:
-    # 02:00 UTC mỗi ngày (~9h sáng VN mùa không DST)
     - cron: "0 2 * * *"
 
 jobs:
+  deploy:
+    name: Deploy Edge Function
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_first == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy handle-missed-deadlines
+        env:
+          REF_RAW: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -e
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::Thiếu secret SUPABASE_ACCESS_TOKEN (Account → Access Tokens). Cần để deploy từ GitHub."
+            exit 1
+          fi
+          REF="$(printf '%s' "$REF_RAW" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          REF="${REF#https://}"; REF="${REF#http://}"; REF="${REF%.supabase.co}"; REF="${REF%.supabase.co/}"
+          case "$REF" in
+            *.supabase.co) REF="${REF%.supabase.co}" ;;
+          esac
+          REF="$(printf '%s' "$REF" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          test -n "$REF" || { echo "::error::SUPABASE_PROJECT_REF rỗng"; exit 1; }
+          echo "Deploying to project ref: $REF"
+          supabase functions deploy handle-missed-deadlines --project-ref "$REF"
+
   invoke:
     name: POST handle-missed-deadlines
+    needs: deploy
+    if: always() && (needs.deploy.result == 'skipped' || needs.deploy.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Invoke Edge Function
@@ -28,13 +62,10 @@ jobs:
           ANON: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -e
-          # Trim CR/LF và khoảng trắng (thường gây curl: Bad hostname)
           REF="$(printf '%s' "$REF" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           ANON="$(printf '%s' "$ANON" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-          # Bỏ ngoặc kép / nháy nếu người dùng dán cả vào secret
           REF="${REF%\"}"; REF="${REF#\"}"; REF="${REF%\'}"; REF="${REF#\'}"
           ANON="${ANON%\"}"; ANON="${ANON#\"}"; ANON="${ANON%\'}"; ANON="${ANON#\'}"
-          # Nếu dán nhầm URL đầy đủ → chỉ lấy project ref
           REF="${REF#https://}"
           REF="${REF#http://}"
           REF="${REF%.supabase.co}"
@@ -46,40 +77,25 @@ jobs:
           esac
           REF="$(printf '%s' "$REF" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           test -n "$REF" && test -n "$ANON" || { echo "Thiếu secrets SUPABASE_PROJECT_REF hoặc SUPABASE_ANON_KEY"; exit 1; }
-          # Chỉ chấp nhận Reference ID kiểu Supabase (chữ thường, số, gạch ngang; không / URL)
           if ! printf '%s' "$REF" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'; then
-            echo "::error::SUPABASE_PROJECT_REF không hợp lệ. Dán đúng Reference ID trong Dashboard (General), không dán URL."
+            echo "::error::SUPABASE_PROJECT_REF không hợp lệ."
             exit 1
           fi
           URL="https://${REF}.supabase.co/functions/v1/handle-missed-deadlines"
           echo "POST $URL"
-          curl -sS -f -X POST "$URL" \
+          http_code=$(curl -sS -o /tmp/curl_body -w "%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer ${ANON}" \
             -H "Content-Type: application/json" \
-            -d '{}'
+            -d '{}')
+          echo "HTTP $http_code"
+          cat /tmp/curl_body || true
           echo ""
-
-  # Bỏ comment job dưới nếu muốn deploy từ GitHub (cần đủ secrets phía trên).
-  # deploy:
-  #   name: Deploy function + secrets
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'workflow_dispatch'
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: supabase/setup-cli@v1
-  #       with:
-  #         version: latest
-  #     - name: Deploy
-  #       env:
-  #         SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-  #       run: |
-  #         supabase functions deploy handle-missed-deadlines \
-  #           --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-  #     - name: Secrets
-  #       env:
-  #         SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-  #       run: |
-  #         supabase secrets set \
-  #           SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-  #           RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
-  #           --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            exit 0
+          fi
+          if [ "$http_code" = "404" ]; then
+            echo "::error::404 — Function chưa deploy lên Supabase. Cách A: máy local chạy npm run supabase:deploy:deadlines (file .env.supabase.deploy). Cách B: Actions → Run workflow → bật \"Deploy function trước\" + thêm secret SUPABASE_ACCESS_TOKEN rồi chạy lại."
+          else
+            echo "::error::Gọi function thất bại (HTTP $http_code)."
+          fi
+          exit 1
