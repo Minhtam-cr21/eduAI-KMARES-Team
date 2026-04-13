@@ -27,9 +27,32 @@ jobs:
           REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           ANON: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
+          set -e
+          # Trim CR/LF và khoảng trắng (thường gây curl: Bad hostname)
+          REF="$(printf '%s' "$REF" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          ANON="$(printf '%s' "$ANON" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          # Bỏ ngoặc kép / nháy nếu người dùng dán cả vào secret
+          REF="${REF%\"}"; REF="${REF#\"}"; REF="${REF%\'}"; REF="${REF#\'}"
+          ANON="${ANON%\"}"; ANON="${ANON#\"}"; ANON="${ANON%\'}"; ANON="${ANON#\'}"
+          # Nếu dán nhầm URL đầy đủ → chỉ lấy project ref
+          REF="${REF#https://}"
+          REF="${REF#http://}"
+          REF="${REF%.supabase.co}"
+          REF="${REF%.supabase.co/}"
+          case "$REF" in
+            *.supabase.co)
+              REF="${REF%.supabase.co}"
+              ;;
+          esac
+          REF="$(printf '%s' "$REF" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           test -n "$REF" && test -n "$ANON" || { echo "Thiếu secrets SUPABASE_PROJECT_REF hoặc SUPABASE_ANON_KEY"; exit 1; }
-          curl -sS -f -X POST \
-            "https://${REF}.supabase.co/functions/v1/handle-missed-deadlines" \
+          if printf '%s' "$REF" | grep -qE '[/:<>\ ]'; then
+            echo "::error::SUPABASE_PROJECT_REF vẫn không hợp lệ sau khi chuẩn hoá. Chỉ dán **Project ID** (chuỗi ~20 ký tự), không dán URL."
+            exit 1
+          fi
+          URL="https://${REF}.supabase.co/functions/v1/handle-missed-deadlines"
+          echo "POST $URL"
+          curl -sS -f -X POST "$URL" \
             -H "Authorization: Bearer ${ANON}" \
             -H "Content-Type: application/json" \
             -d '{}'
