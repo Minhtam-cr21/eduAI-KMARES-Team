@@ -1,6 +1,10 @@
 /**
- * Chạy hằng ngày (Supabase Dashboard → Edge Functions → Schedules, hoặc cron gọi POST).
- * Biến môi trường: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY (tuỳ chọn), RESEND_FROM_EMAIL.
+ * Chạy hằng ngày: GitHub Actions (.github/workflows/supabase-handle-missed-deadlines.yml),
+ * hoặc Supabase Dashboard → Cron / Schedules, hoặc cron ngoài POST tới …/functions/v1/handle-missed-deadlines.
+ *
+ * Secrets (Dashboard → Edge Functions → Secrets hoặc `npm run supabase:deploy:deadlines`):
+ *   SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, RESEND_FROM_EMAIL (tuỳ chọn).
+ * Supabase tự inject: SUPABASE_URL, SUPABASE_ANON_KEY.
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";

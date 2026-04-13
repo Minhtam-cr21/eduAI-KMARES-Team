@@ -1,0 +1,61 @@
+# Gọi Edge Function hằng ngày (UTC) + deploy thủ công.
+#
+# GitHub → Settings → Secrets and variables → Actions, thêm:
+#   SUPABASE_PROJECT_REF   (ví dụ abcdefghijklmnop)
+#   SUPABASE_ANON_KEY      (Settings → API → anon public)
+# Tuỳ chọn (chỉ khi dùng job deploy):
+#   SUPABASE_ACCESS_TOKEN  (Account → Access Tokens)
+#   SUPABASE_SERVICE_ROLE_KEY
+#   RESEND_API_KEY
+#   RESEND_FROM_EMAIL
+
+name: Supabase handle-missed-deadlines
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 02:00 UTC mỗi ngày (~9h sáng VN mùa không DST)
+    - cron: "0 2 * * *"
+
+jobs:
+  invoke:
+    name: POST handle-missed-deadlines
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke Edge Function
+        env:
+          REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          ANON: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$REF" && test -n "$ANON" || { echo "Thiếu secrets SUPABASE_PROJECT_REF hoặc SUPABASE_ANON_KEY"; exit 1; }
+          curl -sS -f -X POST \
+            "https://${REF}.supabase.co/functions/v1/handle-missed-deadlines" \
+            -H "Authorization: Bearer ${ANON}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+          echo ""
+
+  # Bỏ comment job dưới nếu muốn deploy từ GitHub (cần đủ secrets phía trên).
+  # deploy:
+  #   name: Deploy function + secrets
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'workflow_dispatch'
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: supabase/setup-cli@v1
+  #       with:
+  #         version: latest
+  #     - name: Deploy
+  #       env:
+  #         SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  #       run: |
+  #         supabase functions deploy handle-missed-deadlines \
+  #           --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+  #     - name: Secrets
+  #       env:
+  #         SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  #       run: |
+  #         supabase secrets set \
+  #           SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+  #           RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
+  #           --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}

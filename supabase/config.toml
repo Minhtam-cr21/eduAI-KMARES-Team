@@ -1,0 +1,12 @@
+# Cấu hình tối thiểu cho Supabase CLI (link, deploy Edge Functions).
+# Chạy: npx supabase link --project-ref <ref>
+# project_id chỉ là tên cục bộ; sau khi link, CLI dùng project trên cloud.
+
+project_id = "eduai-local"
+
+[api]
+enabled = true
+
+# Edge Function: yêu cầu JWT (anon hoặc user) khi gọi HTTP — phù hợp cron gọi kèm anon key.
+[functions.handle-missed-deadlines]
+verify_jwt = true
