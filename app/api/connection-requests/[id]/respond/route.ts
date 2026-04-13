@@ -1,3 +1,5 @@
+import { sendTeacherConnectionResponseEmail } from "@/lib/email/send";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -24,7 +26,7 @@ export async function PUT(
 
   const { data: row, error: fetchErr } = await supabase
     .from("connection_requests")
-    .select("teacher_id, status")
+    .select("teacher_id, status, student_id")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -79,5 +81,30 @@ export async function PUT(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  try {
+    const admin = createServiceRoleClient();
+    const { data: authUser } = await admin.auth.admin.getUserById(
+      row.student_id as string
+    );
+    const email = authUser.user?.email?.trim();
+    if (email) {
+      const { data: teacherProf } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const teacherName =
+        (teacherProf?.full_name as string | null)?.trim() || "Giáo viên";
+      await sendTeacherConnectionResponseEmail(email, {
+        teacherName,
+        status,
+        teacherResponse: teacher_response ?? null,
+      });
+    }
+  } catch (e) {
+    console.warn("[connection respond] email skip:", e);
+  }
+
   return NextResponse.json(data);
 }

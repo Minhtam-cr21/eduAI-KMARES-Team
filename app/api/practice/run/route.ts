@@ -3,19 +3,38 @@ import {
   formatAiDebugMarkdown,
 } from "@/lib/ai-debugger";
 import { executeCode, type RunCodeLanguage } from "@/lib/code-runner";
+import { getPublishedLessonIfEnrolled } from "@/lib/practice/assert-lesson-access";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
-const bodySchema = z.object({
-  exercise_id: z.string().uuid(),
-  code: z.string(),
-  language: z.enum(["python", "cpp", "java"]),
-  stdin: z.string().optional().default(""),
-  include_ai: z.boolean().optional().default(false),
-});
+const bodySchema = z
+  .object({
+    exercise_id: z.string().uuid().optional().nullable(),
+    lesson_id: z.string().uuid().optional().nullable(),
+    code: z.string(),
+    language: z.enum(["python", "cpp", "java"]),
+    stdin: z.string().optional().default(""),
+    include_ai: z.boolean().optional().default(false),
+  })
+  .superRefine((val, ctx) => {
+    const hasEx = !!val.exercise_id?.trim();
+    const hasLe = !!val.lesson_id?.trim();
+    if (!hasEx && !hasLe) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cần exercise_id hoặc lesson_id",
+      });
+    }
+    if (hasEx && hasLe) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Chỉ gửi một trong exercise_id hoặc lesson_id",
+      });
+    }
+  });
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -42,25 +61,46 @@ export async function POST(request: Request) {
     );
   }
 
-  const { exercise_id, code, language, stdin, include_ai } = parsed.data;
+  const { exercise_id, lesson_id, code, language, stdin, include_ai } =
+    parsed.data;
 
-  const { data: exercise, error: exErr } = await supabase
-    .from("practice_exercises")
-    .select("id, language")
-    .eq("id", exercise_id)
-    .maybeSingle();
+  if (exercise_id) {
+    const { data: exercise, error: exErr } = await supabase
+      .from("practice_exercises")
+      .select("id, language")
+      .eq("id", exercise_id)
+      .maybeSingle();
 
-  if (exErr) {
-    return NextResponse.json({ error: exErr.message }, { status: 500 });
-  }
-  if (!exercise) {
-    return NextResponse.json({ error: "Exercise not found" }, { status: 404 });
-  }
-  if (exercise.language && exercise.language !== language) {
-    return NextResponse.json(
-      { error: "Language does not match exercise" },
-      { status: 400 }
+    if (exErr) {
+      return NextResponse.json({ error: exErr.message }, { status: 500 });
+    }
+    if (!exercise) {
+      return NextResponse.json({ error: "Exercise not found" }, { status: 404 });
+    }
+    if (exercise.language && exercise.language !== language) {
+      return NextResponse.json(
+        { error: "Language does not match exercise" },
+        { status: 400 }
+      );
+    }
+  } else if (lesson_id) {
+    const lesson = await getPublishedLessonIfEnrolled(
+      supabase,
+      user.id,
+      lesson_id
     );
+    if (!lesson) {
+      return NextResponse.json(
+        { error: "Lesson not found or not enrolled" },
+        { status: 404 }
+      );
+    }
+    if (!lesson.code_template?.trim()) {
+      return NextResponse.json(
+        { error: "Lesson has no coding exercise" },
+        { status: 400 }
+      );
+    }
   }
 
   const result = await executeCode({
@@ -84,16 +124,25 @@ export async function POST(request: Request) {
     }
   }
 
+  const insertRow: Record<string, unknown> = {
+    user_id: user.id,
+    code,
+    output: result.output || null,
+    error: result.error || null,
+    ai_suggestion: aiSuggestion,
+  };
+
+  if (exercise_id) {
+    insertRow.exercise_id = exercise_id;
+    insertRow.lesson_id = null;
+  } else {
+    insertRow.exercise_id = null;
+    insertRow.lesson_id = lesson_id;
+  }
+
   const { data: row, error: insErr } = await supabase
     .from("practice_submissions")
-    .insert({
-      user_id: user.id,
-      exercise_id,
-      code,
-      output: result.output || null,
-      error: result.error || null,
-      ai_suggestion: aiSuggestion,
-    })
+    .insert(insertRow)
     .select("id")
     .single();
 

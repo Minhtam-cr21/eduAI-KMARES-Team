@@ -3,7 +3,9 @@ import Link from "next/link";
 
 const baseNav = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/practice", label: "Luyện code" },
+  { href: "/practice/random", label: "Luyện random" },
+  { href: "/practice/exercises", label: "Bài tập khóa" },
+  { href: "/practice", label: "Luyện nhanh" },
   { href: "/assessment", label: "Trắc nghiệm" },
   { href: "/profile", label: "Profile" },
 ] as const;

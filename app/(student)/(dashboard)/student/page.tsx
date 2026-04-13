@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Code2,
   LayoutDashboard,
+  Library,
   User,
   Users,
 } from "lucide-react";
@@ -30,18 +31,12 @@ type EnrolledCourse = {
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/student", icon: LayoutDashboard },
-  { label: "Luyện code", href: "/student/practice", icon: Code2 },
+  { label: "Luyện random", href: "/practice/random", icon: Code2 },
+  { label: "Bài khóa", href: "/practice/exercises", icon: BookOpen },
+  { label: "Danh sách bài", href: "/student/practice", icon: Library },
   { label: "Trắc nghiệm", href: "/assessment", icon: ClipboardList },
   { label: "Profile", href: "/profile", icon: User },
   { label: "Kết nối GV", href: "/student/connections", icon: Users },
-];
-
-const MOCK_SCHEDULE = [
-  { day: "06", label: "T2", course: "English", progress: "10/20 chapters", time: "15:00 – 16:30" },
-  { day: "07", label: "T3", course: "Business Strategy", progress: "9/30 chapters", time: "10:00 – 11:00" },
-  { day: "08", label: "T4", course: "Python", progress: "4/15 chapters", time: "14:00 – 15:30" },
-  { day: "09", label: "T5", course: "Algorithms", progress: "7/25 chapters", time: "09:00 – 10:30" },
-  { day: "10", label: "T6", course: "SQL Practice", progress: "12/18 chapters", time: "16:00 – 17:00" },
 ];
 
 function CourseCard({ c }: { c: EnrolledCourse }) {
@@ -225,32 +220,19 @@ export default function StudentDashboardPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
               <CalendarDays className="h-5 w-5 text-primary" />
-              Schedule
+              Lịch & lộ trình
             </h2>
-            <button
-              type="button"
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              See All
-            </button>
           </div>
-          <div className="space-y-3">
-            {MOCK_SCHEDULE.map((s) => (
-              <div
-                key={s.day}
-                className="flex items-start gap-4 rounded-xl border border-border bg-card p-4 transition hover:shadow-sm"
-              >
-                <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <span className="text-lg font-bold leading-none">{s.day}</span>
-                  <span className="text-[10px] font-medium">{s.label}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-foreground">{s.course}</p>
-                  <p className="text-xs text-muted-foreground">{s.progress}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{s.time}</p>
-                </div>
-              </div>
-            ))}
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <p className="text-sm text-muted-foreground">
+              Lịch học chi tiết theo lộ trình cá nhân hóa — xem sau khi hoàn thành trắc nghiệm và giáo viên duyệt lộ trình.
+            </p>
+            <Link
+              href="/personalized-roadmap"
+              className="inline-flex text-sm font-medium text-primary hover:underline"
+            >
+              Mở lộ trình cá nhân hóa →
+            </Link>
           </div>
         </aside>
       </div>

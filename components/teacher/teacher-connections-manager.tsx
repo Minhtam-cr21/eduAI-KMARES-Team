@@ -26,6 +26,7 @@ export type ConnectionRow = {
   status: string;
   created_at: string;
   responded_at: string | null;
+  teacher_response: string | null;
   student_name: string | null;
 };
 
@@ -142,6 +143,24 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                     Thời gian rảnh: {r.available_time}
                   </p>
                 )}
+
+                {r.status !== "pending" && r.teacher_response ? (
+                  <p className="text-xs text-muted-foreground">
+                    Đã gửi link/phản hồi:{" "}
+                    {/^https?:\/\//i.test(r.teacher_response.trim()) ? (
+                      <a
+                        href={r.teacher_response.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        {r.teacher_response.trim()}
+                      </a>
+                    ) : (
+                      <span className="text-foreground">{r.teacher_response}</span>
+                    )}
+                  </p>
+                ) : null}
 
                 {r.status === "pending" && (
                   <div className="flex gap-2 pt-1">

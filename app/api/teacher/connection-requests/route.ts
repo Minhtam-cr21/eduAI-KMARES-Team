@@ -10,7 +10,9 @@ export async function GET() {
 
   const { data: rows, error } = await gate.supabase
     .from("connection_requests")
-    .select("id, student_id, goal, available_time, status, created_at, responded_at")
+    .select(
+      "id, student_id, goal, available_time, status, created_at, responded_at, teacher_response"
+    )
     .eq("teacher_id", gate.userId)
     .order("created_at", { ascending: false });
 

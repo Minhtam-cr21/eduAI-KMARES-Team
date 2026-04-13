@@ -12,6 +12,8 @@ const profilePutSchema = z.object({
   goal: z.string().optional(),
   hours_per_day: z.coerce.number().int().min(1).max(8).optional(),
   preferred_learning: z.string().optional(),
+  strengths: z.array(z.string().max(200)).max(30).optional(),
+  weaknesses: z.array(z.string().max(200)).max(30).optional(),
 });
 
 /**
@@ -29,7 +31,7 @@ export async function GET() {
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, goal, hours_per_day, preferred_learning, full_name, role, onboarding_completed, onboarding_completed_at, birth_year, school, class, mbti_type, learning_style, preferred_pace, challenge_level, reminder_method"
+      "id, goal, hours_per_day, preferred_learning, full_name, role, onboarding_completed, onboarding_completed_at, birth_year, school, class, mbti_type, learning_style, preferred_pace, challenge_level, reminder_method, career_orientation, assessment_completed, assessment_completed_at, strengths, weaknesses, interests"
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -45,7 +47,7 @@ export async function GET() {
 }
 
 /**
- * PUT /api/user/profile — chỉ goal, hours_per_day, preferred_learning.
+ * PUT /api/user/profile — goal, hours_per_day, preferred_learning, strengths, weaknesses.
  */
 export async function PUT(request: Request) {
   const supabase = createClient();
@@ -75,6 +77,12 @@ export async function PUT(request: Request) {
   if (body.preferred_learning !== undefined) {
     patch.preferred_learning = body.preferred_learning.trim() || null;
   }
+  if (body.strengths !== undefined) {
+    patch.strengths = body.strengths.map((s) => s.trim()).filter(Boolean);
+  }
+  if (body.weaknesses !== undefined) {
+    patch.weaknesses = body.weaknesses.map((s) => s.trim()).filter(Boolean);
+  }
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Không có trường cập nhật." }, { status: 400 });
@@ -85,7 +93,7 @@ export async function PUT(request: Request) {
     .update(patch)
     .eq("id", user.id)
     .select(
-      "id, goal, hours_per_day, preferred_learning, full_name, role, onboarding_completed, birth_year, school, class"
+      "id, goal, hours_per_day, preferred_learning, full_name, role, onboarding_completed, birth_year, school, class, strengths, weaknesses, career_orientation, assessment_completed"
     )
     .single();
 

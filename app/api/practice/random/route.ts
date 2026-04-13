@@ -1,7 +1,80 @@
+import {
+  generateExerciseWithOpenAI,
+  getStaticFallback,
+  pickExistingExerciseFromDb,
+} from "@/lib/practice/generate-random-exercise";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const postSchema = z.object({
+  language: z.enum(["python", "java", "cpp"]),
+  difficulty: z.enum(["easy", "medium", "hard"]),
+});
+
+/**
+ * POST — sinh bài `practice_exercises` (OpenAI → DB có sẵn → fallback tĩnh), trả object để luyện + run.
+ */
+export async function POST(request: Request) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let json: unknown;
+  try {
+    json = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = postSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid body", details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const { language, difficulty } = parsed.data;
+
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 25_000);
+  let payload =
+    (await generateExerciseWithOpenAI(language, difficulty, controller.signal)) ??
+    (await pickExistingExerciseFromDb(supabase, language, difficulty)) ??
+    getStaticFallback(language, difficulty);
+  clearTimeout(t);
+
+  const title = payload.title.slice(0, 200);
+  const { data: inserted, error: insErr } = await supabase
+    .from("practice_exercises")
+    .insert({
+      title,
+      description: payload.description,
+      initial_code: payload.initial_code_template || null,
+      test_code: null,
+      language,
+      difficulty,
+      input_example: payload.input_example || null,
+      output_example: payload.output_example || null,
+    })
+    .select("*")
+    .single();
+
+  if (insErr) {
+    return NextResponse.json({ error: insErr.message }, { status: 500 });
+  }
+
+  return NextResponse.json(inserted);
+}
 
 export async function GET(req: NextRequest) {
   const supabase = createClient();

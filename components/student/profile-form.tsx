@@ -10,10 +10,19 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Pencil, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+
+function splitList(s: string): string[] {
+  return s
+    .split(/[\n,]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
 
 interface ProfileData {
   email: string;
@@ -30,13 +39,25 @@ interface ProfileData {
   mbtiType: string | null;
   learningStyle: string | null;
   onboardingCompleted: boolean;
+  careerOrientation: string | null;
+  assessmentCompleted: boolean;
+  strengths: string[] | null;
+  weaknesses: string[] | null;
 }
 
 export function ProfileForm({ data }: { data: ProfileData }) {
+  const router = useRouter();
   const [goal, setGoal] = useState(data.goal ?? "");
   const [hours, setHours] = useState(String(data.hoursPerDay ?? ""));
   const [preferred, setPreferred] = useState(data.preferredLearning ?? "");
+  const [strengthsText, setStrengthsText] = useState(
+    (data.strengths ?? []).join(", ")
+  );
+  const [weaknessesText, setWeaknessesText] = useState(
+    (data.weaknesses ?? []).join(", ")
+  );
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   async function handleSave() {
     setSaving(true);
@@ -47,6 +68,17 @@ export function ProfileForm({ data }: { data: ProfileData }) {
       if (!isNaN(h) && h !== data.hoursPerDay) body.hours_per_day = h;
       if (preferred.trim() !== (data.preferredLearning ?? ""))
         body.preferred_learning = preferred.trim();
+
+      const nextS = splitList(strengthsText);
+      const prevS = data.strengths ?? [];
+      if (JSON.stringify(nextS) !== JSON.stringify(prevS)) {
+        body.strengths = nextS;
+      }
+      const nextW = splitList(weaknessesText);
+      const prevW = data.weaknesses ?? [];
+      if (JSON.stringify(nextW) !== JSON.stringify(prevW)) {
+        body.weaknesses = nextW;
+      }
 
       if (Object.keys(body).length === 0) {
         toast.info("Không có thay đổi.");
@@ -64,12 +96,40 @@ export function ProfileForm({ data }: { data: ProfileData }) {
         return;
       }
       toast.success("Đã cập nhật hồ sơ.");
+      router.refresh();
     } catch (err) {
       toast.error("Lỗi mạng", {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleResetAssessment() {
+    if (
+      !window.confirm(
+        "Xóa kết quả trắc nghiệm hiện tại và làm lại từ đầu? Hành động không thể hoàn tác."
+      )
+    ) {
+      return;
+    }
+    setResetting(true);
+    try {
+      const res = await fetch("/api/assessment/reset", { method: "POST" });
+      const j = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        toast.error("Không reset được", { description: j.error });
+        return;
+      }
+      toast.success("Đã xóa kết quả. Bạn có thể làm bài test lại.");
+      router.refresh();
+    } catch (e) {
+      toast.error("Lỗi mạng", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -104,10 +164,47 @@ export function ProfileForm({ data }: { data: ProfileData }) {
               {data.onboardingCompleted && (
                 <Badge variant="secondary">Onboarding ✓</Badge>
               )}
+              {data.assessmentCompleted && (
+                <Badge variant="outline" className="border-emerald-500/50 text-emerald-700 dark:text-emerald-400">
+                  Đã làm trắc nghiệm
+                </Badge>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {(data.careerOrientation || data.assessmentCompleted) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Trắc nghiệm & định hướng</CardTitle>
+            <CardDescription>Kết quả từ bài test trên EduAI.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {data.careerOrientation ? (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Định hướng nghề (tóm tắt)
+                </p>
+                <p className="mt-1 text-foreground">{data.careerOrientation}</p>
+              </div>
+            ) : null}
+            {data.assessmentCompleted ? (
+              <button
+                type="button"
+                disabled={resetting}
+                onClick={() => void handleResetAssessment()}
+                className={cn(
+                  "rounded-lg border border-border px-4 py-2 text-sm font-medium transition",
+                  "hover:bg-muted disabled:opacity-60"
+                )}
+              >
+                {resetting ? "Đang xử lý…" : "Làm lại bài test"}
+              </button>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -181,12 +278,12 @@ export function ProfileForm({ data }: { data: ProfileData }) {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="hours">Giờ/ngày</Label>
+              <Label htmlFor="hours">Giờ/ngày (1–8)</Label>
               <Input
                 id="hours"
                 type="number"
-                min={0}
-                max={24}
+                min={1}
+                max={8}
                 value={hours}
                 onChange={(e) => setHours(e.target.value)}
                 placeholder="2"
@@ -199,6 +296,28 @@ export function ProfileForm({ data }: { data: ProfileData }) {
                 value={preferred}
                 onChange={(e) => setPreferred(e.target.value)}
                 placeholder="video, text, practice..."
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="strengths">Điểm mạnh (phân cách bằng dấu phẩy hoặc xuống dòng)</Label>
+              <Textarea
+                id="strengths"
+                value={strengthsText}
+                onChange={(e) => setStrengthsText(e.target.value)}
+                className="min-h-[72px]"
+                placeholder="ví dụ: tư duy logic, kiên trì"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="weaknesses">Điểm cần cải thiện</Label>
+              <Textarea
+                id="weaknesses"
+                value={weaknessesText}
+                onChange={(e) => setWeaknessesText(e.target.value)}
+                className="min-h-[72px]"
+                placeholder="ví dụ: quản lý thời gian"
               />
             </div>
           </div>

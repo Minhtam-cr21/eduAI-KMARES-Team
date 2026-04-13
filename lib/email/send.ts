@@ -52,6 +52,40 @@ export async function sendMissedDeadlineNotification(
   });
 }
 
+export async function sendTeacherConnectionResponseEmail(
+  studentEmail: string,
+  opts: {
+    teacherName: string;
+    status: "accepted" | "rejected";
+    teacherResponse: string | null;
+  }
+): Promise<void> {
+  const subject =
+    opts.status === "accepted"
+      ? "[EduAI] Giáo viên đã chấp nhận kết nối"
+      : "[EduAI] Cập nhật yêu cầu kết nối giáo viên";
+
+  const linkBlock =
+    opts.teacherResponse && /^https?:\/\//i.test(opts.teacherResponse.trim())
+      ? `<p>Link liên hệ: <a href="${escapeHtml(opts.teacherResponse.trim())}">${escapeHtml(opts.teacherResponse.trim())}</a></p>`
+      : opts.teacherResponse
+        ? `<p>Nội dung phản hồi: ${escapeHtml(opts.teacherResponse)}</p>`
+        : "";
+
+  await sendResend({
+    to: studentEmail,
+    subject,
+    html: `<p>Xin chào,</p>
+<p><strong>${escapeHtml(opts.teacherName)}</strong> đã ${
+      opts.status === "accepted"
+        ? "chấp nhận yêu cầu kết nối của bạn."
+        : "từ chối yêu cầu kết nối."
+    }</p>
+${linkBlock}
+<p>Vào mục Kết nối giáo viên trên EduAI để xem lịch sử đầy đủ.</p>`,
+  });
+}
+
 export async function sendFrozenNotification(
   teacherEmail: string,
   studentName: string

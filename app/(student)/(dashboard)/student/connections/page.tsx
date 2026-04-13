@@ -223,8 +223,26 @@ export default function StudentConnectionsPage() {
                   GV: {r.teacher_id?.slice(0, 8)}…
                 </p>
                 {r.teacher_response ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Phản hồi: {r.teacher_response}
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Phản hồi GV: </span>
+                    {/^https?:\/\//i.test(r.teacher_response.trim()) ? (
+                      <a
+                        href={r.teacher_response.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-all text-primary underline"
+                      >
+                        {r.teacher_response.trim()}
+                      </a>
+                    ) : (
+                      <span className="text-foreground">{r.teacher_response}</span>
+                    )}
+                  </div>
+                ) : null}
+                {r.responded_at ? (
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Phản hồi lúc:{" "}
+                    {new Date(r.responded_at).toLocaleString("vi-VN")}
                   </p>
                 ) : null}
               </CardContent>
