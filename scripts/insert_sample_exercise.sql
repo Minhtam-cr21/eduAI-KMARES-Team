@@ -35,4 +35,4 @@ WHERE l.title = 'In ra màn hình'
   )
 RETURNING id, title, lesson_id;
 
--- Sau khi chạy: mở /debug?exerciseId=<id trả về> (đã đăng nhập học sinh).
+-- Sau khi chạy: học sinh có thể luyện qua /practice hoặc /student/practice.

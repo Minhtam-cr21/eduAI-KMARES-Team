@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 import {
   BookOpen,
   BrainCircuit,
-  Bug,
   CalendarDays,
+  ClipboardList,
   Code2,
   LayoutDashboard,
   User,
@@ -30,11 +30,11 @@ type EnrolledCourse = {
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/student", icon: LayoutDashboard },
-  { label: "Debugger", href: "/debug", icon: Bug },
+  { label: "Luyện code", href: "/student/practice", icon: Code2 },
+  { label: "Trắc nghiệm", href: "/assessment", icon: ClipboardList },
   { label: "Profile", href: "/profile", icon: User },
   { label: "MBTI Test", href: "/student/mbti", icon: BrainCircuit },
   { label: "Kết nối GV", href: "/student/connections", icon: Users },
-  { label: "Luyện code", href: "/student/practice", icon: Code2 },
 ];
 
 const MOCK_SCHEDULE = [

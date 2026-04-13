@@ -96,7 +96,7 @@ export default function PracticePage() {
     setRunError("");
     setExitCode(null);
     try {
-      const res = await fetch("/api/run-code", {
+      const res = await fetch("/api/practice/quick-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

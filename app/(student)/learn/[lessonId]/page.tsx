@@ -216,7 +216,7 @@ export default function LearnLessonPage() {
 
         {firstExerciseId ? (
           <Link
-            href={`/debug?exerciseId=${firstExerciseId}`}
+            href="/practice"
             className={cn(buttonVariants())}
           >
             Thực hành

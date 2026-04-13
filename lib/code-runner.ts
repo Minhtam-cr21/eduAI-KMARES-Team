@@ -1,6 +1,6 @@
 /**
  * Chạy code (Judge0 → Piston fallback). Dùng cho /api/practice/run;
- * /api/run-code giữ nguyên, không import file này để tránh đổi hành vi API cũ.
+ * Dùng cho /api/practice/run và /api/practice/quick-run.
  */
 import {
   JUDGE0_SUBMISSIONS_URL,
