@@ -55,6 +55,8 @@ export interface ConnectionRequest {
   student_id: string;
   teacher_id: string;
   goal: string;
+  reason?: string | null;
+  desired_roadmap?: string | null;
   available_time: string | null;
   status: ConnectionRequestStatus;
   teacher_response: string | null;

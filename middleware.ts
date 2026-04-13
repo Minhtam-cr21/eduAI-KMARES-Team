@@ -32,8 +32,19 @@ function needsAdminRole(pathname: string): boolean {
   );
 }
 
+/** API khám phá GV: mọi user đăng nhập (học sinh), không ép role teacher. */
+function isTeacherDiscoveryStudentApi(pathname: string): boolean {
+  return (
+    pathname === "/api/teacher/list" ||
+    pathname.startsWith("/api/teacher/public/")
+  );
+}
+
 /** `/teacher/*` và `/api/teacher/*` — `profiles.role` là `teacher` hoặc `admin`. */
 function needsTeacherOrAdminRole(pathname: string): boolean {
+  if (isTeacherDiscoveryStudentApi(pathname)) {
+    return false;
+  }
   return (
     pathname === "/teacher" ||
     pathname.startsWith("/teacher/") ||

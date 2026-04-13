@@ -36,7 +36,7 @@ const NAV_ITEMS = [
   { label: "Danh sách bài", href: "/student/practice", icon: Library },
   { label: "Trắc nghiệm", href: "/assessment", icon: ClipboardList },
   { label: "Profile", href: "/profile", icon: User },
-  { label: "Kết nối GV", href: "/student/connections", icon: Users },
+  { label: "Kết nối GV", href: "/student/teachers", icon: Users },
 ];
 
 function CourseCard({ c }: { c: EnrolledCourse }) {

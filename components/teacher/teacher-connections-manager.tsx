@@ -22,6 +22,8 @@ export type ConnectionRow = {
   id: string;
   student_id: string;
   goal: string;
+  reason: string | null;
+  desired_roadmap: string | null;
   available_time: string | null;
   status: string;
   created_at: string;
@@ -137,6 +139,22 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                 </div>
 
                 <p className="line-clamp-3 text-sm text-foreground">{r.goal}</p>
+
+                {r.reason ? (
+                  <div className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Lý do: </span>
+                    <span className="whitespace-pre-wrap">{r.reason}</span>
+                  </div>
+                ) : null}
+
+                {r.desired_roadmap ? (
+                  <div className="rounded-md border border-border/60 p-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      Lộ trình mong muốn:{" "}
+                    </span>
+                    <span className="whitespace-pre-wrap">{r.desired_roadmap}</span>
+                  </div>
+                ) : null}
 
                 {r.available_time && (
                   <p className="text-xs text-muted-foreground">

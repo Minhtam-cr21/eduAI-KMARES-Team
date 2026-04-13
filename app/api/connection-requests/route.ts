@@ -6,7 +6,10 @@ export const dynamic = "force-dynamic";
 
 const postSchema = z.object({
   teacher_id: z.string().uuid(),
-  goal: z.string().min(1),
+  goal: z.string().min(1, "Mục tiêu là bắt buộc"),
+  /** Form mới: bắt buộc từ UI; client cũ không gửi → dùng lại `goal`. */
+  reason: z.string().optional().nullable(),
+  desired_roadmap: z.string().optional().nullable(),
   available_time: z.string().optional().nullable(),
 });
 
@@ -43,12 +46,17 @@ export async function POST(request: Request) {
   const parsed = postSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Missing or invalid teacher_id or goal", details: parsed.error.flatten() },
+      {
+        error: "Dữ liệu không hợp lệ",
+        details: parsed.error.flatten(),
+      },
       { status: 400 }
     );
   }
 
-  const { teacher_id, goal, available_time } = parsed.data;
+  const { teacher_id, goal, reason, desired_roadmap, available_time } =
+    parsed.data;
+  const reasonText = (reason?.trim() || goal.trim()).slice(0, 8000);
 
   const { data: teacher } = await supabase
     .from("profiles")
@@ -69,6 +77,8 @@ export async function POST(request: Request) {
       student_id: user.id,
       teacher_id,
       goal,
+      reason: reasonText,
+      desired_roadmap: desired_roadmap?.trim() || null,
       available_time: available_time ?? null,
       status: "pending",
     })

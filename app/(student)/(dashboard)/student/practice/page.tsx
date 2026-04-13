@@ -215,7 +215,7 @@ export default function StudentPracticeListPage() {
             code.
           </p>
           <Link
-            href="/student/connections"
+            href="/student/teachers"
             className="mt-3 text-sm font-medium text-primary hover:underline"
           >
             Kết nối giáo viên →
