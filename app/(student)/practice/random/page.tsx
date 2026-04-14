@@ -5,7 +5,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PracticeExercise } from "@/types/database";
-import Editor from "@monaco-editor/react";
+import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -343,7 +343,7 @@ export default function PracticeRandomSmartPage() {
               </button>
             </div>
             <div className="min-h-[360px] flex-1">
-              <Editor
+              <LazyMonacoEditor
                 height="100%"
                 language={editorLang}
                 theme="vs-dark"

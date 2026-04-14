@@ -1,5 +1,14 @@
 import { requireTeacherOrAdmin } from "@/lib/auth/require-teacher-or-admin";
+import { segmentMetadata } from "@/lib/seo/shared-metadata";
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = segmentMetadata({
+  title: "Giáo viên",
+  description:
+    "Quản lý khóa học, học sinh và kết nối trên EduAI (khu vực giáo viên).",
+  noIndex: true,
+});
 
 export const dynamic = "force-dynamic";
 

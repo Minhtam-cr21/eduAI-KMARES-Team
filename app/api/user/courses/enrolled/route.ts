@@ -28,7 +28,7 @@ export async function GET() {
 
   const { data: rows, error } = await supabase
     .from("user_courses")
-    .select("*")
+    .select("id, course_id, status, enrolled_at, completed_at")
     .eq("user_id", user.id)
     .order("enrolled_at", { ascending: false });
 

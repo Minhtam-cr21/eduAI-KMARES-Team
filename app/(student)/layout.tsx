@@ -1,7 +1,16 @@
 import { StudentNav } from "@/components/student/student-nav";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { segmentMetadata } from "@/lib/seo/shared-metadata";
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+
+export const metadata: Metadata = segmentMetadata({
+  title: "Học tập",
+  description:
+    "Dashboard học sinh EduAI: khóa học, luyện code, trắc nghiệm định hướng và lộ trình cá nhân hóa.",
+  noIndex: true,
+});
 
 export default function StudentLayout({
   children,

@@ -1,12 +1,27 @@
 "use client";
 
-import { AiRoadmapRequestDialog } from "@/components/student/ai-roadmap-request-dialog";
-import { RequireTestDialog } from "@/components/assessment/require-test-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { BookOpen, Briefcase, Code2, Lightbulb, Route } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+
+const RequireTestDialog = dynamic(
+  () =>
+    import("@/components/assessment/require-test-dialog").then((m) => ({
+      default: m.RequireTestDialog,
+    })),
+  { ssr: false }
+);
+
+const AiRoadmapRequestDialog = dynamic(
+  () =>
+    import("@/components/student/ai-roadmap-request-dialog").then((m) => ({
+      default: m.AiRoadmapRequestDialog,
+    })),
+  { ssr: false }
+);
 
 type NextSuggest = {
   suggested_language: string;

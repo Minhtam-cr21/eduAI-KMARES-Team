@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { PracticeExercise } from "@/types/database";
-import Editor from "@monaco-editor/react";
+import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
 import { Code2, Search } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -333,7 +333,7 @@ export default function StudentPracticeListPage() {
                     </div>
                   </div>
                   <div className="min-h-[350px] flex-1">
-                    <Editor
+                    <LazyMonacoEditor
                       height="100%"
                       language={monacoLang(selected.language)}
                       theme="vs-dark"

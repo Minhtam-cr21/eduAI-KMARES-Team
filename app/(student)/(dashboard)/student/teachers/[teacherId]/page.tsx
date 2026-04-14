@@ -11,6 +11,7 @@ import {
 import { parseTeacherPublicProfile } from "@/lib/teacher/parse-public-profile";
 import { createClient } from "@/lib/supabase/server";
 import { BookOpen, User } from "lucide-react";
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { TeacherProfileActions } from "./profile-actions";
 
@@ -47,11 +48,13 @@ export default async function TeacherPublicPage({ params }: PageProps) {
         <div className="flex shrink-0 justify-center sm:justify-start">
           {profile.avatar_url ? (
             <div className="relative h-28 w-28 overflow-hidden rounded-2xl border border-border bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={profile.avatar_url}
                 alt=""
-                className="h-full w-full object-cover"
+                fill
+                className="object-cover"
+                sizes="112px"
+                unoptimized
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -103,13 +106,15 @@ export default async function TeacherPublicPage({ params }: PageProps) {
           <div className="grid gap-4 sm:grid-cols-2">
             {profile.published_courses.map((c) => (
               <Card key={c.id} className="overflow-hidden">
-                <div className="flex h-36 border-b border-border bg-muted/40">
+                <div className="relative flex h-36 border-b border-border bg-muted/40">
                   {c.thumbnail_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={c.thumbnail_url}
                       alt=""
-                      className="h-full w-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 100vw, 50vw"
+                      unoptimized
                       referrerPolicy="no-referrer"
                     />
                   ) : (

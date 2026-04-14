@@ -1,6 +1,5 @@
 "use client";
 
-import { ConnectTeacherDialog } from "@/components/connection/connect-teacher-dialog";
 import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -18,9 +17,19 @@ import type { TeacherDiscoveryCard } from "@/lib/types/teacher-discovery";
 import { cn } from "@/lib/utils";
 import type { ConnectionRequest } from "@/types/database";
 import { BookOpen, Search, User, Users } from "lucide-react";
+import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+
+const ConnectTeacherDialog = dynamic(
+  () =>
+    import("@/components/connection/connect-teacher-dialog").then((m) => ({
+      default: m.ConnectTeacherDialog,
+    })),
+  { ssr: false }
+);
 
 const STATUS_STYLE: Record<string, string> = {
   pending:
@@ -40,19 +49,22 @@ function TeacherAvatar({
 }) {
   if (url) {
     return (
-      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
-        <img
+      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
+        <Image
           src={url}
           alt=""
-          className="h-full w-full object-cover"
+          width={40}
+          height={40}
+          className="object-cover"
+          unoptimized
           referrerPolicy="no-referrer"
         />
       </div>
     );
   }
   return (
-    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
-      <User className="h-8 w-8 text-muted-foreground" />
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
+      <User className="h-5 w-5 text-muted-foreground" />
     </div>
   );
 }
@@ -67,10 +79,13 @@ function CourseThumb({
   if (thumbnailUrl) {
     return (
       <div className="relative h-9 w-9 overflow-hidden rounded-md border border-border bg-muted">
-        <img
+        <Image
           src={thumbnailUrl}
           alt=""
-          className="h-full w-full object-cover"
+          fill
+          className="object-cover"
+          sizes="36px"
+          unoptimized
           referrerPolicy="no-referrer"
         />
       </div>

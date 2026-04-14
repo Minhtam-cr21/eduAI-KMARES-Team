@@ -5,7 +5,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RunCodeLanguage } from "@/lib/code-runner";
-import Editor from "@monaco-editor/react";
+import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -251,7 +251,7 @@ export default function PracticeLessonCodingPage() {
               </button>
             </div>
             <div className="min-h-[360px] flex-1">
-              <Editor
+              <LazyMonacoEditor
                 height="100%"
                 language={editorLang}
                 theme="vs-dark"

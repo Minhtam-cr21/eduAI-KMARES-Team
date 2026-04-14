@@ -20,13 +20,13 @@ export async function GET() {
 
   const { count: completed, error: e1 } = await supabase
     .from("study_schedule")
-    .select("*", { count: "exact", head: true })
+    .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
     .eq("status", "completed");
 
   const { count: totalAssigned, error: e2 } = await supabase
     .from("study_schedule")
-    .select("*", { count: "exact", head: true })
+    .select("id", { count: "exact", head: true })
     .eq("user_id", user.id);
 
   if (e1 || e2) {

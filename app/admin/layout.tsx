@@ -1,6 +1,14 @@
 import { AdminShellNav } from "@/components/admin/admin-shell-nav";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { segmentMetadata } from "@/lib/seo/shared-metadata";
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = segmentMetadata({
+  title: "Quản trị",
+  description: "Quản trị nội dung và người dùng EduAI.",
+  noIndex: true,
+});
 
 export const dynamic = "force-dynamic";
 

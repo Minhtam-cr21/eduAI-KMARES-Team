@@ -14,6 +14,7 @@ import type { AssessmentResultPayload } from "@/lib/assessment/load-result";
 import { mbtiBadgeClass, mbtiBlurb } from "@/lib/assessment/mbti-display";
 import { cn } from "@/lib/utils";
 import { BookOpen, Sparkles } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -209,13 +210,15 @@ export default function AssessmentResultPage() {
                 key={c.id}
                 className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row"
               >
-                <div className="flex h-24 w-full shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted sm:h-24 sm:w-32">
+                <div className="relative flex h-24 w-full shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted sm:h-24 sm:w-32">
                   {c.thumbnail_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={c.thumbnail_url}
                       alt=""
-                      className="h-full w-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="128px"
+                      unoptimized
                     />
                   ) : (
                     <BookOpen className="h-10 w-10 text-muted-foreground/40" />

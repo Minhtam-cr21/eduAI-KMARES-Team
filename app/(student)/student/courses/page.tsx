@@ -4,6 +4,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -107,13 +108,15 @@ export default function MyCoursesPage() {
                 key={item.enrollment.id}
                 className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center"
               >
-                <div className="h-28 w-full shrink-0 overflow-hidden rounded-lg bg-muted sm:h-24 sm:w-40">
+                <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-lg bg-muted sm:h-24 sm:w-40">
                   {c.thumbnail_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={c.thumbnail_url}
                       alt=""
-                      className="h-full w-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 100vw, 160px"
+                      unoptimized
                     />
                   ) : null}
                 </div>

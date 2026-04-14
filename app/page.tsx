@@ -1,6 +1,29 @@
 import { LandingHeader } from "@/components/landing/landing-header";
+import {
+  defaultOpenGraph,
+  defaultTwitter,
+} from "@/lib/seo/shared-metadata";
+import type { Metadata } from "next";
 import { BookOpen, Brain, Code2, Users, Mail, MapPin } from "lucide-react";
 import Link from "next/link";
+
+const landingDescription =
+  "Lộ trình cá nhân hóa, phòng luyện code thông minh, trắc nghiệm định hướng và kết nối giáo viên — học lập trình hiệu quả cùng EduAI.";
+
+export const metadata: Metadata = {
+  title: "EduAI — Học lập trình cá nhân hóa",
+  description: landingDescription,
+  openGraph: {
+    ...defaultOpenGraph,
+    title: "EduAI — Học lập trình cá nhân hóa",
+    description: landingDescription,
+  },
+  twitter: {
+    ...defaultTwitter,
+    title: "EduAI — Học lập trình cá nhân hóa",
+    description: landingDescription,
+  },
+};
 
 const features = [
   {

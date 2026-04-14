@@ -57,7 +57,14 @@ export function LandingHeader() {
     <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-foreground">
-          <Image src="/images/logo.png" alt="EduAI" width={32} height={32} className="h-8 w-8 md:h-9 md:w-9" />
+          <Image
+            src="/images/logo.png"
+            alt="EduAI"
+            width={36}
+            height={36}
+            priority
+            className="h-8 w-8 md:h-9 md:w-9"
+          />
           EduAI
         </Link>
 

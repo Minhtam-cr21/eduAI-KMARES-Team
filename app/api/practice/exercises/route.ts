@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+const EXERCISE_COLUMNS =
+  "id, title, description, initial_code, test_code, language, difficulty, input_example, output_example, created_at";
+
 export async function GET(request: NextRequest) {
   const supabase = createClient();
   const {
@@ -19,7 +22,7 @@ export async function GET(request: NextRequest) {
   if (id) {
     const { data, error } = await supabase
       .from("practice_exercises")
-      .select("*")
+      .select(EXERCISE_COLUMNS)
       .eq("id", id)
       .maybeSingle();
 
@@ -39,7 +42,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("practice_exercises")
-    .select("*", { count: "exact" });
+    .select(EXERCISE_COLUMNS, { count: "exact" });
 
   if (language && ["cpp", "java", "python"].includes(language)) {
     query = query.eq("language", language);

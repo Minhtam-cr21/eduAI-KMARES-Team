@@ -15,7 +15,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("connection_requests")
-    .select("*")
+    .select(
+      "id, student_id, teacher_id, goal, reason, desired_roadmap, available_time, status, teacher_response, created_at, responded_at, last_updated"
+    )
     .eq("student_id", user.id)
     .order("created_at", { ascending: false });
 

@@ -2,7 +2,7 @@
 
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { BackButton } from "@/components/ui/back-button";
-import Editor from "@monaco-editor/react";
+import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -289,7 +289,7 @@ export default function PracticePage() {
               </button>
             </div>
             <div className="min-h-[360px] flex-1">
-              <Editor
+              <LazyMonacoEditor
                 height="100%"
                 language={monacoLang}
                 theme="vs-dark"

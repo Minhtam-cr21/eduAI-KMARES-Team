@@ -1,15 +1,13 @@
-import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
-import { Inter } from "next/font/google";
+import { buildRootMetadata } from "@/lib/seo/shared-metadata";
 import { cn } from "@/lib/utils";
+import { Inter } from "next/font/google";
+import type { Metadata } from "next";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
-export const metadata: Metadata = {
-  title: "EduAI",
-  description: "EduAI MVP",
-};
+export const metadata: Metadata = buildRootMetadata();
 
 export default function RootLayout({
   children,

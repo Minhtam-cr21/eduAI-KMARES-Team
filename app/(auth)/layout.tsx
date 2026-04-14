@@ -1,5 +1,14 @@
+import { segmentMetadata } from "@/lib/seo/shared-metadata";
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+
+export const metadata: Metadata = segmentMetadata({
+  title: "Đăng nhập & đăng ký",
+  description:
+    "Đăng nhập hoặc tạo tài khoản EduAI để bắt đầu học lập trình cá nhân hóa.",
+  noIndex: true,
+});
 
 export default function AuthLayout({
   children,
