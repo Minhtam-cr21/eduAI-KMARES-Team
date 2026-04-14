@@ -12,6 +12,7 @@
     "lint": "next lint",
     "seed": "npx tsx scripts/seed.ts",
     "ingest:roadmap": "npx tsx scripts/ingest-roadmap.ts",
+    "ingest:roadmaps": "ts-node -P ./scripts/tsconfig.json --transpile-only ./scripts/ingest-roadmaps.ts",
     "seed:courses": "npx tsx scripts/seed-courses.ts",
     "supabase:deploy:deadlines": "node scripts/deploy-edge-deadlines.mjs",
     "gh:missed-deadlines": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-missed-deadlines-workflow.ps1"
@@ -32,10 +33,13 @@
     "@vercel/speed-insights": "^2.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
     "lucide-react": "^1.7.0",
     "monaco-editor": "^0.55.1",
     "next": "14.2.28",
     "next-themes": "^0.4.6",
+    "openai": "^6.34.0",
+    "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.72.1",
@@ -56,6 +60,7 @@
     "eslint-config-next": "14.2.28",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
+    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.8.3"
   }
