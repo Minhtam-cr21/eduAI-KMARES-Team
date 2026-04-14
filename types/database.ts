@@ -62,6 +62,7 @@ export interface ConnectionRequest {
   teacher_response: string | null;
   created_at: string;
   responded_at: string | null;
+  last_updated?: string | null;
 }
 
 /** `reports`. */

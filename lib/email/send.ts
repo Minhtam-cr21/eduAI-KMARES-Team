@@ -52,6 +52,53 @@ export async function sendMissedDeadlineNotification(
   });
 }
 
+export type ConnectionUpdateAction =
+  | "accepted"
+  | "rejected"
+  | "link_updated"
+  | "deleted";
+
+/** Thông báo học sinh khi GV thay đổi kết nối (Resend; không key thì chỉ log). */
+export async function sendConnectionUpdateEmail(
+  studentEmail: string,
+  opts: {
+    teacherName: string;
+    action: ConnectionUpdateAction;
+    teacherResponse?: string | null;
+  }
+): Promise<void> {
+  const verb: Record<ConnectionUpdateAction, string> = {
+    accepted: "đã chấp nhận yêu cầu kết nối của bạn",
+    rejected: "đã từ chối yêu cầu kết nối của bạn",
+    link_updated: "đã cập nhật link liên hệ trong yêu cầu kết nối của bạn",
+    deleted: "đã xóa yêu cầu kết nối của bạn",
+  };
+
+  const subjectMap: Record<ConnectionUpdateAction, string> = {
+    accepted: "[EduAI] Giáo viên đã chấp nhận kết nối",
+    rejected: "[EduAI] Giáo viên đã từ chối kết nối",
+    link_updated: "[EduAI] Cập nhật link kết nối giáo viên",
+    deleted: "[EduAI] Yêu cầu kết nối đã bị xóa",
+  };
+
+  const resp = opts.teacherResponse?.trim();
+  const linkBlock =
+    resp && /^https?:\/\//i.test(resp)
+      ? `<p>Link liên hệ: <a href="${escapeHtml(resp)}">${escapeHtml(resp)}</a></p>`
+      : resp
+        ? `<p>Nội dung: ${escapeHtml(resp)}</p>`
+        : "";
+
+  await sendResend({
+    to: studentEmail,
+    subject: subjectMap[opts.action],
+    html: `<p>Xin chào,</p>
+<p><strong>${escapeHtml(opts.teacherName)}</strong> ${verb[opts.action]}.</p>
+${linkBlock}
+<p>Vào mục <strong>Kết nối giáo viên</strong> trên EduAI để xem chi tiết.</p>`,
+  });
+}
+
 export async function sendTeacherConnectionResponseEmail(
   studentEmail: string,
   opts: {
@@ -60,29 +107,10 @@ export async function sendTeacherConnectionResponseEmail(
     teacherResponse: string | null;
   }
 ): Promise<void> {
-  const subject =
-    opts.status === "accepted"
-      ? "[EduAI] Giáo viên đã chấp nhận kết nối"
-      : "[EduAI] Cập nhật yêu cầu kết nối giáo viên";
-
-  const linkBlock =
-    opts.teacherResponse && /^https?:\/\//i.test(opts.teacherResponse.trim())
-      ? `<p>Link liên hệ: <a href="${escapeHtml(opts.teacherResponse.trim())}">${escapeHtml(opts.teacherResponse.trim())}</a></p>`
-      : opts.teacherResponse
-        ? `<p>Nội dung phản hồi: ${escapeHtml(opts.teacherResponse)}</p>`
-        : "";
-
-  await sendResend({
-    to: studentEmail,
-    subject,
-    html: `<p>Xin chào,</p>
-<p><strong>${escapeHtml(opts.teacherName)}</strong> đã ${
-      opts.status === "accepted"
-        ? "chấp nhận yêu cầu kết nối của bạn."
-        : "từ chối yêu cầu kết nối."
-    }</p>
-${linkBlock}
-<p>Vào mục Kết nối giáo viên trên EduAI để xem lịch sử đầy đủ.</p>`,
+  await sendConnectionUpdateEmail(studentEmail, {
+    teacherName: opts.teacherName,
+    action: opts.status === "accepted" ? "accepted" : "rejected",
+    teacherResponse: opts.teacherResponse,
   });
 }
 

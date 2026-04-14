@@ -1,5 +1,6 @@
 import { generateStudySchedule } from "@/lib/schedule/generator";
 import { createClient } from "@/lib/supabase/server";
+import { ensureEnrollmentAndSyncProgress } from "@/lib/user-courses/enroll-and-sync";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ export async function POST(_request: Request, { params }: Ctx) {
 
   const { data: path, error: fetchErr } = await supabase
     .from("personalized_paths")
-    .select("id, student_id, status")
+    .select("id, student_id, status, course_sequence")
     .eq("id", pathId)
     .maybeSingle();
 
@@ -54,10 +55,35 @@ export async function POST(_request: Request, { params }: Ctx) {
 
   try {
     const { inserted } = await generateStudySchedule(supabase, pathId);
-    return NextResponse.json({ ok: true, scheduleItems: inserted });
+    const courseIds = extractCourseIdsFromSequence(path.course_sequence);
+    const enrollWarnings: string[] = [];
+    for (const courseId of courseIds) {
+      const r = await ensureEnrollmentAndSyncProgress(user.id, courseId);
+      if (!r.ok) {
+        enrollWarnings.push(`${courseId}: ${r.error}`);
+      }
+    }
+    return NextResponse.json({
+      ok: true,
+      scheduleItems: inserted,
+      enrolledCourseIds: courseIds,
+      enrollWarnings: enrollWarnings.length ? enrollWarnings : undefined,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Không tạo được lịch";
     console.error("[student/approve]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+function extractCourseIdsFromSequence(sequence: unknown): string[] {
+  if (!Array.isArray(sequence)) return [];
+  const ids: string[] = [];
+  for (const item of sequence) {
+    if (item && typeof item === "object" && "course_id" in item) {
+      const raw = (item as { course_id: unknown }).course_id;
+      if (typeof raw === "string" && raw.length > 0) ids.push(raw);
+    }
+  }
+  return Array.from(new Set(ids));
 }
