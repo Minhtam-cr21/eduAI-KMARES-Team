@@ -1,5 +1,6 @@
 "use client";
 
+import { AiRoadmapRequestDialog } from "@/components/student/ai-roadmap-request-dialog";
 import { RequireTestDialog } from "@/components/assessment/require-test-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -156,7 +157,7 @@ export function StudentDashboardModules() {
         <h2 className="mb-4 text-lg font-semibold text-foreground">
           Lộ trình & định hướng
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {completed ? (
             <Link href="/personalized-roadmap" className={cardClass}>
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-600 dark:text-violet-400">
@@ -190,6 +191,8 @@ export function StudentDashboardModules() {
               </div>
             </button>
           )}
+
+          {completed ? <AiRoadmapRequestDialog /> : null}
 
           {completed ? (
             <Link href="/career" className={cardClass}>

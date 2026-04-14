@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "npx tsx scripts/seed.ts",
+    "ingest:roadmap": "npx tsx scripts/ingest-roadmap.ts",
     "seed:courses": "npx tsx scripts/seed-courses.ts",
     "supabase:deploy:deadlines": "node scripts/deploy-edge-deadlines.mjs",
     "gh:missed-deadlines": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-missed-deadlines-workflow.ps1"

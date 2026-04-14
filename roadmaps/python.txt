@@ -1,0 +1,39 @@
+# Lộ trình Python (tài liệu mẫu cho RAG)
+
+Tài liệu này là nội dung placeholder — thay bằng bản trích từ PDF/khóa học thật của bạn trước khi ingest production.
+
+## Phần 1 — Nền tảng
+- Cài Python, pip, virtualenv; chạy script đầu tiên; REPL và chạy file .py.
+- Kiểu dữ liệu: int, float, str, bool; toán tử; nhập xuất cơ bản.
+- Điều khiển luồng: if/elif/else, vòng lặp for/while, break/continue.
+- Hàm: def, tham số, giá trị mặc định, *args/**kwargs, docstring.
+
+## Phần 2 — Cấu trúc dữ liệu
+- list, tuple, dict, set; list comprehension; slicing.
+- Xử lý chuỗi: format, f-string, split/join, encoding UTF-8.
+- File I/O: open, read/write, context manager `with`.
+
+## Phần 3 — Lập trình hướng module
+- import, package, __name__ == "__main__".
+- Xử lý lỗi: try/except/finally, raise, custom exception.
+- unittest / pytest cơ bản; assert.
+
+## Phần 4 — Hướng đối tượng
+- class, __init__, self; kế thừa; @property; magic methods cơ bản.
+- Composition vs inheritance; dataclasses (Python 3.7+).
+
+## Phần 5 — Thư viện chuẩn & hệ sinh thái
+- pathlib, json, csv, datetime, collections, itertools.
+- pip, venv, pyproject.toml; đọc tài liệu official docs.
+
+## Phần 6 — Web & dữ liệu (giới thiệu)
+- HTTP với requests hoặc httpx; parse JSON.
+- Flask/FastAPI hello world; route, query params.
+- Pandas đọc CSV; NumPy mảng 1D/2D cơ bản.
+
+## Phần 7 — Nâng cao & thực hành
+- async/await giới thiệu; typing (Optional, List, Protocol).
+- Git: branch, commit, PR; đọc code người khác.
+- Dự án cuối: CLI tool hoặc API nhỏ + test + README.
+
+Kỹ năng mềm: đặt tên rõ ràng, refactor từng bước, debug có hệ thống (print/logging), đọc stack trace.
