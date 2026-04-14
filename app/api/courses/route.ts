@@ -72,15 +72,30 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10", 10)));
-  const category = searchParams.get("category");
+  const categorySlug =
+    searchParams.get("category_slug") ?? searchParams.get("category");
   const course_type = searchParams.get("course_type");
 
   let query = supabase
     .from("courses")
-    .select("*, profiles(id, full_name, avatar_url)", { count: "exact" })
+    .select(
+      "*, profiles(id, full_name, avatar_url), course_categories(id, name, slug, icon)",
+      { count: "exact" }
+    )
     .eq("is_published", true);
 
-  if (category) query = query.eq("category", category);
+  if (categorySlug && categorySlug !== "all") {
+    const { data: catRow } = await supabase
+      .from("course_categories")
+      .select("id")
+      .eq("slug", categorySlug)
+      .maybeSingle();
+    if (catRow?.id) {
+      query = query.eq("category_id", catRow.id);
+    } else {
+      query = query.eq("category", categorySlug);
+    }
+  }
   if (course_type) query = query.eq("course_type", course_type);
 
   const from = (page - 1) * limit;
@@ -95,8 +110,12 @@ export async function GET(request: Request) {
   }
 
   const rows = (data ?? []).map((row: Record<string, unknown>) => {
-    const { profiles: prof, ...rest } = row;
-    return { ...rest, teacher: prof ?? null };
+    const { profiles: prof, course_categories: categoryRow, ...rest } = row;
+    return {
+      ...rest,
+      teacher: prof ?? null,
+      category: categoryRow ?? null,
+    };
   });
 
   return NextResponse.json({
