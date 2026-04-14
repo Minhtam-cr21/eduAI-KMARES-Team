@@ -1,15 +1,13 @@
 import { TeacherStudentsTable } from "@/components/teacher/teacher-students-table";
-import { BackButton } from "@/components/ui/back-button";
 import type { TeacherStudentRow } from "@/lib/types/teacher";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
-import Link from "next/link";
 
 export default async function TeacherStudentsPage() {
   const res = await fetchInternalApi("/api/teacher/students");
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
     return (
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div>
         <p className="text-destructive text-sm">
           {err.error ?? `Lỗi ${res.status}`}
         </p>
@@ -21,15 +19,14 @@ export default async function TeacherStudentsPage() {
   const students = body.students ?? [];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-      <BackButton fallbackHref="/teacher" className="mb-2" />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">Học sinh</h1>
-          <p className="text-muted-foreground text-sm">
-            Danh sách học sinh và tiến độ lộ trình (bài học được giao).
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Học sinh
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Danh sách học sinh và tiến độ lộ trình (bài học được giao).
+        </p>
       </div>
       <TeacherStudentsTable students={students} />
     </div>

@@ -1,8 +1,6 @@
 import { TeacherCoursesManager } from "@/components/teacher/teacher-courses-manager";
-import { BackButton } from "@/components/ui/back-button";
 import { loadTeacherCoursesWithCounts } from "@/lib/teacher/courses-with-counts";
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
 
 export default async function TeacherCoursesPage() {
   const supabase = createClient();
@@ -16,15 +14,14 @@ export default async function TeacherCoursesPage() {
   const courses = await loadTeacherCoursesWithCounts(supabase, user.id);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-      <BackButton fallbackHref="/teacher" className="mb-2" />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">Khóa học của tôi</h1>
-          <p className="text-muted-foreground text-sm">
-            Tạo, sửa, xóa khóa học và mở trang bài học.
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Khóa học của tôi
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Tạo, sửa, xóa khóa học và mở trang bài học.
+        </p>
       </div>
       <TeacherCoursesManager initialCourses={courses} />
     </div>

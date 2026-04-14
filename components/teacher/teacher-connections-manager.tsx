@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import { Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -316,8 +317,14 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {rows.map((r) => (
-            <Card key={r.id} className="transition hover:shadow-md">
+          {rows.map((r, i) => (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: Math.min(i * 0.04, 0.24) }}
+            >
+            <Card className="h-full border-border/60 bg-card/80 shadow-sm transition hover:border-primary/25 hover:shadow-md">
               <CardContent className="space-y-3 pt-5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -427,6 +434,7 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                 </div>
               </CardContent>
             </Card>
+            </motion.div>
           ))}
         </div>
       )}

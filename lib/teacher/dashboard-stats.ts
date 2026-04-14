@@ -2,8 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type TeacherDashboardStats = {
   total_courses: number;
+  courses_published: number;
+  courses_pending: number;
   total_students: number;
   pending_connections: number;
+  pending_ai_roadmaps: number;
+  weekly_new_students: Array<{ label: string; count: number }>;
   recent_courses: Array<{
     id: string;
     title: string;
@@ -29,8 +33,12 @@ export async function loadTeacherDashboardStats(
 ): Promise<TeacherDashboardStats> {
   const [
     coursesCountRes,
+    coursesPublishedRes,
+    coursesPendingRes,
     rpcRes,
     pendingConnRes,
+    pendingAiRes,
+    acceptedConnectionsRes,
     recentCoursesRes,
     pendingListRes,
   ] = await Promise.all([
@@ -38,12 +46,32 @@ export async function loadTeacherDashboardStats(
       .from("courses")
       .select("*", { count: "exact", head: true })
       .eq("teacher_id", userId),
+    supabase
+      .from("courses")
+      .select("*", { count: "exact", head: true })
+      .eq("teacher_id", userId)
+      .eq("status", "published"),
+    supabase
+      .from("courses")
+      .select("*", { count: "exact", head: true })
+      .eq("teacher_id", userId)
+      .eq("status", "pending"),
     supabase.rpc("teacher_list_students_with_stats"),
     supabase
       .from("connection_requests")
       .select("*", { count: "exact", head: true })
       .eq("teacher_id", userId)
       .eq("status", "pending"),
+    supabase
+      .from("custom_roadmaps")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("connection_requests")
+      .select("student_id, responded_at")
+      .eq("teacher_id", userId)
+      .eq("status", "accepted")
+      .not("responded_at", "is", null),
     supabase
       .from("courses")
       .select("id, title, status, category, created_at")
@@ -60,9 +88,50 @@ export async function loadTeacherDashboardStats(
   ]);
 
   const total_courses = coursesCountRes.count ?? 0;
+  const courses_published = coursesPublishedRes.count ?? 0;
+  const courses_pending = coursesPendingRes.count ?? 0;
   const total_students =
     !rpcRes.error && Array.isArray(rpcRes.data) ? rpcRes.data.length : 0;
   const pending_connections = pendingConnRes.count ?? 0;
+  const pending_ai_roadmaps = pendingAiRes.count ?? 0;
+
+  function startOfWeekMonday(d: Date): Date {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    const day = (x.getDay() + 6) % 7;
+    x.setDate(x.getDate() - day);
+    return x;
+  }
+
+  function weekKeyUtc(d: Date): string {
+    return startOfWeekMonday(d).toISOString().slice(0, 10);
+  }
+
+  const now = new Date();
+  const anchorMonday = startOfWeekMonday(now);
+  const weekBuckets: { key: string; label: string; count: number }[] = [];
+  for (let w = 7; w >= 0; w--) {
+    const monday = new Date(anchorMonday);
+    monday.setDate(anchorMonday.getDate() - w * 7);
+    const key = monday.toISOString().slice(0, 10);
+    const label = `${monday.getDate()}/${monday.getMonth() + 1}`;
+    weekBuckets.push({ key, label, count: 0 });
+  }
+
+  const bucketByKey = new Map(weekBuckets.map((b) => [b.key, b]));
+  const acceptedRows = acceptedConnectionsRes.data ?? [];
+  for (const row of acceptedRows) {
+    const raw = (row as { responded_at: string | null }).responded_at;
+    if (!raw) continue;
+    const k = weekKeyUtc(new Date(raw));
+    const b = bucketByKey.get(k);
+    if (b) b.count += 1;
+  }
+
+  const weekly_new_students = weekBuckets.map(({ label, count }) => ({
+    label,
+    count,
+  }));
 
   const recentRows = recentCoursesRes.data ?? [];
   const courseIds = recentRows.map((r) => r.id);
@@ -131,8 +200,12 @@ export async function loadTeacherDashboardStats(
 
   return {
     total_courses,
+    courses_published,
+    courses_pending,
     total_students,
     pending_connections,
+    pending_ai_roadmaps,
+    weekly_new_students,
     recent_courses,
     recent_pending_requests,
   };

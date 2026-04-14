@@ -1,7 +1,5 @@
 import { TeacherLessonsManager } from "@/components/teacher/teacher-lessons-manager";
-import { BackButton } from "@/components/ui/back-button";
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 export default async function TeacherCourseLessonsPage({
@@ -37,8 +35,7 @@ export default async function TeacherCourseLessonsPage({
     .order("order_index", { ascending: true });
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <BackButton fallbackHref="/teacher/courses" label="Danh sách khóa học" className="mb-6" />
+    <div className="space-y-6">
       <TeacherLessonsManager
         courseId={course.id}
         courseTitle={course.title}

@@ -29,10 +29,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { TeacherCourseRow } from "@/lib/teacher/courses-with-counts";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BookOpen, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const STATUS_BADGE: Record<string, string> = {
@@ -55,8 +62,38 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   const editing = courses.find((c) => c.id === editId);
+
+  const categoryOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of courses) {
+      const cat = c.category?.trim();
+      if (cat) s.add(cat);
+    }
+    return Array.from(s).sort();
+  }, [courses]);
+
+  const filteredCourses = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return courses.filter((c) => {
+      if (q) {
+        const inTitle = c.title.toLowerCase().includes(q);
+        const inDesc = (c.description ?? "").toLowerCase().includes(q);
+        if (!inTitle && !inDesc) return false;
+      }
+      if (statusFilter !== "all" && (c.status ?? "") !== statusFilter) {
+        return false;
+      }
+      if (categoryFilter !== "all" && c.category !== categoryFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [courses, search, statusFilter, categoryFilter]);
 
   async function submitCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -141,16 +178,58 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Quản lý tất cả khóa học của bạn.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Quản lý tất cả khóa học của bạn.
+        </p>
         <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
           <Plus className="h-4 w-4" />
           Tạo khóa học mới
         </Button>
       </div>
+
+      {courses.length > 0 ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="min-w-[200px] flex-1 space-y-1.5">
+            <Label htmlFor="course-search">Tìm kiếm</Label>
+            <Input
+              id="course-search"
+              placeholder="Tên hoặc mô tả…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="w-full min-w-[140px] space-y-1.5 sm:w-40">
+            <Label>Trạng thái</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tất cả" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                <SelectItem value="pending">Chờ duyệt</SelectItem>
+                <SelectItem value="published">Đã duyệt</SelectItem>
+                <SelectItem value="rejected">Từ chối</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full min-w-[140px] space-y-1.5 sm:w-44">
+            <Label>Danh mục</Label>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tất cả" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                {categoryOptions.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      ) : null}
 
       {courses.length === 0 ? (
         <Card className="border-dashed">
@@ -160,19 +239,27 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="overflow-hidden border-border/60 shadow-sm">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 <TableHead>Tên khóa</TableHead>
                 <TableHead>Danh mục</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead className="text-right">Bài học</TableHead>
+                <TableHead className="text-right tabular-nums">Ngày tạo</TableHead>
                 <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {courses.map((c) => (
+              {filteredCourses.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    Không có khóa học khớp bộ lọc.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              {filteredCourses.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell>
                     <div className="max-w-xs">
@@ -200,6 +287,9 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {c.lesson_count}
+                  </TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                    {new Date(c.created_at).toLocaleDateString("vi-VN")}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-1">

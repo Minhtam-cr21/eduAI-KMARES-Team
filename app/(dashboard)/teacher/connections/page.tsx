@@ -2,16 +2,14 @@ import {
   TeacherConnectionsManager,
   type ConnectionRow,
 } from "@/components/teacher/teacher-connections-manager";
-import { BackButton } from "@/components/ui/back-button";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
-import Link from "next/link";
 
 export default async function TeacherConnectionsPage() {
   const res = await fetchInternalApi("/api/teacher/connection-requests");
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
     return (
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div>
         <p className="text-destructive text-sm">
           {err.error ?? `Lỗi ${res.status}`}
         </p>
@@ -22,15 +20,14 @@ export default async function TeacherConnectionsPage() {
   const initialRows = (await res.json()) as ConnectionRow[];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-      <BackButton fallbackHref="/teacher" className="mb-2" />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">Yêu cầu kết nối</h1>
-          <p className="text-muted-foreground text-sm">
-            Phản hồi yêu cầu từ học sinh.
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Yêu cầu kết nối
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Phản hồi yêu cầu từ học sinh. Email thông báo phụ thuộc cấu hình Resend (nếu có).
+        </p>
       </div>
       <TeacherConnectionsManager initialRows={initialRows} />
     </div>

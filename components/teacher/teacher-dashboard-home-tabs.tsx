@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TeacherDashboardStatsPremium } from "@/components/teacher/teacher-dashboard-stats-premium";
 import type { TeacherDashboardStats } from "@/lib/teacher/dashboard-stats";
 import type { CompletedAssessmentPendingStudent } from "@/lib/types/teacher";
 import { cn } from "@/lib/utils";
@@ -116,12 +117,12 @@ export function TeacherDashboardHomeTabs({
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Bảng điều khiển giáo viên
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Bảng điều khiển
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
           Tổng quan, học sinh chờ lộ trình cá nhân hóa, kết nối và thông báo.
         </p>
       </div>
@@ -149,65 +150,7 @@ export function TeacherDashboardHomeTabs({
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-8">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Khóa học</CardDescription>
-                <CardTitle className="text-3xl tabular-nums">
-                  {stats.total_courses}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Link
-                  href="/teacher/courses"
-                  className={cn(
-                    buttonVariants({ variant: "link", size: "sm" }),
-                    "h-auto p-0"
-                  )}
-                >
-                  Quản lý khóa học →
-                </Link>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Học sinh (theo dõi)</CardDescription>
-                <CardTitle className="text-3xl tabular-nums">
-                  {stats.total_students}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Link
-                  href="/teacher/students"
-                  className={cn(
-                    buttonVariants({ variant: "link", size: "sm" }),
-                    "h-auto p-0"
-                  )}
-                >
-                  Danh sách học sinh →
-                </Link>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Yêu cầu chưa xử lý</CardDescription>
-                <CardTitle className="text-3xl tabular-nums">
-                  {stats.pending_connections}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Link
-                  href="/teacher/connections"
-                  className={cn(
-                    buttonVariants({ variant: "link", size: "sm" }),
-                    "h-auto p-0"
-                  )}
-                >
-                  Xem yêu cầu →
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
+          <TeacherDashboardStatsPremium stats={stats} />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>

@@ -1,7 +1,7 @@
 "use client";
 
-import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { GraduationCap } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -99,8 +100,13 @@ export default function TeacherStudentDetailPage() {
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <BackButton fallbackHref="/teacher/students" className="mb-4" />
+      <div className="space-y-4">
+        <Link
+          href="/teacher/students"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-auto px-0")}
+        >
+          ← Danh sách học sinh
+        </Link>
         <Card className="border-destructive/30 bg-destructive/5">
           <CardContent className="py-8 text-center">
             <p className="text-sm text-destructive">{error ?? "Không có dữ liệu"}</p>
@@ -111,8 +117,13 @@ export default function TeacherStudentDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-8">
-      <BackButton fallbackHref="/teacher/students" className="mb-2" />
+    <div className="space-y-6">
+      <Link
+        href="/teacher/students"
+        className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-auto px-0")}
+      >
+        ← Danh sách học sinh
+      </Link>
 
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-500 text-lg font-bold text-white">
@@ -129,7 +140,7 @@ export default function TeacherStudentDetailPage() {
         </div>
       </div>
 
-      <Card>
+      <Card className="border-border/60 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Tiến độ tổng thể</CardTitle>
           <CardDescription>
@@ -146,7 +157,7 @@ export default function TeacherStudentDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-border/60 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <GraduationCap className="h-4 w-4" />
@@ -198,6 +209,15 @@ export default function TeacherStudentDetailPage() {
           </TableBody>
         </Table>
       </Card>
+
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={`/teacher/personalized-paths/${studentId}`}
+          className={buttonVariants({ size: "default" })}
+        >
+          Tạo / sửa lộ trình cá nhân
+        </Link>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,22 @@
 "use client";
 
+import {
+  DndContext,
+  closestCenter,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,9 +39,9 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { FileText, Plus } from "lucide-react";
+import { FileText, GripVertical, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 type Lesson = {
@@ -44,6 +61,83 @@ const STATUS_BADGE: Record<string, string> = {
   published: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400",
   rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400",
 };
+
+function SortableLessonRow({
+  lesson,
+  onEdit,
+  onDelete,
+}: {
+  lesson: Lesson;
+  onEdit: (l: Lesson) => void;
+  onDelete: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: lesson.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={style}
+      className={cn(isDragging && "bg-muted/50 opacity-90")}
+    >
+      <TableCell className="w-12">
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground cursor-grab touch-none rounded-md p-1 active:cursor-grabbing"
+          aria-label="Kéo để sắp xếp"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      </TableCell>
+      <TableCell className="tabular-nums font-medium">{lesson.order_index ?? 0}</TableCell>
+      <TableCell>
+        <span className="font-medium text-foreground">{lesson.title}</span>
+      </TableCell>
+      <TableCell>
+        <Badge
+          variant="outline"
+          className={cn(
+            "text-xs font-semibold capitalize",
+            STATUS_BADGE[lesson.status ?? ""] ?? ""
+          )}
+        >
+          {lesson.status ?? "—"}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onEdit(lesson)}
+            disabled={
+              lesson.status === "published" ||
+              (lesson.status !== "pending" && lesson.status !== "rejected")
+            }
+          >
+            Sửa
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => onDelete(lesson.id)}>
+            Xóa
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
 
 type Props = {
   courseId: string;
@@ -65,11 +159,64 @@ export function TeacherLessonsManager({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     setLessons(initialLessons);
   }, [initialLessons]);
 
   const canAddLesson = courseStatus === "published";
+
+  const reorderEnabled = useMemo(
+    () =>
+      lessons.length > 0 &&
+      lessons.every(
+        (l) => l.status === "pending" || l.status === "rejected"
+      ),
+    [lessons]
+  );
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = lessons.findIndex((l) => l.id === active.id);
+    const newIndex = lessons.findIndex((l) => l.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(lessons, oldIndex, newIndex).map((l, i) => ({
+      ...l,
+      order_index: i,
+    }));
+    setLessons(next);
+    setLoading(true);
+    try {
+      for (let i = 0; i < next.length; i++) {
+        const le = next[i];
+        if (le.status === "pending" || le.status === "rejected") {
+          const res = await fetch(`/api/course-lessons/${le.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order_index: i }),
+          });
+          if (!res.ok) {
+            const j = (await res.json()) as { error?: string };
+            toast.error(j.error ?? "Không lưu thứ tự");
+            await reload();
+            return;
+          }
+        }
+      }
+      toast.success("Đã cập nhật thứ tự bài học");
+      router.refresh();
+      await reload();
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function reload() {
     const res = await fetch(`/api/teacher/courses/${courseId}/lessons`);
@@ -193,7 +340,16 @@ export function TeacherLessonsManager({
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        {reorderEnabled ? (
+          <p className="text-muted-foreground text-xs sm:mr-auto">
+            Kéo biểu tượng ⋮⋮ để sắp xếp thứ tự (chỉ khi mọi bài đều chờ duyệt / từ chối).
+          </p>
+        ) : lessons.length > 0 ? (
+          <p className="text-muted-foreground text-xs sm:mr-auto">
+            Có bài đã xuất bản — không thể kéo thả thứ tự hàng loạt.
+          </p>
+        ) : null}
         <Button
           type="button"
           onClick={() => setCreateOpen(true)}
@@ -212,11 +368,46 @@ export function TeacherLessonsManager({
             <p className="text-sm text-muted-foreground">Chưa có bài học.</p>
           </CardContent>
         </Card>
+      ) : reorderEnabled ? (
+        <Card className="overflow-hidden border-border/60 shadow-sm">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(e) => void handleDragEnd(e)}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-12" />
+                  <TableHead className="w-20">Thứ tự</TableHead>
+                  <TableHead>Tiêu đề</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <SortableContext
+                  items={lessons.map((l) => l.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {lessons.map((l) => (
+                    <SortableLessonRow
+                      key={l.id}
+                      lesson={l}
+                      onEdit={setEditLesson}
+                      onDelete={setDeleteId}
+                    />
+                  ))}
+                </SortableContext>
+              </TableBody>
+            </Table>
+          </DndContext>
+        </Card>
       ) : (
-        <Card>
+        <Card className="overflow-hidden border-border/60 shadow-sm">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 <TableHead className="w-16">Thứ tự</TableHead>
                 <TableHead>Tiêu đề</TableHead>
                 <TableHead>Trạng thái</TableHead>
