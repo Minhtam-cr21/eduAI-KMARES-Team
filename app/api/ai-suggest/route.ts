@@ -1,8 +1,4 @@
-import {
-  analyzeCodeError,
-  formatAiDebugMarkdown,
-  type AIDebugResponse,
-} from "@/lib/ai-debugger";
+import { analyzeCodeWithAI } from "@/lib/ai/code-mentor";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -11,8 +7,9 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
   code: z.string(),
-  error: z.string(),
   language: z.string(),
+  error: z.string().optional(),
+  output: z.string().optional(),
   context: z
     .object({
       projectFiles: z
@@ -35,6 +32,19 @@ function memoryRateKey(userId: string): string {
   return `${userId}|${day}`;
 }
 
+function extraContextFromBody(
+  context: z.infer<typeof bodySchema>["context"]
+): string | undefined {
+  const files = context?.projectFiles;
+  if (!files?.length) return undefined;
+  return files
+    .map(
+      (f) =>
+        `--- ${f.path} ---\n${f.content.slice(0, 4000)}${f.content.length > 4000 ? "\n…" : ""}`
+    )
+    .join("\n\n");
+}
+
 export async function POST(req: NextRequest) {
   try {
     let raw: unknown;
@@ -54,7 +64,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { code, error, language, context } = parsed.data;
+    const { code, language, error, output, context } = parsed.data;
 
     const supabase = createClient();
     const {
@@ -76,22 +86,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const analysis: AIDebugResponse = await analyzeCodeError(
+    const suggestion = await analyzeCodeWithAI({
       code,
-      error,
       language,
-      context
-    );
-    const suggestion = formatAiDebugMarkdown(analysis);
+      error,
+      output,
+      extraContext: extraContextFromBody(context),
+    });
 
     dailyAiUsage.set(rateKey, usedToday + 1);
+
+    const errLine = error?.trim() || null;
+    const outLine = output?.trim() || null;
 
     const { error: subErr } = await supabase.from("code_submissions").insert({
       user_id: user.id,
       code,
       language,
-      output: null,
-      error: error || null,
+      output: outLine,
+      error: errLine,
       ai_suggestion: suggestion,
     });
 
@@ -99,12 +112,7 @@ export async function POST(req: NextRequest) {
       console.error("[ai-suggest] insert code_submissions:", subErr.message);
     }
 
-    const body: AIDebugResponse & { suggestion: string } = {
-      ...analysis,
-      suggestion,
-    };
-
-    return NextResponse.json(body);
+    return NextResponse.json({ suggestion });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[ai-suggest] Route error:", err);

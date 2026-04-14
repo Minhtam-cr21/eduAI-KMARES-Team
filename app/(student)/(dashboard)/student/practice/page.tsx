@@ -1,7 +1,9 @@
 "use client";
 
+import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { PracticeExercise } from "@/types/database";
@@ -144,8 +146,9 @@ export default function StudentPracticeListPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
-          error: runError || output || "(chưa có lỗi)",
           language: selected.language ?? "python",
+          ...(runError.trim() ? { error: runError } : {}),
+          ...(output.trim() ? { output } : {}),
         }),
       });
       const data = (await res.json()) as { suggestion?: string; error?: string };
@@ -348,6 +351,35 @@ export default function StudentPracticeListPage() {
                   </div>
                 </div>
 
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Gợi ý AI
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => void handleAskAi()}
+                      disabled={askingAi}
+                      className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
+                    >
+                      {askingAi ? "Đang hỏi…" : "Hỏi AI"}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Markdown · tối đa 3 lượt/ngày khi bấm Hỏi AI. &quot;Run + AI&quot; điền gợi ý
+                    sau khi chạy.
+                  </p>
+                  <div className="prose prose-sm dark:prose-invert mt-2 min-h-[120px] max-w-none text-sm">
+                    {aiSuggestion ? (
+                      <LessonMarkdown content={aiSuggestion} />
+                    ) : (
+                      <p className="text-sm italic text-muted-foreground">
+                        Chạy &quot;Run + AI&quot; hoặc &quot;Hỏi AI&quot; sau khi Run.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Output */}
                 <div className="rounded-xl border border-border bg-card p-4">
                   <div className="flex items-center justify-between">
@@ -368,26 +400,6 @@ export default function StudentPracticeListPage() {
                       {runError}
                     </pre>
                   )}
-
-                  {aiSuggestion && (
-                    <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-                      <p className="mb-1 text-xs font-semibold text-primary">
-                        Gợi ý AI
-                      </p>
-                      <p className="whitespace-pre-wrap text-sm text-foreground">
-                        {aiSuggestion}
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => void handleAskAi()}
-                    disabled={askingAi}
-                    className="mt-3 w-full rounded-lg bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition hover:bg-secondary/80 disabled:opacity-60"
-                  >
-                    {askingAi ? "Đang hỏi AI…" : "Hỏi AI (tối đa 3 lượt/ngày)"}
-                  </button>
                 </div>
               </>
             )}

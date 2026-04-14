@@ -138,8 +138,9 @@ export default function PracticeLessonCodingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
-          error: runError || output || "(chưa có lỗi rõ)",
           language: runLang,
+          ...(runError.trim() ? { error: runError } : {}),
+          ...(output.trim() ? { output } : {}),
         }),
       });
       const data = (await res.json()) as { suggestion?: string; error?: string };
@@ -217,13 +218,26 @@ export default function PracticeLessonCodingPage() {
           </div>
 
           <div className="rounded-xl border border-border bg-card p-4">
-            <h2 className="text-sm font-semibold">Gợi ý AI</h2>
-            <div className="mt-2 min-h-[100px] text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Gợi ý AI</h2>
+              <button
+                type="button"
+                onClick={() => void handleAskAi()}
+                disabled={askingAi}
+                className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
+              >
+                {askingAi ? "Đang hỏi…" : "Hỏi AI"}
+              </button>
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Markdown · tối đa 3 lượt/ngày (Hỏi AI).
+            </p>
+            <div className="prose prose-sm dark:prose-invert mt-2 min-h-[100px] max-w-none text-sm">
               {aiSuggestion ? (
                 <LessonMarkdown content={aiSuggestion} />
               ) : (
                 <p className="text-muted-foreground text-sm italic">
-                  Dùng Run + AI hoặc Hỏi AI sau khi chạy.
+                  Dùng &quot;Run + AI&quot; hoặc &quot;Hỏi AI&quot; sau khi chạy.
                 </p>
               )}
             </div>
@@ -279,17 +293,6 @@ export default function PracticeLessonCodingPage() {
                 {runError}
               </pre>
             ) : null}
-            <button
-              type="button"
-              onClick={() => void handleAskAi()}
-              disabled={askingAi}
-              className={cn(
-                buttonVariants({ variant: "secondary", size: "sm" }),
-                "mt-3 w-full"
-              )}
-            >
-              {askingAi ? "Đang hỏi AI…" : "Hỏi AI (lượt/ngày)"}
-            </button>
           </div>
         </div>
       </div>

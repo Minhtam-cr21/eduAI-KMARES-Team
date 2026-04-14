@@ -2,7 +2,9 @@
 
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { BackButton } from "@/components/ui/back-button";
+import { buttonVariants } from "@/components/ui/button";
 import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -136,8 +138,9 @@ export default function PracticePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
-          error: runError || output || "(chưa có lỗi)",
           language,
+          ...(runError.trim() ? { error: runError } : {}),
+          ...(output.trim() ? { output } : {}),
         }),
       });
       const data = (await res.json()) as { suggestion?: string; error?: string };
@@ -261,8 +264,21 @@ export default function PracticePage() {
           </div>
 
           <div className="flex-1 rounded-xl border border-border bg-card p-4">
-            <h2 className="text-sm font-semibold">Gợi ý AI</h2>
-            <div className="mt-2 min-h-[200px] text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Gợi ý AI</h2>
+              <button
+                type="button"
+                onClick={handleAskAi}
+                disabled={asking}
+                className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
+              >
+                {asking ? "Đang hỏi…" : "Hỏi AI"}
+              </button>
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Markdown · tối đa 3 lượt/ngày.
+            </p>
+            <div className="prose prose-sm dark:prose-invert mt-2 min-h-[200px] max-w-none text-sm">
               {suggestion ? (
                 <LessonMarkdown content={suggestion} />
               ) : (
@@ -319,17 +335,6 @@ export default function PracticePage() {
                 {runError}
               </pre>
             ) : null}
-            <button
-              type="button"
-              onClick={handleAskAi}
-              disabled={asking}
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/80 mt-3 w-full rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-60"
-            >
-              {asking ? "Đang hỏi AI…" : "Hỏi AI"}
-            </button>
-            <p className="text-muted-foreground mt-2 text-xs">
-              Tối đa 3 lượt/ngày.
-            </p>
           </div>
         </div>
       </div>

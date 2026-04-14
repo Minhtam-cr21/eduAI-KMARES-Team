@@ -1,7 +1,4 @@
-import {
-  analyzeCodeError,
-  formatAiDebugMarkdown,
-} from "@/lib/ai-debugger";
+import { analyzeCodeWithAI } from "@/lib/ai/code-mentor";
 import { executeCode, type RunCodeLanguage } from "@/lib/code-runner";
 import { getPublishedLessonIfEnrolled } from "@/lib/practice/assert-lesson-access";
 import { createClient } from "@/lib/supabase/server";
@@ -112,12 +109,12 @@ export async function POST(request: Request) {
   let aiSuggestion: string | null = null;
   if (include_ai) {
     try {
-      const analysis = await analyzeCodeError(
+      aiSuggestion = await analyzeCodeWithAI({
         code,
-        result.error || result.output || "(no output)",
-        language
-      );
-      aiSuggestion = formatAiDebugMarkdown(analysis);
+        language,
+        error: result.error?.trim() || undefined,
+        output: result.output?.trim() || undefined,
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[practice/run] AI:", msg);
