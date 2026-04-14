@@ -3,6 +3,7 @@ import {
   getStaticFallback,
   pickExistingExerciseFromDb,
 } from "@/lib/practice/generate-random-exercise";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -54,7 +55,16 @@ export async function POST(request: Request) {
   clearTimeout(t);
 
   const title = payload.title.slice(0, 200);
-  const { data: inserted, error: insErr } = await supabase
+
+  let supabaseAdmin;
+  try {
+    supabaseAdmin = createServiceRoleClient();
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Service role client unavailable";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  const { data: inserted, error: insErr } = await supabaseAdmin
     .from("practice_exercises")
     .insert({
       title,
