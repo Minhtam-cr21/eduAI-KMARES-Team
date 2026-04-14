@@ -4,8 +4,9 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
+/** Từ chối trực tiếp; duyệt dùng POST …/approve. */
 const patchSchema = z.object({
-  status: z.enum(["approved", "rejected"]),
+  status: z.literal("rejected"),
   teacher_feedback: z.string().max(4000).optional().nullable(),
 });
 
@@ -57,6 +58,25 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid body", details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const { data: current, error: curErr } = await gate.supabase
+    .from("custom_roadmaps")
+    .select("status")
+    .eq("id", params.id)
+    .maybeSingle();
+
+  if (curErr) {
+    return NextResponse.json({ error: curErr.message }, { status: 500 });
+  }
+  if (!current) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (current.status !== "pending") {
+    return NextResponse.json(
+      { error: "Chỉ xử lý được lộ trình đang ở trạng thái chờ duyệt." },
       { status: 400 }
     );
   }
