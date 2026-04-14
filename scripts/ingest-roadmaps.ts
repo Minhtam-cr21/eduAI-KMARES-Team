@@ -14,7 +14,7 @@ loadEnv();
 
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
-import OpenAI from "openai";
+import { getOpenAI } from "../lib/ai/openai-client";
 import { PDFParse } from "pdf-parse";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -38,7 +38,7 @@ const supabase = createClient(supabaseUrl, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const openai = new OpenAI({ apiKey });
+const openai = getOpenAI();
 
 const EMBEDDING_MODEL = "text-embedding-3-small" as const;
 const EMBEDDING_DIM = 1536;

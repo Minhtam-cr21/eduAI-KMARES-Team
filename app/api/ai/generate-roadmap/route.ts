@@ -1,11 +1,10 @@
+import { getOpenAI } from "@/lib/ai/openai-client";
 import { createEmbedding } from "@/lib/rag/openai-embeddings";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
-
-const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 
 const bodySchema = z.object({
   goal: z.string().min(1).max(2000),
@@ -157,13 +156,9 @@ Trả về **một object JSON duy nhất** (không markdown), đúng schema:
   "reasoning": "Giải thích tại sao chọn lộ trình này"
 }`;
 
-  const chatRes = await fetch(OPENAI_CHAT_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  let rawContent: string | null | undefined;
+  try {
+    const completion = await getOpenAI().chat.completions.create({
       model,
       response_format: { type: "json_object" },
       messages: [
@@ -175,22 +170,12 @@ Trả về **một object JSON duy nhất** (không markdown), đúng schema:
         { role: "user", content: userPrompt },
       ],
       temperature: 0.5,
-    }),
-  });
-
-  const chatJson = (await chatRes.json()) as {
-    choices?: { message?: { content?: string } }[];
-    error?: { message?: string };
-  };
-
-  if (!chatRes.ok) {
-    return NextResponse.json(
-      { error: chatJson.error?.message ?? `OpenAI HTTP ${chatRes.status}` },
-      { status: 502 }
-    );
+    });
+    rawContent = completion.choices?.[0]?.message?.content;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "OpenAI request failed";
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
-
-  const rawContent = chatJson.choices?.[0]?.message?.content;
   if (!rawContent) {
     return NextResponse.json({ error: "Empty model response" }, { status: 502 });
   }

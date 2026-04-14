@@ -1,3 +1,4 @@
+import { getOpenAI } from "@/lib/ai/openai-client";
 import { z } from "zod";
 
 const lessonSchema = z.object({
@@ -20,8 +21,6 @@ const outlineSchema = z.object({
 });
 
 export type GeneratedCourseOutline = z.infer<typeof outlineSchema>;
-
-const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 
 const MAX_SOURCE_CHARS = 200_000;
 
@@ -109,33 +108,18 @@ ${supplement ? `\n${supplement}\n` : ""}
 --- Extracted document (PDF / text) ---
 ${docBody}`;
 
-  const res = await fetch(OPENAI_CHAT_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.35,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-    }),
+  const completion = await getOpenAI().chat.completions.create({
+    model,
+    temperature: 0.35,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userMessage },
+    ],
   });
-
-  const rawText = await res.text();
-  if (!res.ok) {
-    throw new Error(`OpenAI HTTP ${res.status}: ${rawText.slice(0, 400)}`);
-  }
 
   let parsedJson: unknown;
   try {
-    const j = JSON.parse(rawText) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = j.choices?.[0]?.message?.content?.trim();
+    const content = completion.choices?.[0]?.message?.content?.trim();
     if (!content) throw new Error("empty");
     parsedJson = extractJsonObject(content);
   } catch {

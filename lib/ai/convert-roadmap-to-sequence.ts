@@ -1,3 +1,4 @@
+import { getOpenAI } from "@/lib/ai/openai-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type CourseSequenceRow = {
@@ -21,8 +22,6 @@ type CourseCatalogRow = {
 };
 
 type ModuleItem = { name: string; lessons: string[]; duration_days: number };
-
-const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 
 function extractJsonObject(raw: string): unknown {
   const t = raw.trim();
@@ -179,13 +178,9 @@ Quy tắc:
 - due_date_offset_days: số ngày tích lũy từ hiện tại đến khi xong khóa đó (số nguyên >= 1), phù hợp duration của module tương ứng nếu có.
 - Không bịa course_id; nếu không khớp, courseSequence có thể rỗng và note giải thích.`;
 
-  const chatRes = await fetch(OPENAI_CHAT_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  let rawContent: string | undefined;
+  try {
+    const completion = await getOpenAI().chat.completions.create({
       model,
       response_format: { type: "json_object" },
       messages: [
@@ -197,23 +192,15 @@ Quy tắc:
         { role: "user", content: userPrompt },
       ],
       temperature: 0.3,
-    }),
-  });
-
-  const chatJson = (await chatRes.json()) as {
-    choices?: { message?: { content?: string } }[];
-    error?: { message?: string };
-  };
-
-  if (!chatRes.ok) {
+    });
+    rawContent = completion.choices?.[0]?.message?.content ?? undefined;
+  } catch (e) {
     console.warn(
       "[convert-roadmap-to-sequence] OpenAI:",
-      chatJson.error?.message ?? chatRes.status
+      e instanceof Error ? e.message : e
     );
     return [];
   }
-
-  const rawContent = chatJson.choices?.[0]?.message?.content;
   if (!rawContent) return [];
 
   let parsed: unknown;

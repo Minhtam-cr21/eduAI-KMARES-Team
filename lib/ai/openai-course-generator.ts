@@ -1,26 +1,10 @@
-import OpenAI from "openai";
 import { z } from "zod";
 import type { AICourseDraft } from "@/lib/ai/ai-course-draft";
-
-const ALLOWED_CATEGORIES = [
-  "Python",
-  "Java",
-  "C++",
-  "SQL",
-  "Frontend",
-  "Backend",
-  "Fullstack",
-  "Prompt engineering",
-] as const;
+import { openai } from "@/lib/ai/openai-client";
+import { normalizeCourseCategory } from "@/lib/constants/course-categories";
 
 export function normalizeAiCategory(raw: string): string {
-  const t = raw.trim();
-  const exact = ALLOWED_CATEGORIES.find((c) => c.toLowerCase() === t.toLowerCase());
-  if (exact) return exact;
-  for (const c of ALLOWED_CATEGORIES) {
-    if (t.toLowerCase().includes(c.toLowerCase())) return c;
-  }
-  return "Python";
+  return normalizeCourseCategory(raw);
 }
 
 const aiLessonZ = z.object({
@@ -192,12 +176,6 @@ export async function generateCourseDraftWithOpenAI(args: {
       usedFallback: true,
     };
   }
-
-  const openai = new OpenAI({
-    apiKey: key,
-    timeout: 100_000,
-    maxRetries: 0,
-  });
 
   const model = resolveModel();
   const userContent = buildUserPrompt(args);

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getOpenAI, hasOpenAIApiKey } from "@/lib/ai/openai-client";
 import { computeMBTI, computeTraits, type TraitScores } from "./analyzer";
 
 export type CourseSequenceItem = {
@@ -14,8 +15,6 @@ const openAiResponseSchema = z.object({
   course_ids: z.array(z.string().uuid()),
   reasoning: z.string(),
 });
-
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
 type PublishedCourse = { id: string; category: string; title?: string };
 
@@ -119,8 +118,7 @@ async function callOpenAiPathSuggestion(args: {
   traits: TraitScores;
   courseCatalog: { id: string; category: string; title: string }[];
 }): Promise<{ course_ids: string[]; reasoning: string } | null> {
-  const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) return null;
+  if (!hasOpenAIApiKey()) return null;
 
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-3.5-turbo";
   const allowed = new Set(args.courseCatalog.map((c) => c.id));
@@ -132,13 +130,9 @@ async function callOpenAiPathSuggestion(args: {
     'Trả về DUY NHẤT JSON: {"course_ids":["uuid",...],"reasoning":"lý do ngắn tiếng Việt"} — mọi id phải nằm trong catalog.',
   ].join("\n");
 
-  const res = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
+  let content: string | undefined;
+  try {
+    const completion = await getOpenAI().chat.completions.create({
       model,
       messages: [
         {
@@ -151,19 +145,16 @@ async function callOpenAiPathSuggestion(args: {
       temperature: 0.35,
       max_tokens: 600,
       response_format: { type: "json_object" },
-    }),
-  });
-
-  const text = await res.text();
-  if (!res.ok) {
-    console.error("[path-generator] OpenAI error:", res.status, text.slice(0, 200));
+    });
+    content = completion.choices?.[0]?.message?.content?.trim();
+  } catch (e) {
+    console.error(
+      "[path-generator] OpenAI error:",
+      e instanceof Error ? e.message : e
+    );
     return null;
   }
 
-  const data = JSON.parse(text) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const content = data.choices?.[0]?.message?.content?.trim();
   if (!content) return null;
 
   let raw: unknown;

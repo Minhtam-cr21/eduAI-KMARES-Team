@@ -1,4 +1,5 @@
 import type { AIDebugResponse } from "../types";
+import { getOpenAI, hasOpenAIApiKey } from "@/lib/ai/openai-client";
 import { z } from "zod";
 
 const aidSchema = z.object({
@@ -31,8 +32,6 @@ Schema:
 
 Quy tắc: C++ memory leak → smart pointer; JS async → async/await; Python def f(x=[]) → None.`;
 
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-
 function parseAidJson(content: string): AIDebugResponse {
   const t = content.trim();
   const fence = /^```(?:json)?\s*([\s\S]*?)```$/m.exec(t);
@@ -48,20 +47,14 @@ export async function callOpenai(
   userPrompt: string,
   signal: AbortSignal
 ): Promise<AIDebugResponse> {
-  const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) {
+  if (!hasOpenAIApiKey()) {
     throw new Error("OPENAI_API_KEY missing");
   }
 
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-3.5-turbo";
 
-  const res = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
+  const completion = await getOpenAI().chat.completions.create(
+    {
       model,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -70,26 +63,11 @@ export async function callOpenai(
       temperature: 0.3,
       max_tokens: 800,
       response_format: { type: "json_object" },
-    }),
-    signal,
-  });
+    },
+    { signal }
+  );
 
-  const text = await res.text();
-  if (!res.ok) {
-    let detail = text.slice(0, 400);
-    try {
-      const j = JSON.parse(text) as { error?: { message?: string } };
-      detail = j.error?.message ?? detail;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(`OpenAI ${res.status}: ${detail}`);
-  }
-
-  const data = JSON.parse(text) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const content = data.choices?.[0]?.message?.content?.trim();
+  const content = completion.choices?.[0]?.message?.content?.trim();
   if (!content) {
     throw new Error("OpenAI: empty content");
   }
