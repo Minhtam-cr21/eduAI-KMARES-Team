@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
 import { Eye } from "lucide-react";
@@ -69,7 +70,7 @@ export function TeacherAiRoadmapsClient() {
     void load();
   }, [load]);
 
-  async function rejectRoadmap() {
+  async function patchStatus(status: "approved" | "rejected") {
     if (!detail) return;
     setActionLoading(true);
     try {
@@ -77,8 +78,9 @@ export function TeacherAiRoadmapsClient() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: "rejected",
+          status,
           teacher_feedback: feedback.trim() || null,
+          autoPersonalizedPath: false,
         }),
       });
       const j = (await res.json()) as { error?: string };
@@ -86,47 +88,12 @@ export function TeacherAiRoadmapsClient() {
         toast.error(j.error ?? "Không cập nhật được");
         return;
       }
-      toast.success("Đã từ chối");
-      setDetail(null);
-      setFeedback("");
-      await load();
-    } catch {
-      toast.error("Lỗi mạng");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function approveRoadmap() {
-    if (!detail) return;
-    setActionLoading(true);
-    try {
-      const res = await fetch(`/api/teacher/custom-roadmaps/${detail.id}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teacher_feedback: feedback.trim() || null,
-        }),
-      });
-      const j = (await res.json()) as {
-        error?: string;
-        enrollWarnings?: string[];
-        scheduleItems?: number;
-      };
-      if (!res.ok) {
-        toast.error(j.error ?? "Không duyệt được");
-        return;
-      }
-      if (j.enrollWarnings?.length) {
-        toast.message("Đã duyệt — một số khóa chưa ghi danh", {
-          description: j.enrollWarnings.slice(0, 3).join("\n"),
-        });
-      } else {
+      if (status === "approved") {
         toast.success(
-          typeof j.scheduleItems === "number"
-            ? `Đã duyệt — đã tạo ${j.scheduleItems} mục lịch học`
-            : "Đã duyệt và tạo lộ trình cá nhân hóa"
+          "Đã duyệt lộ trình AI. Bạn có thể tạo lộ trình cá nhân hóa thủ công cho học sinh khi cần."
         );
+      } else {
+        toast.success("Đã từ chối");
       }
       setDetail(null);
       setFeedback("");
@@ -256,6 +223,26 @@ export function TeacherAiRoadmapsClient() {
                   rows={3}
                 />
               </div>
+              <div className="flex items-start gap-3 rounded-md border border-border/60 bg-muted/30 p-3">
+                <Checkbox
+                  id="auto-path"
+                  checked={false}
+                  disabled
+                  aria-describedby="auto-path-hint"
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="auto-path"
+                    className="cursor-not-allowed font-medium leading-snug text-muted-foreground"
+                  >
+                    Tự động tạo lộ trình cá nhân hóa từ gợi ý này
+                  </Label>
+                  <p id="auto-path-hint" className="text-xs text-muted-foreground">
+                    Tính năng sẽ bổ sung sau khi gắn module AI với khóa học trong hệ thống.
+                    Hiện tại chỉ cập nhật trạng thái duyệt.
+                  </p>
+                </div>
+              </div>
             </div>
           ) : null}
           <DialogFooter className="flex-col gap-2 sm:flex-row">
@@ -266,21 +253,22 @@ export function TeacherAiRoadmapsClient() {
               type="button"
               variant="destructive"
               disabled={actionLoading}
-              onClick={() => void rejectRoadmap()}
+              onClick={() => void patchStatus("rejected")}
             >
               Từ chối
             </Button>
             <Button
               type="button"
               disabled={actionLoading}
-              onClick={() => void approveRoadmap()}
+              onClick={() => void patchStatus("approved")}
             >
               {actionLoading ? "Đang xử lý…" : "Duyệt"}
             </Button>
           </DialogFooter>
           <p className="text-muted-foreground text-xs">
-            Duyệt sẽ tạo hoặc cập nhật lộ trình cá nhân hóa, ghi danh khóa học, tạo lịch học
-            và gửi thông báo cho học sinh (học sinh vẫn xác nhận trên trang lộ trình).
+            Duyệt chỉ lưu trạng thái và phản hồi trên bản ghi lộ trình AI. Tạo lộ trình cá nhân
+            hóa (<code className="rounded bg-muted px-1">personalized_paths</code>) thực hiện
+            thủ công từ trang quản lý học sinh khi bạn sẵn sàng gắn khóa học cụ thể.
           </p>
         </DialogContent>
       </Dialog>

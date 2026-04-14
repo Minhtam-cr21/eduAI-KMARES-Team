@@ -40,10 +40,18 @@ export async function GET(request: NextRequest) {
   const chosen = pending ?? completed ?? list[0] ?? null;
 
   if (!chosen) {
-    return NextResponse.json({ schedule: null });
+    return NextResponse.json({
+      schedule_id: null,
+      status: null,
+      schedule: null,
+    });
   }
 
+  const id = chosen.id as string;
+  const st = chosen.status as string;
   return NextResponse.json({
-    schedule: { id: chosen.id as string, status: chosen.status as string },
+    schedule_id: id,
+    status: st,
+    schedule: { id, status: st },
   });
 }

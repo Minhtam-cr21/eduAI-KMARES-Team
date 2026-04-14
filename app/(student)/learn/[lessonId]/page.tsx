@@ -92,7 +92,6 @@ export default async function LearnCourseLessonPage({
 
   const videoSrc = normalizeVideoEmbedUrl(lesson.video_url as string | null);
   const content = (lesson.content as string | null)?.trim() ?? "";
-  const codeTemplate = (lesson.code_template as string | null)?.trim();
 
   return (
     <>
@@ -142,17 +141,15 @@ export default async function LearnCourseLessonPage({
             initialStatus={scheduleStatus}
           />
 
-          {codeTemplate ? (
-            <Link
-              href={`/practice/lesson/${lessonId}`}
-              className={cn(
-                buttonVariants({ variant: "default" }),
-                "inline-flex"
-              )}
-            >
-              Thực hành
-            </Link>
-          ) : null}
+          <Link
+            href={`/practice/lesson/${lessonId}`}
+            className={cn(
+              buttonVariants({ variant: "default" }),
+              "inline-flex"
+            )}
+          >
+            Thực hành
+          </Link>
 
           <Link
             href={`/student/courses/${String(lesson.course_id)}`}
