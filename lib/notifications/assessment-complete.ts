@@ -1,3 +1,4 @@
+import { sendAssessmentCompletedToTeachers } from "@/lib/email/send";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 /**
@@ -62,5 +63,32 @@ export async function notifyAssessmentCompletedForStudent(args: {
   const { error: insErr } = await admin.from("notifications").insert(rows);
   if (insErr) {
     console.error("[notifyAssessmentCompletedForStudent] insert:", insErr.message);
+  }
+
+  const emails: string[] = [];
+  for (const id of Array.from(teacherIds)) {
+    const { data: u, error: uErr } = await admin.auth.admin.getUserById(id);
+    if (uErr) {
+      console.warn(
+        "[notifyAssessmentCompletedForStudent] getUserById:",
+        id,
+        uErr.message
+      );
+      continue;
+    }
+    const em = u.user?.email?.trim();
+    if (em) emails.push(em);
+  }
+
+  try {
+    await sendAssessmentCompletedToTeachers(emails, {
+      studentName: args.studentDisplayName,
+      studentId: args.studentId,
+    });
+  } catch (e) {
+    console.warn(
+      "[notifyAssessmentCompletedForStudent] email:",
+      e instanceof Error ? e.message : e
+    );
   }
 }

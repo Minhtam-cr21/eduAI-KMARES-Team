@@ -1,3 +1,5 @@
+import { getSiteOrigin } from "@/lib/site-origin";
+
 const RESEND_API = "https://api.resend.com/emails";
 
 function fromAddress(): string {
@@ -125,6 +127,31 @@ export async function sendFrozenNotification(
 <p>Học sinh <strong>${escapeHtml(studentName)}</strong> không có hoạt động học tập trong hơn 3 ngày. Các mục lịch chưa hoàn thành đã chuyển sang trạng thái <strong>đóng băng</strong>.</p>
 <p>Vui lòng kiểm tra khu vực lộ trình cá nhân hóa.</p>`,
   });
+}
+
+/** Mỗi giáo viên/admin một thư (không lộ danh sách email). */
+export async function sendAssessmentCompletedToTeachers(
+  toEmails: string[],
+  opts: { studentName: string; studentId: string }
+): Promise<void> {
+  const base = getSiteOrigin();
+  const path = `/teacher/personalized-paths/${encodeURIComponent(opts.studentId)}`;
+  const link = `${base}${path}`;
+  const seen = new Set<string>();
+  for (const raw of toEmails) {
+    const email = raw?.trim();
+    if (!email?.includes("@")) continue;
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    await sendResend({
+      to: email,
+      subject: "[EduAI] Học sinh đã hoàn thành trắc nghiệm định hướng",
+      html: `<p>Xin chào,</p>
+<p><strong>${escapeHtml(opts.studentName)}</strong> vừa hoàn thành trắc nghiệm định hướng. Bạn có thể xem và hỗ trợ tạo lộ trình cá nhân hóa.</p>
+<p><a href="${escapeHtml(link)}">Mở trang lộ trình học sinh</a></p>`,
+    });
+  }
 }
 
 function escapeHtml(s: string): string {

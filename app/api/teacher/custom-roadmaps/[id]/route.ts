@@ -4,12 +4,10 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-/** Duyệt / từ chối — chỉ cập nhật custom_roadmaps (không tạo personalized_paths tự động). */
+/** Chỉ từ chối; duyệt dùng POST …/approve (tạo personalized_paths + lịch). */
 const patchSchema = z.object({
-  status: z.enum(["approved", "rejected"]),
+  status: z.literal("rejected"),
   teacher_feedback: z.string().max(4000).optional().nullable(),
-  /** Dự phòng: sau này bật tạo path tự động; hiện bỏ qua. */
-  autoPersonalizedPath: z.boolean().optional(),
 });
 
 type Ctx = { params: { id: string } };
