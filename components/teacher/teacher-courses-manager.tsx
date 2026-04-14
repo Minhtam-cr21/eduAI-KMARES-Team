@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TeacherCourseRow } from "@/lib/teacher/courses-with-counts";
 import { cn } from "@/lib/utils";
 import {
@@ -36,17 +37,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
-const STATUS_BADGE: Record<string, string> = {
-  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400",
-  published: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400",
-  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400",
-};
 
 type Props = { initialCourses: TeacherCourseRow[] };
 
@@ -63,7 +58,11 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [visibilityFilter, setVisibilityFilter] = useState("all");
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiTitle, setAiTitle] = useState("");
+  const [aiFile, setAiFile] = useState<File | null>(null);
+  const [createTab, setCreateTab] = useState("manual");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const editing = courses.find((c) => c.id === editId);
@@ -85,7 +84,10 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
         const inDesc = (c.description ?? "").toLowerCase().includes(q);
         if (!inTitle && !inDesc) return false;
       }
-      if (statusFilter !== "all" && (c.status ?? "") !== statusFilter) {
+      if (visibilityFilter === "published" && c.is_published === false) {
+        return false;
+      }
+      if (visibilityFilter === "draft" && c.is_published !== false) {
         return false;
       }
       if (categoryFilter !== "all" && c.category !== categoryFilter) {
@@ -93,7 +95,72 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
       }
       return true;
     });
-  }, [courses, search, statusFilter, categoryFilter]);
+  }, [courses, search, visibilityFilter, categoryFilter]);
+
+  async function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const s = r.result as string;
+        const i = s.indexOf(",");
+        resolve(i >= 0 ? s.slice(i + 1) : s);
+      };
+      r.onerror = () => reject(new Error("read"));
+      r.readAsDataURL(file);
+    });
+  }
+
+  async function submitAiCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const topic = aiTopic.trim();
+    if (!topic && !aiFile) {
+      toast.error("Nhập chủ đề hoặc chọn file PDF / text.");
+      return;
+    }
+    if (!topic && aiFile) {
+      toast.error("Vẫn cần mô tả ngắn (chủ đề) để AI đặt tên khóa học.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const body: Record<string, unknown> = {
+        topic,
+        title: aiTitle.trim() || null,
+        description: null,
+        file_base64: null as string | null,
+        file_name: null as string | null,
+      };
+      if (aiFile) {
+        body.file_base64 = await fileToBase64(aiFile);
+        body.file_name = aiFile.name;
+      }
+      const res = await fetch("/api/ai/generate-course", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = (await res.json()) as { error?: string; course_id?: string };
+      if (!res.ok) {
+        toast.error(j.error ?? "Không tạo được");
+        return;
+      }
+      const cid = j.course_id;
+      if (!cid) {
+        toast.error("Thiếu course_id từ server");
+        return;
+      }
+      toast.success("Đã tạo khóa học bằng AI");
+      setCreateOpen(false);
+      setAiTopic("");
+      setAiTitle("");
+      setAiFile(null);
+      setCreateTab("manual");
+      router.push(`/teacher/courses/${cid}/lessons`);
+      router.refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function submitCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -138,6 +205,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
         course_type: fd.get("course_type") as "skill" | "role",
         category: String(fd.get("category") ?? "").trim(),
         thumbnail_url: String(fd.get("thumbnail_url") ?? "").trim() || null,
+        is_published: fd.get("is_published") === "on",
       };
       const res = await fetch(`/api/courses/${editId}`, {
         method: "PUT",
@@ -199,16 +267,15 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
             />
           </div>
           <div className="w-full min-w-[140px] space-y-1.5 sm:w-40">
-            <Label>Trạng thái</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Label>Hiển thị</Label>
+            <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Tất cả" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="pending">Chờ duyệt</SelectItem>
-                <SelectItem value="published">Đã duyệt</SelectItem>
-                <SelectItem value="rejected">Từ chối</SelectItem>
+                <SelectItem value="published">Đang xuất bản</SelectItem>
+                <SelectItem value="draft">Nháp</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -245,7 +312,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Tên khóa</TableHead>
                 <TableHead>Danh mục</TableHead>
-                <TableHead>Trạng thái</TableHead>
+                <TableHead>Catalog / AI</TableHead>
                 <TableHead className="text-right">Bài học</TableHead>
                 <TableHead className="text-right tabular-nums">Ngày tạo</TableHead>
                 <TableHead className="text-right">Thao tác</TableHead>
@@ -275,15 +342,25 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs font-semibold capitalize",
-                        STATUS_BADGE[c.status ?? ""] ?? ""
-                      )}
-                    >
-                      {c.status ?? "—"}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs font-semibold",
+                          c.is_published === false
+                            ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400"
+                            : "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400"
+                        )}
+                      >
+                        {c.is_published === false ? "Nháp" : "Xuất bản"}
+                      </Badge>
+                      {c.ai_generated ? (
+                        <Badge variant="secondary" className="text-xs gap-0.5">
+                          <Sparkles className="h-3 w-3" />
+                          AI
+                        </Badge>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {c.lesson_count}
@@ -325,50 +402,114 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
       )}
 
       {/* Create Dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog
+        open={createOpen}
+        onOpenChange={(o) => {
+          setCreateOpen(o);
+          if (!o) {
+            setCreateTab("manual");
+            setAiTopic("");
+            setAiTitle("");
+            setAiFile(null);
+          }
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Tạo khóa học</DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => void submitCreate(e)} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="c-title">Tiêu đề</Label>
-              <Input id="c-title" name="title" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="c-desc">Mô tả</Label>
-              <Textarea id="c-desc" name="description" rows={3} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="c-type">Loại</Label>
-              <select
-                id="c-type"
-                name="course_type"
-                required
-                defaultValue="skill"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-              >
-                <option value="skill">Kỹ năng</option>
-                <option value="role">Vai trò</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="c-cat">Danh mục</Label>
-              <Input id="c-cat" name="category" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="c-thumb">Thumbnail URL (tuỳ chọn)</Label>
-              <Input id="c-thumb" name="thumbnail_url" type="url" />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                Huỷ
-              </Button>
-              <Button type="submit" disabled={loading}>
-                Tạo
-              </Button>
-            </DialogFooter>
-          </form>
+          <Tabs value={createTab} onValueChange={setCreateTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="manual">Thủ công</TabsTrigger>
+              <TabsTrigger value="ai" className="gap-1">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="manual" className="mt-4">
+              <form onSubmit={(e) => void submitCreate(e)} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="c-title">Tiêu đề</Label>
+                  <Input id="c-title" name="title" required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="c-desc">Mô tả</Label>
+                  <Textarea id="c-desc" name="description" rows={3} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="c-type">Loại</Label>
+                  <select
+                    id="c-type"
+                    name="course_type"
+                    required
+                    defaultValue="skill"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  >
+                    <option value="skill">Kỹ năng</option>
+                    <option value="role">Vai trò</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="c-cat">Danh mục</Label>
+                  <Input id="c-cat" name="category" required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="c-thumb">Thumbnail URL (tuỳ chọn)</Label>
+                  <Input id="c-thumb" name="thumbnail_url" type="url" />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                    Huỷ
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    Tạo
+                  </Button>
+                </DialogFooter>
+              </form>
+            </TabsContent>
+            <TabsContent value="ai" className="mt-4">
+              <form onSubmit={(e) => void submitAiCreate(e)} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ai-topic">Chủ đề / mô tả nội dung</Label>
+                  <Textarea
+                    id="ai-topic"
+                    value={aiTopic}
+                    onChange={(e) => setAiTopic(e.target.value)}
+                    rows={4}
+                    placeholder="Ví dụ: Python cho người mới bắt đầu…"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ai-title">Tiêu đề khóa (tuỳ chọn)</Label>
+                  <Input
+                    id="ai-title"
+                    value={aiTitle}
+                    onChange={(e) => setAiTitle(e.target.value)}
+                    placeholder="Để trống để AI đặt tên"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ai-file">PDF hoặc .txt (tuỳ chọn)</Label>
+                  <Input
+                    id="ai-file"
+                    type="file"
+                    accept=".pdf,.txt,text/plain,application/pdf"
+                    onChange={(e) => setAiFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                    Huỷ
+                  </Button>
+                  <Button type="submit" disabled={loading} className="gap-1">
+                    <Sparkles className="h-4 w-4" />
+                    Tạo khóa học
+                  </Button>
+                </DialogFooter>
+              </form>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
@@ -408,6 +549,19 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
               <div className="space-y-1.5">
                 <Label htmlFor="e-thumb">Thumbnail URL</Label>
                 <Input id="e-thumb" name="thumbnail_url" type="url" defaultValue={editing.thumbnail_url ?? ""} placeholder="https://..." />
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="e-pub"
+                  name="is_published"
+                  value="on"
+                  defaultChecked={editing.is_published !== false}
+                  className="border-input h-4 w-4 rounded"
+                />
+                <Label htmlFor="e-pub" className="cursor-pointer text-sm font-normal">
+                  Xuất bản (hiển thị trong catalog)
+                </Label>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditId(null)}>

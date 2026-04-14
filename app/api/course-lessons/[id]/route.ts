@@ -43,7 +43,7 @@ async function getLessonWithCourse(
   };
 }
 
-/** PUT — chỉ sửa khi bài chưa published (pending hoặc rejected). */
+/** PUT — teacher updates a lesson in their course. */
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -77,23 +77,6 @@ export async function PUT(
     return NextResponse.json(
       { error: "You can only edit lessons in your own courses" },
       { status: 403 }
-    );
-  }
-
-  if (lesson.status === "published") {
-    return NextResponse.json(
-      {
-        error:
-          "Published lessons cannot be edited; create a new lesson or contact admin.",
-      },
-      { status: 403 }
-    );
-  }
-
-  if (lesson.status !== "pending" && lesson.status !== "rejected") {
-    return NextResponse.json(
-      { error: "Only pending or rejected lessons can be edited" },
-      { status: 400 }
     );
   }
 

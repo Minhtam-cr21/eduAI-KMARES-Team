@@ -51,14 +51,22 @@ export async function POST(request: NextRequest) {
 
   const { data: course, error: cErr } = await supabase
     .from("courses")
-    .select("id, status")
+    .select("id, status, is_published")
     .eq("id", courseId)
     .maybeSingle();
 
   if (cErr) {
     return NextResponse.json({ error: cErr.message }, { status: 500 });
   }
-  if (!course || course.status !== "published") {
+  const courseRow = course as {
+    id?: string;
+    status?: string;
+    is_published?: boolean | null;
+  } | null;
+  const visible =
+    courseRow &&
+    (courseRow.is_published === true || courseRow.status === "published");
+  if (!visible) {
     return NextResponse.json(
       { error: "Khóa học không tồn tại hoặc chưa xuất bản." },
       { status: 404 }
@@ -79,7 +87,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: row, error: insErr } = await supabase
+  const { data: enrollment, error: insErr } = await supabase
     .from("user_courses")
     .insert({
       user_id: user.id,
@@ -100,7 +108,12 @@ export async function POST(request: NextRequest) {
       : undefined;
 
   return NextResponse.json(
-    { ...row, progress_synced: sync.ok, sync_created: sync.ok ? sync.created : 0, syncWarning },
+    {
+      ...enrollment,
+      progress_synced: sync.ok,
+      sync_created: sync.ok ? sync.created : 0,
+      syncWarning,
+    },
     { status: 201 }
   );
 }

@@ -14,6 +14,7 @@
     "ingest:roadmap": "npx tsx scripts/ingest-roadmap.ts",
     "ingest:roadmaps": "ts-node -P ./scripts/tsconfig.json --transpile-only ./scripts/ingest-roadmaps.ts",
     "seed:courses": "npx tsx scripts/seed-courses.ts",
+    "seed:new-courses": "npx tsx scripts/seed-new-courses.ts",
     "supabase:deploy:deadlines": "node scripts/deploy-edge-deadlines.mjs",
     "gh:missed-deadlines": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-missed-deadlines-workflow.ps1",
     "test:flow": "npx tsx scripts/test-flow.ts"

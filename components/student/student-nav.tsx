@@ -3,6 +3,7 @@ import Link from "next/link";
 
 const baseNav = [
   { href: "/student", label: "Dashboard" },
+  { href: "/roadmaps", label: "Roadmap" },
   { href: "/quizzes", label: "Quiz" },
   { href: "/assessment", label: "Trắc nghiệm cá nhân" },
   { href: "/profile", label: "Profile" },

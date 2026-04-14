@@ -18,6 +18,7 @@ import {
   Bell,
   Link2,
   ListVideo,
+  MapPinned,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -40,6 +41,7 @@ export function useTeacherNavItems(badges: {
   return [
     { href: "/teacher", label: "Tổng quan", icon: LayoutDashboard },
     { href: "/teacher/courses", label: "Khóa học của tôi", icon: BookOpen },
+    { href: "/teacher/roadmaps", label: "Roadmap công khai", icon: MapPinned },
     { href: "/teacher/lessons", label: "Bài học", icon: ListVideo },
     { href: "/teacher/connections", label: "Yêu cầu kết nối", icon: Link2 },
     { href: "/teacher/students", label: "Học sinh", icon: Users },

@@ -17,7 +17,7 @@ export default async function TeacherCourseLessonsPage({
 
   const { data: course, error: cErr } = await supabase
     .from("courses")
-    .select("id, title, status, teacher_id")
+    .select("id, title, status, teacher_id, is_published")
     .eq("id", params.courseId)
     .maybeSingle();
 
@@ -39,7 +39,7 @@ export default async function TeacherCourseLessonsPage({
       <TeacherLessonsManager
         courseId={course.id}
         courseTitle={course.title}
-        courseStatus={course.status}
+        courseIsPublished={course.is_published !== false}
         initialLessons={
           (lessons ?? []) as {
             id: string;

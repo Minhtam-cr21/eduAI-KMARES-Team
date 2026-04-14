@@ -15,6 +15,7 @@ import { TeacherNavLinks, type TeacherNavItem } from "./teacher-nav-links";
 const TITLE_MAP: { prefix: string; title: string }[] = [
   { prefix: "/teacher/courses/", title: "Bài học khóa" },
   { prefix: "/teacher/courses", title: "Khóa học" },
+  { prefix: "/teacher/roadmaps", title: "Roadmap công khai" },
   { prefix: "/teacher/lessons", title: "Bài học" },
   { prefix: "/teacher/connections", title: "Kết nối" },
   { prefix: "/teacher/students", title: "Học sinh" },

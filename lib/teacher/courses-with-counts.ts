@@ -7,6 +7,8 @@ export type TeacherCourseRow = {
   course_type: string;
   category: string;
   status: string | null;
+  is_published: boolean | null;
+  ai_generated: boolean | null;
   thumbnail_url: string | null;
   created_at: string;
   updated_at: string;
@@ -49,6 +51,8 @@ export async function loadTeacherCoursesWithCounts(
       course_type: row.course_type as string,
       category: row.category as string,
       status: (row.status as string | null) ?? null,
+      is_published: (row.is_published as boolean | null) ?? null,
+      ai_generated: (row.ai_generated as boolean | null) ?? null,
       thumbnail_url: (row.thumbnail_url as string | null) ?? null,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,

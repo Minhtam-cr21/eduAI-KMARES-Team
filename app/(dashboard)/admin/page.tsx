@@ -24,7 +24,7 @@ type Stats = {
 export default async function AdminHomePage() {
   const [statsRes, coursesRes, lessonsRes, reportsRes] = await Promise.all([
     fetchInternalApi("/api/admin/stats"),
-    fetchInternalApi("/api/courses/pending"),
+    fetchInternalApi("/api/admin/courses"),
     fetchInternalApi("/api/course-lessons/pending"),
     fetchInternalApi("/api/reports/admin"),
   ]);
@@ -37,7 +37,7 @@ export default async function AdminHomePage() {
   type IdTitle = { id?: string; title?: string };
   type ReportPreview = { id?: string; description?: string; type?: string | null };
 
-  const pendingCourses: IdTitle[] = coursesRes.ok
+  const recentCourses: IdTitle[] = coursesRes.ok
     ? ((await coursesRes.json()) as IdTitle[]).slice(0, 5)
     : [];
   const pendingLessons: IdTitle[] = lessonsRes.ok
@@ -87,20 +87,20 @@ export default async function AdminHomePage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base">Khóa học chờ duyệt</CardTitle>
+            <CardTitle className="text-base">Khóa học</CardTitle>
             <Link
-              href="/admin/courses/pending"
+              href="/admin/courses"
               className={cn(buttonVariants({ variant: "link", size: "sm" }), "h-auto p-0")}
             >
-              Xem tất cả
+              Quản lý
             </Link>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {pendingCourses.length === 0 ? (
+            {recentCourses.length === 0 ? (
               <p className="text-muted-foreground">Không có.</p>
             ) : (
               <ul className="space-y-2">
-                {pendingCourses.map((c) => (
+                {recentCourses.map((c) => (
                   <li key={String(c.id)} className="line-clamp-1 border-b border-border pb-2 last:border-0">
                     {c.title ?? c.id}
                   </li>

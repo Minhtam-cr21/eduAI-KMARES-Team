@@ -41,7 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { FileText, GripVertical, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 type Lesson = {
@@ -119,15 +119,7 @@ function SortableLessonRow({
       </TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-1">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onEdit(lesson)}
-            disabled={
-              lesson.status === "published" ||
-              (lesson.status !== "pending" && lesson.status !== "rejected")
-            }
-          >
+          <Button variant="secondary" size="sm" onClick={() => onEdit(lesson)}>
             Sửa
           </Button>
           <Button variant="destructive" size="sm" onClick={() => onDelete(lesson.id)}>
@@ -142,14 +134,14 @@ function SortableLessonRow({
 type Props = {
   courseId: string;
   courseTitle: string;
-  courseStatus: string | null;
+  courseIsPublished: boolean;
   initialLessons: Lesson[];
 };
 
 export function TeacherLessonsManager({
   courseId,
   courseTitle,
-  courseStatus,
+  courseIsPublished,
   initialLessons,
 }: Props) {
   const router = useRouter();
@@ -170,16 +162,7 @@ export function TeacherLessonsManager({
     setLessons(initialLessons);
   }, [initialLessons]);
 
-  const canAddLesson = courseStatus === "published";
-
-  const reorderEnabled = useMemo(
-    () =>
-      lessons.length > 0 &&
-      lessons.every(
-        (l) => l.status === "pending" || l.status === "rejected"
-      ),
-    [lessons]
-  );
+  const canAddLesson = courseIsPublished;
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -196,18 +179,16 @@ export function TeacherLessonsManager({
     try {
       for (let i = 0; i < next.length; i++) {
         const le = next[i];
-        if (le.status === "pending" || le.status === "rejected") {
-          const res = await fetch(`/api/course-lessons/${le.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ order_index: i }),
-          });
-          if (!res.ok) {
-            const j = (await res.json()) as { error?: string };
-            toast.error(j.error ?? "Không lưu thứ tự");
-            await reload();
-            return;
-          }
+        const res = await fetch(`/api/course-lessons/${le.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_index: i }),
+        });
+        if (!res.ok) {
+          const j = (await res.json()) as { error?: string };
+          toast.error(j.error ?? "Không lưu thứ tự");
+          await reload();
+          return;
         }
       }
       toast.success("Đã cập nhật thứ tự bài học");
@@ -228,7 +209,7 @@ export function TeacherLessonsManager({
   async function submitCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canAddLesson) {
-      toast.error("Chỉ thêm bài khi khóa đã được duyệt (published).");
+      toast.error("Khóa đang nháp — bật xuất bản trong mục Sửa khóa học để thêm bài.");
       return;
     }
     const fd = new FormData(e.currentTarget);
@@ -322,32 +303,30 @@ export function TeacherLessonsManager({
       <div>
         <h1 className="text-2xl font-bold text-foreground">{courseTitle}</h1>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <span>Trạng thái khóa:</span>
+          <span>Hiển thị catalog:</span>
           <Badge
             variant="outline"
             className={cn(
-              "text-xs font-semibold capitalize",
-              STATUS_BADGE[courseStatus ?? ""] ?? ""
+              "text-xs font-semibold",
+              courseIsPublished
+                ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400"
+                : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400"
             )}
           >
-            {courseStatus ?? "—"}
+            {courseIsPublished ? "Đang xuất bản" : "Nháp"}
           </Badge>
-          {!canAddLesson && (
+          {!canAddLesson ? (
             <span className="text-xs text-destructive">
-              — Cần admin duyệt khóa (published) để thêm bài học mới.
+              — Khóa nháp: không thêm bài mới cho đến khi bạn bật xuất bản.
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-        {reorderEnabled ? (
+        {lessons.length > 0 ? (
           <p className="text-muted-foreground text-xs sm:mr-auto">
-            Kéo biểu tượng ⋮⋮ để sắp xếp thứ tự (chỉ khi mọi bài đều chờ duyệt / từ chối).
-          </p>
-        ) : lessons.length > 0 ? (
-          <p className="text-muted-foreground text-xs sm:mr-auto">
-            Có bài đã xuất bản — không thể kéo thả thứ tự hàng loạt.
+            Kéo biểu tượng để đổi thứ tự bài học.
           </p>
         ) : null}
         <Button
@@ -368,7 +347,7 @@ export function TeacherLessonsManager({
             <p className="text-sm text-muted-foreground">Chưa có bài học.</p>
           </CardContent>
         </Card>
-      ) : reorderEnabled ? (
+      ) : (
         <Card className="overflow-hidden border-border/60 shadow-sm">
           <DndContext
             sensors={sensors}
@@ -402,64 +381,6 @@ export function TeacherLessonsManager({
               </TableBody>
             </Table>
           </DndContext>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden border-border/60 shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-16">Thứ tự</TableHead>
-                <TableHead>Tiêu đề</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lessons.map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="tabular-nums font-medium">
-                    {l.order_index ?? 0}
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium text-foreground">{l.title}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs font-semibold capitalize",
-                        STATUS_BADGE[l.status ?? ""] ?? ""
-                      )}
-                    >
-                      {l.status ?? "—"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setEditLesson(l)}
-                        disabled={
-                          l.status === "published" ||
-                          (l.status !== "pending" && l.status !== "rejected")
-                        }
-                      >
-                        Sửa
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setDeleteId(l.id)}
-                      >
-                        Xóa
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </Card>
       )}
 
@@ -516,7 +437,13 @@ export function TeacherLessonsManager({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="eorder">Thứ tự</Label>
-                <Input id="eorder" name="order_index" type="number" min={0} defaultValue={editLesson.order_index ?? 0} />
+                <Input
+                  id="eorder"
+                  name="order_index"
+                  type="number"
+                  min={0}
+                  defaultValue={editLesson.order_index ?? 0}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="econtent">Nội dung</Label>

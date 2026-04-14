@@ -13,7 +13,7 @@ const createLessonSchema = z.object({
   order_index: z.number().int().min(0).optional(),
 });
 
-/** POST — giáo viên thêm bài học vào khóa đã published. */
+/** POST — teacher adds a lesson to their own course (lesson saved as published). */
 export async function POST(request: Request) {
   const supabase = createClient();
   const {
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
   const { data: course, error: cErr } = await supabase
     .from("courses")
-    .select("teacher_id, status")
+    .select("teacher_id, status, is_published")
     .eq("id", course_id)
     .maybeSingle();
 
@@ -56,9 +56,10 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
-  if (course.status !== "published") {
+  const c = course as { is_published?: boolean | null; status?: string };
+  if (c.is_published === false) {
     return NextResponse.json(
-      { error: "Can only add lessons to published courses" },
+      { error: "Course is unpublished — publish the course first or enable visibility." },
       { status: 400 }
     );
   }
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
       video_url: video_url ?? null,
       code_template: code_template ?? null,
       order_index: order_index ?? 0,
-      status: "pending",
+      status: "published",
       created_by: user.id,
     })
     .select()

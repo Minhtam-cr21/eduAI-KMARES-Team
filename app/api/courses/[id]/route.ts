@@ -7,9 +7,11 @@ export const dynamic = "force-dynamic";
 const updateCourseSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
+  content: z.string().nullable().optional(),
   course_type: z.enum(["skill", "role"]).optional(),
   category: z.string().min(1).optional(),
   thumbnail_url: z.string().nullable().optional(),
+  is_published: z.boolean().optional(),
 });
 
 /** PUT — giáo viên cập nhật khóa học của mình (không đổi teacher_id / status qua route này). */
@@ -59,7 +61,13 @@ export async function PUT(
     );
   }
 
-  const patch = { ...parsed.data, updated_at: new Date().toISOString() };
+  const patch: Record<string, unknown> = {
+    ...parsed.data,
+    updated_at: new Date().toISOString(),
+  };
+  if (typeof parsed.data.is_published === "boolean") {
+    patch.status = parsed.data.is_published ? "published" : "pending";
+  }
 
   const { data, error } = await supabase
     .from("courses")

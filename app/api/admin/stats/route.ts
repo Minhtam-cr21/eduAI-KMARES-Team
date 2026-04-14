@@ -31,7 +31,7 @@ export async function GET() {
     supabase
       .from("courses")
       .select("*", { count: "exact", head: true })
-      .eq("status", "published"),
+      .eq("is_published", true),
     supabase
       .from("course_lessons")
       .select("*", { count: "exact", head: true })

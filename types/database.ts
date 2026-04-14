@@ -7,15 +7,32 @@ export interface Course {
   id: string;
   title: string;
   description: string | null;
+  content?: string | null;
   course_type: CourseType;
   category: string;
   teacher_id: string | null;
   status: CourseStatus;
+  is_published?: boolean | null;
+  ai_generated?: boolean | null;
+  source_file?: string | null;
   enrolled_count: number | null;
   thumbnail_url: string | null;
   rejection_reason: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Teacher-published roadmaps (`public.roadmaps`, migration 030). */
+export interface Roadmap {
+  id: string;
+  title: string;
+  description: string | null;
+  content: string | null;
+  image_url: string | null;
+  teacher_id: string;
+  is_public: boolean;
+  tags: string[] | null;
+  created_at: string;
 }
 
 export type CourseLessonStatus = "pending" | "published" | "rejected";

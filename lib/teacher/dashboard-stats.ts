@@ -50,12 +50,12 @@ export async function loadTeacherDashboardStats(
       .from("courses")
       .select("*", { count: "exact", head: true })
       .eq("teacher_id", userId)
-      .eq("status", "published"),
+      .eq("is_published", true),
     supabase
       .from("courses")
       .select("*", { count: "exact", head: true })
       .eq("teacher_id", userId)
-      .eq("status", "pending"),
+      .eq("is_published", false),
     supabase.rpc("teacher_list_students_with_stats"),
     supabase
       .from("connection_requests")

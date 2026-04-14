@@ -3,15 +3,16 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-/** GET — admin xem khóa học chờ duyệt. */
+/** GET — admin: all courses (including unpublished). */
 export async function GET() {
-  const admin = await getAdminSupabase();
-  if (!admin.ok) return admin.response;
+  const gate = await getAdminSupabase();
+  if (!gate.ok) return gate.response;
 
-  const { data, error } = await admin.supabase
+  const { data, error } = await gate.supabase
     .from("courses")
-    .select("*, profiles(id, full_name, avatar_url)")
-    .eq("status", "pending")
+    .select(
+      "id, title, category, teacher_id, status, is_published, created_at, profiles(id, full_name)"
+    )
     .order("created_at", { ascending: false });
 
   if (error) {

@@ -53,7 +53,8 @@ export async function POST(request: Request) {
       course_type,
       category,
       teacher_id: user.id,
-      status: "pending",
+      status: "published",
+      is_published: true,
       thumbnail_url: thumbnail_url ?? null,
     })
     .select()
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from("courses")
     .select("*, profiles(id, full_name, avatar_url)", { count: "exact" })
-    .eq("status", "published");
+    .eq("is_published", true);
 
   if (category) query = query.eq("category", category);
   if (course_type) query = query.eq("course_type", course_type);
