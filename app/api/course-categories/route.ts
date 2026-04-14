@@ -8,7 +8,7 @@ export async function GET() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("course_categories")
-    .select("id, name, slug, description, icon, display_order, created_at")
+    .select("id, name, slug, display_order")
     .order("display_order", { ascending: true })
     .order("name", { ascending: true });
 

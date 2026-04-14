@@ -1,20 +1,124 @@
+import { updateCourseSchema } from "@/lib/validations/course";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-const updateCourseSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().nullable().optional(),
-  content: z.string().nullable().optional(),
-  course_type: z.enum(["skill", "role"]).optional(),
-  category: z.string().min(1).optional(),
-  thumbnail_url: z.string().nullable().optional(),
-  is_published: z.boolean().optional(),
-});
+function reviewStats(reviews: { rating: number }[]) {
+  const by_star = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let sum = 0;
+  for (const r of reviews) {
+    const n = Math.min(5, Math.max(1, Math.round(r.rating))) as 1 | 2 | 3 | 4 | 5;
+    by_star[n]++;
+    sum += r.rating;
+  }
+  const count = reviews.length;
+  const average = count ? Math.round((sum / count) * 100) / 100 : 0;
+  return { average, count, by_star };
+}
 
-/** PUT — giáo viên cập nhật khóa học của mình (không đổi teacher_id / status qua route này). */
+/** GET — chi tiết khóa học công khai (catalog). */
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: course, error: cErr } = await supabase
+    .from("courses")
+    .select(
+      `
+      id, title, description, content, course_type, category, category_id,
+      thumbnail_url, image_url, promo_video_url, teacher_id,
+      price, duration_hours, total_lessons, rating, level, enrolled_count,
+      objectives, target_audience, recommendations, what_you_will_learn, requirements, faq,
+      is_published, created_at, updated_at,
+      course_categories ( id, name, slug, icon ),
+      profiles!courses_teacher_id_fkey ( id, full_name, avatar_url )
+    `
+    )
+    .eq("id", params.id)
+    .eq("is_published", true)
+    .maybeSingle();
+
+  if (cErr) {
+    return NextResponse.json({ error: cErr.message }, { status: 500 });
+  }
+  if (!course) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const row = course as Record<string, unknown>;
+  const teacher = row.profiles ?? null;
+  const category = row.course_categories ?? null;
+  delete row.profiles;
+  delete row.course_categories;
+
+  const { data: lessons, error: lErr } = await supabase
+    .from("course_lessons")
+    .select("id, title, order_index, video_url, status")
+    .eq("course_id", params.id)
+    .eq("status", "published")
+    .order("order_index", { ascending: true });
+
+  if (lErr) {
+    return NextResponse.json({ error: lErr.message }, { status: 500 });
+  }
+
+  const { data: reviewRows, error: rErr } = await supabase
+    .from("course_reviews")
+    .select(
+      `
+      id, rating, comment, created_at, user_id,
+      profiles!course_reviews_user_id_fkey ( full_name, avatar_url )
+    `
+    )
+    .eq("course_id", params.id)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (rErr) {
+    return NextResponse.json({ error: rErr.message }, { status: 500 });
+  }
+
+  const rawReviews = reviewRows ?? [];
+  const reviews = rawReviews.map((r) => {
+    const o = r as Record<string, unknown>;
+    const prof = o.profiles as { full_name: string | null; avatar_url: string | null } | null;
+    return {
+      id: o.id,
+      rating: o.rating,
+      comment: o.comment,
+      created_at: o.created_at,
+      user_id: o.user_id,
+      user: prof
+        ? { full_name: prof.full_name, avatar_url: prof.avatar_url }
+        : null,
+    };
+  });
+
+  let my_review: (typeof reviews)[0] | null = null;
+  if (user) {
+    my_review = reviews.find((r) => r.user_id === user.id) ?? null;
+  }
+
+  const stats = reviewStats(
+    rawReviews.map((r) => ({ rating: r.rating as number }))
+  );
+
+  return NextResponse.json({
+    course: { ...row, teacher, category },
+    lessons: lessons ?? [],
+    reviews,
+    review_stats: stats,
+    my_review,
+  });
+}
+
+/** PUT — teacher updates own course. */
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -61,10 +165,21 @@ export async function PUT(
     );
   }
 
-  const patch: Record<string, unknown> = {
-    ...parsed.data,
-    updated_at: new Date().toISOString(),
-  };
+  const patch: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(parsed.data)) {
+    if (v !== undefined) patch[k] = v;
+  }
+
+  if (parsed.data.category_id) {
+    const { data: crow } = await supabase
+      .from("course_categories")
+      .select("name")
+      .eq("id", parsed.data.category_id)
+      .maybeSingle();
+    if (crow?.name) patch.category = crow.name;
+  }
+
+  patch.updated_at = new Date().toISOString();
   if (typeof parsed.data.is_published === "boolean") {
     patch.status = parsed.data.is_published ? "published" : "pending";
   }
@@ -82,7 +197,7 @@ export async function PUT(
   return NextResponse.json(data);
 }
 
-/** DELETE — giáo viên xóa khóa học (không có bài course_lessons đã published). */
+/** DELETE — teacher deletes course (no published lessons, etc.). */
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } }

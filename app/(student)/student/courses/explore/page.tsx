@@ -2,6 +2,7 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,30 +13,73 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { CourseWithTeacher } from "@/types/database";
-import { BookOpen, Search } from "lucide-react";
+import { BookOpen, Clock, Search, Star } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-type Catalog = { data: CourseWithTeacher[]; count: number | null };
+type CategoryRow = { id: string; name: string; slug: string; display_order?: number };
 
-const CATEGORY_COLORS: Record<string, string> = {
-  programming: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
-  web: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400",
-  data: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400",
-  mobile: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400",
+type CatalogCategory = { id: string; name: string; slug: string; icon?: string | null } | null;
+
+type CatalogCourse = {
+  id: string;
+  title: string;
+  description: string | null;
+  price?: number | null;
+  duration_hours?: number | null;
+  total_lessons?: number | null;
+  rating?: number | null;
+  level?: string | null;
+  image_url?: string | null;
+  thumbnail_url?: string | null;
+  course_type?: string;
+  teacher?: { full_name?: string | null } | null;
+  category?: CatalogCategory;
 };
+
+type CatalogResponse = {
+  data: CatalogCourse[];
+  count: number | null;
+  error?: string;
+};
+
+function formatVnd(n: number | null | undefined) {
+  if (n == null || Number.isNaN(Number(n))) return "Free";
+  if (Number(n) <= 0) return "Free";
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(Number(n));
+}
+
+function Stars({ value }: { value: number }) {
+  const r = Math.min(5, Math.max(0, Math.round(Number(value) || 0)));
+  return (
+    <div className="flex items-center gap-0.5" aria-label={`Rating ${value} / 5`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star
+          key={i}
+          className={cn(
+            "h-3.5 w-3.5",
+            i < r ? "fill-amber-400 text-amber-400" : "text-muted-foreground/25"
+          )}
+        />
+      ))}
+    </div>
+  );
+}
 
 function CourseSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, i) => (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="space-y-3 rounded-xl border border-border p-4">
-          <Skeleton className="h-32 w-full rounded-lg" />
+          <Skeleton className="h-36 w-full rounded-lg" />
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-9 w-full" />
         </div>
       ))}
     </div>
@@ -43,50 +87,14 @@ function CourseSkeleton() {
 }
 
 export default function ExploreCoursesPage() {
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set());
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [courses, setCourses] = useState<CatalogCourse[]>([]);
+  const [count, setCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [enrolling, setEnrolling] = useState<string | null>(null);
+  const [catLoading, setCatLoading] = useState(true);
+  const [categorySlug, setCategorySlug] = useState("all");
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [highlightCourseId, setHighlightCourseId] = useState<string | null>(
-    null
-  );
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [catRes, enRes] = await Promise.all([
-        fetch("/api/courses?page=1&limit=50"),
-        fetch("/api/user/courses/enrolled"),
-      ]);
-      const catJson = (await catRes.json()) as Catalog & { error?: string };
-      if (!catRes.ok) {
-        toast.error(catJson.error ?? "Không tải catalog");
-        return;
-      }
-      setCatalog({ data: catJson.data ?? [], count: catJson.count ?? null });
-
-      if (enRes.ok) {
-        const enJson = (await enRes.json()) as {
-          courses?: Array<{ course: { id: string } }>;
-        };
-        setEnrolledIds(
-          new Set((enJson.courses ?? []).map((x) => x.course.id))
-        );
-      } else {
-        setEnrolledIds(new Set());
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Lỗi mạng");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const [highlightCourseId, setHighlightCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -94,44 +102,55 @@ export default function ExploreCoursesPage() {
     setHighlightCourseId(id);
   }, []);
 
-  async function enroll(courseId: string) {
-    setEnrolling(courseId);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setCatLoading(true);
+      try {
+        const res = await fetch("/api/course-categories");
+        const j = (await res.json()) as { data?: CategoryRow[] };
+        if (!cancelled && res.ok && j.data) setCategories(j.data);
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setCatLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loadCourses = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await fetch("/api/user/courses/enroll", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId }),
-      });
-      const j = (await res.json()) as {
-        error?: string;
-        syncWarning?: string;
-      };
+      const q =
+        categorySlug && categorySlug !== "all"
+          ? `&categorySlug=${encodeURIComponent(categorySlug)}`
+          : "";
+      const res = await fetch(`/api/courses?page=1&limit=50${q}`);
+      const j = (await res.json()) as CatalogResponse;
       if (!res.ok) {
-        toast.error(j.error ?? "Không đăng ký được");
+        toast.error(j.error ?? "Không tải catalog");
+        setCourses([]);
+        setCount(null);
         return;
       }
-      toast.success(
-        j.syncWarning
-          ? "Đăng ký thành công"
-          : "Đăng ký thành công — lộ trình đã đồng bộ.",
-        j.syncWarning ? { description: j.syncWarning } : undefined
-      );
-      setEnrolledIds((prev) => new Set(prev).add(courseId));
+      setCourses(j.data ?? []);
+      setCount(j.count ?? null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Network error");
     } finally {
-      setEnrolling(null);
+      setLoading(false);
     }
-  }
+  }, [categorySlug]);
 
-  const categories = useMemo(() => {
-    const cats = new Set<string>();
-    (catalog?.data ?? []).forEach((c) => {
-      if (c.category) cats.add(c.category);
-    });
-    return Array.from(cats).sort();
-  }, [catalog]);
+  useEffect(() => {
+    void loadCourses();
+  }, [loadCourses]);
 
   const visible = useMemo(() => {
-    let list = (catalog?.data ?? []).filter((c) => !enrolledIds.has(c.id));
+    let list = courses;
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -140,11 +159,8 @@ export default function ExploreCoursesPage() {
           (c.description ?? "").toLowerCase().includes(q)
       );
     }
-    if (activeCategory) {
-      list = list.filter((c) => c.category === activeCategory);
-    }
     return list;
-  }, [catalog, enrolledIds, search, activeCategory]);
+  }, [courses, search]);
 
   useEffect(() => {
     if (!highlightCourseId || loading) return;
@@ -156,8 +172,11 @@ export default function ExploreCoursesPage() {
     return () => window.clearTimeout(t);
   }, [highlightCourseId, loading, visible]);
 
+  const coverUrl = (c: CatalogCourse) =>
+    c.image_url?.trim() || c.thumbnail_url?.trim() || null;
+
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <main className="mx-auto max-w-7xl px-4 py-8">
       <BackButton fallbackHref="/student" className="mb-4" />
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -168,7 +187,7 @@ export default function ExploreCoursesPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Khám phá khóa học</h1>
             <p className="text-sm text-muted-foreground">
-              Đăng ký để học — tiến độ bài học được đồng bộ tự động.
+              Lọc theo danh mục — xem chi tiết và đăng ký học.
             </p>
           </div>
         </div>
@@ -176,7 +195,7 @@ export default function ExploreCoursesPage() {
           href="/student/courses"
           className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
-          ← Khóa của tôi
+          Khóa của tôi
         </Link>
       </div>
 
@@ -186,44 +205,35 @@ export default function ExploreCoursesPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm khóa học theo tên hoặc mô tả..."
+            placeholder="Tìm theo tên hoặc mô tả..."
             className="pl-9"
           />
         </div>
 
-        {categories.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveCategory(null)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition",
-                !activeCategory
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted"
-              )}
-            >
-              Tất cả
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() =>
-                  setActiveCategory(activeCategory === cat ? null : cat)
-                }
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium capitalize transition",
-                  activeCategory === cat
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-muted-foreground hover:bg-muted"
-                )}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex gap-2 overflow-x-auto pb-1 pt-1 [-ms-overflow-style:none] [scrollbar-width:thin]">
+          {catLoading ? (
+            <Skeleton className="h-9 w-40 shrink-0 rounded-full" />
+          ) : (
+            categories.map((cat) => {
+              const active = categorySlug === cat.slug;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setCategorySlug(cat.slug)}
+                  className={cn(
+                    "shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {cat.name}
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -233,40 +243,43 @@ export default function ExploreCoursesPage() {
           <CardContent className="flex flex-col items-center py-12 text-center">
             <BookOpen className="mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm text-muted-foreground">
-              {(catalog?.data?.length ?? 0) === 0
-                ? "Chưa có khóa học công khai."
-                : search || activeCategory
-                  ? "Không tìm thấy khóa học phù hợp."
-                  : "Bạn đã đăng ký tất cả khóa trong danh sách."}
+              {courses.length === 0
+                ? "No courses match this filter."
+                : "Không tìm thấy khóa học."}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {visible.map((c) => {
-            const catColor =
-              CATEGORY_COLORS[c.category?.toLowerCase() ?? ""] ??
-              "bg-muted text-muted-foreground";
+            const img = coverUrl(c);
+            const rating = Number(c.rating) || 0;
             return (
               <Card
                 id={`course-card-${c.id}`}
                 key={c.id}
                 className={cn(
-                  "flex flex-col transition hover:shadow-md",
+                  "flex flex-col overflow-hidden transition hover:shadow-md",
                   highlightCourseId === c.id &&
                     "ring-2 ring-primary ring-offset-2 ring-offset-background"
                 )}
               >
-                <div
-                  className={cn(
-                    "flex h-28 items-center justify-center rounded-t-xl",
-                    catColor
+                <div className="relative aspect-video w-full bg-muted">
+                  {img ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={img}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <BookOpen className="h-12 w-12 text-muted-foreground/30" />
+                    </div>
                   )}
-                >
-                  <BookOpen className="h-10 w-10 opacity-40" />
                 </div>
                 <CardHeader className="pb-2">
-                  <CardTitle className="line-clamp-1 text-base">
+                  <CardTitle className="line-clamp-2 text-base leading-snug">
                     {c.title}
                   </CardTitle>
                   <CardDescription className="line-clamp-2 text-xs">
@@ -274,40 +287,53 @@ export default function ExploreCoursesPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="mt-auto space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Stars value={rating} />
+                    <span className="tabular-nums">{rating.toFixed(1)}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      {c.duration_hours != null ? `${c.duration_hours} h` : "—"}
+                    </span>
+                    <span>{c.total_lessons ?? 0} bài</span>
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {c.category && (
-                      <Badge variant="outline" className="text-[10px] capitalize">
-                        {c.category}
+                    {c.category?.name ? (
+                      <Badge variant="outline" className="text-[10px]">
+                        {c.category.name}
                       </Badge>
-                    )}
-                    {c.course_type && (
+                    ) : null}
+                    {c.course_type ? (
                       <Badge variant="secondary" className="text-[10px]">
                         {c.course_type}
                       </Badge>
-                    )}
+                    ) : null}
                   </div>
-                  {c.teacher?.full_name && (
+                  <p className="text-sm font-semibold text-foreground">
+                    {formatVnd(c.price)}
+                  </p>
+                  {c.teacher?.full_name ? (
                     <p className="text-xs text-muted-foreground">
                       GV: {c.teacher.full_name}
                     </p>
-                  )}
-                  <button
-                    type="button"
-                    disabled={enrolling === c.id}
-                    onClick={() => void enroll(c.id)}
-                    className={cn(
-                      "w-full rounded-lg px-4 py-2 text-sm font-semibold transition",
-                      "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60"
-                    )}
+                  ) : null}
+                  <Link
+                    href={`/student/courses/${c.id}`}
+                    className={cn(buttonVariants(), "w-full")}
                   >
-                    {enrolling === c.id ? "Đang xử lý…" : "Đăng ký"}
-                  </button>
+                    Xem chi tiết
+                  </Link>
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+
+      {count != null && !loading ? (
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Showing {visible.length} of {count} courses
+        </p>
+      ) : null}
     </main>
   );
 }
