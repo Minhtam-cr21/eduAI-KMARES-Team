@@ -5,10 +5,7 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-/**
- * GET ?lessonId= — mục study_schedule của user cho lesson (ưu tiên pending, sau đó completed).
- * @deprecated Dùng `/api/study-schedule/by-lesson` (cùng hành vi).
- */
+/** GET ?lessonId= — schedule ưu tiên pending, sau đó completed. */
 export async function GET(request: NextRequest) {
   const supabase = createClient();
   const {

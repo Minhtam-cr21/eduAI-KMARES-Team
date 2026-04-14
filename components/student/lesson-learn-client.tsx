@@ -15,24 +15,64 @@ export function LessonActivityPing() {
 }
 
 type Props = {
-  scheduleId: string | null;
-  initialStatus: string | null;
+  lessonId: string;
 };
 
-export function LessonScheduleCompleteSection({
-  scheduleId,
-  initialStatus,
-}: Props) {
+/**
+ * Lấy schedule qua GET /api/study-schedule/by-lesson, hoàn thành qua POST /api/study-schedule/complete.
+ */
+export function LessonScheduleCompleteSection({ lessonId }: Props) {
   const router = useRouter();
-  const [status, setStatus] = useState(initialStatus);
-  const [loading, setLoading] = useState(false);
+  const [scheduleId, setScheduleId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [fetching, setFetching] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setFetching(true);
+      try {
+        const res = await fetch(
+          `/api/study-schedule/by-lesson?lessonId=${encodeURIComponent(lessonId)}`
+        );
+        const j = (await res.json()) as {
+          schedule_id?: string | null;
+          status?: string | null;
+          error?: string;
+        };
+        if (!res.ok) {
+          if (!cancelled) {
+            setScheduleId(null);
+            setStatus(null);
+          }
+          return;
+        }
+        if (cancelled) return;
+        setScheduleId(j.schedule_id ?? null);
+        setStatus(j.status ?? null);
+      } catch {
+        if (!cancelled) {
+          setScheduleId(null);
+          setStatus(null);
+        }
+      } finally {
+        if (!cancelled) setFetching(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lessonId]);
 
   const handleComplete = useCallback(async () => {
     if (!scheduleId) return;
-    setLoading(true);
+    setSubmitting(true);
     try {
-      const res = await fetch(`/api/study-schedule/${scheduleId}/complete`, {
+      const res = await fetch("/api/study-schedule/complete", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduleId }),
       });
       const j = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -45,9 +85,18 @@ export function LessonScheduleCompleteSection({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi mạng");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }, [router, scheduleId]);
+
+  if (fetching) {
+    return (
+      <div
+        className="h-9 w-[160px] animate-pulse rounded-md bg-muted"
+        aria-hidden
+      />
+    );
+  }
 
   if (status === "completed") {
     return (
@@ -61,10 +110,10 @@ export function LessonScheduleCompleteSection({
     return (
       <Button
         type="button"
-        disabled={loading}
+        disabled={submitting}
         onClick={() => void handleComplete()}
       >
-        {loading ? "Đang xử lý…" : "Đánh dấu hoàn thành"}
+        {submitting ? "Đang xử lý…" : "Đánh dấu hoàn thành"}
       </Button>
     );
   }

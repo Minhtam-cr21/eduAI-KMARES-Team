@@ -76,20 +76,6 @@ export default async function LearnCourseLessonPage({
     );
   }
 
-  const { data: schedRows } = await supabase
-    .from("study_schedule")
-    .select("id, status")
-    .eq("user_id", user.id)
-    .eq("lesson_id", lessonId)
-    .order("updated_at", { ascending: false });
-
-  const list = schedRows ?? [];
-  const pending = list.find((r) => r.status === "pending");
-  const completed = list.find((r) => r.status === "completed");
-  const chosen = pending ?? completed ?? list[0] ?? null;
-  const scheduleId = chosen?.id ? String(chosen.id) : null;
-  const scheduleStatus = chosen?.status ? String(chosen.status) : null;
-
   const videoSrc = normalizeVideoEmbedUrl(lesson.video_url as string | null);
   const content = (lesson.content as string | null)?.trim() ?? "";
 
@@ -136,10 +122,7 @@ export default async function LearnCourseLessonPage({
         </div>
 
         <div className="mt-10 flex flex-col gap-4 border-t border-border pt-6 sm:flex-row sm:flex-wrap sm:items-center">
-          <LessonScheduleCompleteSection
-            scheduleId={scheduleId}
-            initialStatus={scheduleStatus}
-          />
+          <LessonScheduleCompleteSection lessonId={lessonId} />
 
           <Link
             href={`/practice/lesson/${lessonId}`}

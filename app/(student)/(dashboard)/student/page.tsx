@@ -1,6 +1,7 @@
 "use client";
 
 import { StudentDashboardModules } from "@/components/student/student-dashboard-modules";
+import { StudentStatsCharts } from "@/components/student/student-stats-charts";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -157,6 +158,8 @@ export default function StudentDashboardPage() {
           </Link>
         ))}
       </nav>
+
+      <StudentStatsCharts />
 
       <StudentDashboardModules />
 
