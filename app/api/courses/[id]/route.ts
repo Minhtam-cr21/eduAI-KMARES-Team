@@ -33,7 +33,7 @@ export async function GET(
       `
       id, title, description, content, course_type, category, category_id,
       thumbnail_url, image_url, promo_video_url, teacher_id,
-      price, duration_hours, total_lessons, rating, level, enrolled_count,
+      price, original_price, duration_hours, total_lessons, rating, level, enrolled_count, reviews_count,
       objectives, target_audience, recommendations, what_you_will_learn, requirements, faq,
       is_published, created_at, updated_at,
       course_categories ( id, name, slug, icon ),

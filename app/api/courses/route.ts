@@ -5,7 +5,15 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const COURSE_LIST_FIELDS =
-  "id, title, description, course_type, category, category_id, thumbnail_url, image_url, promo_video_url, is_published, created_at, price, duration_hours, total_lessons, rating, level, enrolled_count";
+  "id, title, description, course_type, category, category_id, thumbnail_url, image_url, promo_video_url, is_published, created_at, price, original_price, duration_hours, total_lessons, rating, level, enrolled_count, reviews_count";
+
+function escapeIlikeSearch(raw: string): string {
+  return raw
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_")
+    .replace(/,/g, " ");
+}
 
 /** POST — create course (teacher only). */
 export async function POST(request: Request) {
@@ -92,7 +100,7 @@ export async function POST(request: Request) {
   return NextResponse.json(data, { status: 201 });
 }
 
-/** GET — danh sách khóa published (phân trang + lọc). */
+/** GET — danh sách khóa published (phân trang + lọc category + search). */
 export async function GET(request: Request) {
   const supabase = createClient();
   const { searchParams } = new URL(request.url);
@@ -103,7 +111,10 @@ export async function GET(request: Request) {
     searchParams.get("category_slug") ??
     searchParams.get("category");
   const course_type = searchParams.get("course_type");
+  const search =
+    searchParams.get("search") ?? searchParams.get("q") ?? undefined;
 
+  let categoryId: string | null = null;
   if (categorySlug && categorySlug !== "all") {
     const { data: catRow } = await supabase
       .from("course_categories")
@@ -113,44 +124,7 @@ export async function GET(request: Request) {
     if (!catRow?.id) {
       return NextResponse.json({ data: [], count: 0, page, limit });
     }
-
-    let query = supabase
-      .from("courses")
-      .select(
-        `${COURSE_LIST_FIELDS}, profiles(id, full_name, avatar_url), course_categories(id, name, slug, icon)`,
-        { count: "exact" }
-      )
-      .eq("is_published", true)
-      .eq("category_id", catRow.id);
-
-    if (course_type) query = query.eq("course_type", course_type);
-
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-
-    const { data, error, count } = await query
-      .range(from, to)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    const rows = (data ?? []).map((row: Record<string, unknown>) => {
-      const { profiles: prof, course_categories: categoryRow, ...rest } = row;
-      return {
-        ...rest,
-        teacher: prof ?? null,
-        category: categoryRow ?? null,
-      };
-    });
-
-    return NextResponse.json({
-      data: rows,
-      count,
-      page,
-      limit,
-    });
+    categoryId = catRow.id;
   }
 
   let query = supabase
@@ -161,7 +135,15 @@ export async function GET(request: Request) {
     )
     .eq("is_published", true);
 
+  if (categoryId) query = query.eq("category_id", categoryId);
   if (course_type) query = query.eq("course_type", course_type);
+
+  const q = search?.trim();
+  if (q) {
+    const safe = escapeIlikeSearch(q);
+    const pattern = `%${safe}%`;
+    query = query.or(`title.ilike.${pattern},description.ilike.${pattern}`);
+  }
 
   const from = (page - 1) * limit;
   const to = from + limit - 1;
