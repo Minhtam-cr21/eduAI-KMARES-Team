@@ -1,3 +1,7 @@
+/**
+ * Scope: `/assessment` and `/api/assessment/*` = personal orientation test (career / MBTI-style, ~50 questions).
+ * Not for per-lesson course quizzes — those use the `quizzes` table and separate API routes (e.g. `/api/quiz/*`).
+ */
 export type AssessmentQuestion = {
   code: string;
   text: string;

@@ -4,7 +4,7 @@ import Link from "next/link";
 const baseNav = [
   { href: "/student", label: "Dashboard" },
   { href: "/quizzes", label: "Quiz" },
-  { href: "/assessment", label: "Assessment" },
+  { href: "/assessment", label: "Trắc nghiệm cá nhân" },
   { href: "/profile", label: "Profile" },
   { href: "/student/teachers", label: "Kết nối GV" },
   { href: "/personalized-roadmap", label: "Lộ trình" },

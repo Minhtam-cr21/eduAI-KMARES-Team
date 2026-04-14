@@ -10,6 +10,8 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
+/** Personal orientation (`/assessment`). Not lesson quizzes — scope note at top of `lib/assessment/questions.ts`. */
+
 const bodySchema = z.object({
   answers: z.array(
     z.object({

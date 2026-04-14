@@ -31,7 +31,7 @@ type EnrolledCourse = {
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/student", icon: LayoutDashboard },
   { label: "Quiz", href: "/quizzes", icon: ClipboardList },
-  { label: "Assessment", href: "/assessment", icon: ClipboardList },
+  { label: "Trắc nghiệm cá nhân", href: "/assessment", icon: ClipboardList },
   { label: "Profile", href: "/profile", icon: User },
   { label: "Kết nối GV", href: "/student/teachers", icon: Users },
 ];
