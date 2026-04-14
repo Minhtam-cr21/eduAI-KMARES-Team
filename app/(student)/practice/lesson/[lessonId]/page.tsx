@@ -257,7 +257,7 @@ export default function PracticeLessonCodingPage() {
             <p className="text-muted-foreground mt-1 text-xs">
               Markdown · tối đa 3 lượt/ngày (Hỏi AI).
             </p>
-            <div className="mt-2 min-h-[100px] text-sm">
+            <div className="mt-2 min-h-0 text-sm">
               <ErrorAnalysisPanel
                 analysis={aiAnalysis}
                 analysisSource={aiSource}

@@ -4,15 +4,7 @@ import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { cn } from "@/lib/utils";
 import type { AnalysisSource, ErrorAnalysis } from "@/lib/ai/error-analyzer";
 import type { LucideIcon } from "lucide-react";
-import {
-  AlertCircle,
-  Code2,
-  Lightbulb,
-  ListOrdered,
-  MessageCircle,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
+import { AlertCircle, Code2, Lightbulb, Sparkles, Wrench } from "lucide-react";
 
 type Props = {
   analysis: ErrorAnalysis | null;
@@ -30,44 +22,45 @@ function Section({
 }: {
   icon: LucideIcon;
   title: string;
-  tint: "rose" | "sky" | "amber" | "violet" | "emerald" | "slate";
+  tint: "rose" | "amber" | "violet";
   children: React.ReactNode;
 }) {
   const ring =
     tint === "rose"
       ? "border-rose-500/20 bg-rose-500/5"
-      : tint === "sky"
-        ? "border-sky-500/20 bg-sky-500/5"
-        : tint === "amber"
-          ? "border-amber-500/20 bg-amber-500/5"
-          : tint === "violet"
-            ? "border-violet-500/20 bg-violet-500/5"
-            : tint === "emerald"
-              ? "border-emerald-500/20 bg-emerald-500/5"
-              : "border-border bg-muted/30";
+      : tint === "amber"
+        ? "border-amber-500/20 bg-amber-500/5"
+        : "border-violet-500/20 bg-violet-500/5";
   const iconClass =
     tint === "rose"
       ? "text-rose-600 dark:text-rose-400"
-      : tint === "sky"
-        ? "text-sky-600 dark:text-sky-400"
-        : tint === "amber"
-          ? "text-amber-600 dark:text-amber-400"
-          : tint === "violet"
-            ? "text-violet-600 dark:text-violet-400"
-            : tint === "emerald"
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-muted-foreground";
+      : tint === "amber"
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-violet-600 dark:text-violet-400";
 
   return (
-    <section className={cn("rounded-xl border p-4", ring)}>
-      <div className="mb-2 flex items-center gap-2">
-        <Icon className={cn("h-4 w-4 shrink-0", iconClass)} aria-hidden />
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+    <section className={cn("rounded-lg border px-3 py-2.5", ring)}>
+      <div className="mb-1.5 flex items-center gap-2">
+        <Icon className={cn("h-3.5 w-3.5 shrink-0", iconClass)} aria-hidden />
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+          {title}
+        </h3>
       </div>
-      <div className="text-sm text-foreground/90">{children}</div>
+      <div
+        className={cn(
+          "text-sm leading-snug text-foreground/90",
+          "[&_.prose]:my-0 [&_.prose_p]:my-0.5 [&_.prose_li]:my-0",
+          "[&_.prose]:max-w-none"
+        )}
+      >
+        {children}
+      </div>
     </section>
   );
 }
+
+const scrollBox =
+  "max-h-[min(42vh,360px)] overflow-y-auto overflow-x-hidden overscroll-contain pr-1";
 
 export function ErrorAnalysisPanel({
   analysis,
@@ -80,18 +73,15 @@ export function ErrorAnalysisPanel({
   if (!analysis) {
     if (fallbackMarkdown?.trim()) {
       return (
-        <div className={cn("space-y-3", className)}>
+        <div className={cn("space-y-2", className)}>
           {showHeuristicHint ? (
-            <p className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
-              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <span>
-                Đang sử dụng chế độ phân tích cơ bản. Để có phân tích chi tiết hơn, hãy cấu hình{" "}
-                <strong>OpenAI</strong> hoặc <strong>DeepSeek</strong> API key trong biến môi trường.
-              </span>
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-100">
+              <Lightbulb className="mr-1 inline h-3 w-3 -translate-y-px" aria-hidden />
+              Chế độ cơ bản — thêm <strong>OpenAI</strong> hoặc <strong>DeepSeek</strong> key để gợi ý sâu hơn.
             </p>
           ) : null}
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <LessonMarkdown content={fallbackMarkdown} />
+          <div className={cn(scrollBox, "prose prose-sm dark:prose-invert")}>
+            <LessonMarkdown content={fallbackMarkdown.trim()} />
           </div>
         </div>
       );
@@ -103,70 +93,45 @@ export function ErrorAnalysisPanel({
     );
   }
 
+  const showCode = Boolean(analysis.codeExample?.trim());
+
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("flex flex-col gap-2", className)}>
       {showHeuristicHint ? (
-        <p className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
-          <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <span>
-            Đang sử dụng chế độ phân tích cơ bản. Để có phân tích chi tiết hơn, hãy cấu hình{" "}
-            <strong>OpenAI</strong> hoặc <strong>DeepSeek</strong> API key.
-          </span>
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-100">
+          <Lightbulb className="mr-1 inline h-3 w-3 -translate-y-px" aria-hidden />
+          Chế độ cơ bản — thêm <strong>OpenAI</strong> hoặc <strong>DeepSeek</strong> key nếu cần gợi ý chi tiết hơn.
         </p>
       ) : (
-        <p className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
-          <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <span>
-            Phân tích bằng mô hình AI ({analysisSource === "openai" ? "OpenAI" : "DeepSeek"}).
-          </span>
+        <p className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-[11px] text-foreground">
+          <Sparkles className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+          {analysisSource === "openai" ? "OpenAI" : "DeepSeek"}
         </p>
       )}
 
-      <Section icon={AlertCircle} title="Nguyên nhân gốc rễ" tint="rose">
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <LessonMarkdown content={analysis.rootCause} />
-        </div>
-      </Section>
-
-      <Section icon={MessageCircle} title="Giải thích" tint="sky">
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <LessonMarkdown content={analysis.explanation} />
-        </div>
-      </Section>
-
-      <Section icon={Wrench} title="Cách sửa" tint="amber">
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <LessonMarkdown content={analysis.solution} />
-        </div>
-      </Section>
-
-      {analysis.codeExample?.trim() ? (
-        <Section icon={Code2} title="Ví dụ code" tint="violet">
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <LessonMarkdown
-              content={`\`\`\`\n${analysis.codeExample.trim()}\n\`\`\``}
-            />
+      <div className={cn(scrollBox, "flex flex-col gap-2")}>
+        <Section icon={AlertCircle} title="Nguyên nhân" tint="rose">
+          <div className="prose prose-sm dark:prose-invert">
+            <LessonMarkdown content={analysis.rootCause.trim() || "—"} />
           </div>
         </Section>
-      ) : null}
 
-      <Section icon={Lightbulb} title="Phòng tránh" tint="emerald">
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <LessonMarkdown content={analysis.preventionTip} />
-        </div>
-      </Section>
+        <Section icon={Wrench} title="Cách sửa" tint="amber">
+          <div className="prose prose-sm dark:prose-invert">
+            <LessonMarkdown content={analysis.solution.trim() || "—"} />
+          </div>
+        </Section>
 
-      <Section icon={ListOrdered} title="Bước debug gợi ý" tint="slate">
-        <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed">
-          {analysis.debugSteps.map((step, i) => (
-            <li key={i} className="pl-1">
-              <div className="prose prose-sm dark:prose-invert max-w-none inline">
-                <LessonMarkdown content={step} />
-              </div>
-            </li>
-          ))}
-        </ol>
-      </Section>
+        {showCode ? (
+          <Section icon={Code2} title="Ví dụ" tint="violet">
+            <div className="prose prose-sm dark:prose-invert">
+              <LessonMarkdown
+                content={`\`\`\`\n${analysis.codeExample!.trim()}\n\`\`\``}
+              />
+            </div>
+          </Section>
+        ) : null}
+      </div>
     </div>
   );
 }

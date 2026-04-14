@@ -231,7 +231,7 @@ export default function PracticeExercisePage() {
             <p className="text-muted-foreground mt-1 text-xs">
               Hiển thị Markdown · tối đa 3 lượt/ngày khi bấm Hỏi AI.
             </p>
-            <div className="mt-2 min-h-[120px] text-sm">
+            <div className="mt-2 min-h-0 text-sm">
               <ErrorAnalysisPanel
                 analysis={aiAnalysis}
                 analysisSource={aiSource}

@@ -401,7 +401,7 @@ export default function StudentPracticeListPage() {
                     Markdown · tối đa 3 lượt/ngày khi bấm Hỏi AI. &quot;Run + AI&quot; điền gợi ý
                     sau khi chạy.
                   </p>
-                  <div className="mt-2 min-h-[120px] text-sm">
+                  <div className="mt-2 min-h-0 text-sm">
                     <ErrorAnalysisPanel
                       analysis={aiAnalysis}
                       analysisSource={aiSource}
