@@ -1,9 +1,11 @@
 "use client";
 
+import { ErrorAnalysisPanel } from "@/components/code/error-analysis-panel";
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
+import type { AnalysisSource, ErrorAnalysis } from "@/lib/ai/error-analyzer";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -42,6 +44,8 @@ export default function PracticePage() {
   const [output, setOutput] = useState("");
   const [runError, setRunError] = useState("");
   const [exitCode, setExitCode] = useState<number | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<ErrorAnalysis | null>(null);
+  const [aiSource, setAiSource] = useState<AnalysisSource | null>(null);
   const [suggestion, setSuggestion] = useState("");
   const [running, setRunning] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -49,6 +53,8 @@ export default function PracticePage() {
   const fetchRandom = useCallback(
     async (lang: Lang) => {
       setLoading(true);
+      setAiAnalysis(null);
+      setAiSource(null);
       setSuggestion("");
       setOutput("");
       setRunError("");
@@ -131,6 +137,8 @@ export default function PracticePage() {
 
   async function handleAskAi() {
     setAsking(true);
+    setAiAnalysis(null);
+    setAiSource(null);
     setSuggestion("");
     try {
       const res = await fetch("/api/ai-suggest", {
@@ -141,9 +149,20 @@ export default function PracticePage() {
           language,
           ...(runError.trim() ? { error: runError } : {}),
           ...(output.trim() ? { output } : {}),
+          ...(question?.sample_input?.trim()
+            ? { input_example: question.sample_input }
+            : {}),
+          ...(question?.sample_output?.trim()
+            ? { expected_output: question.sample_output }
+            : {}),
         }),
       });
-      const data = (await res.json()) as { suggestion?: string; error?: string };
+      const data = (await res.json()) as {
+        suggestion?: string;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
+        error?: string;
+      };
       if (res.status === 429) {
         toast.error("Hết lượt AI", { description: data.error });
         return;
@@ -151,6 +170,10 @@ export default function PracticePage() {
       if (!res.ok) {
         toast.error("AI không phản hồi", { description: data.error });
         return;
+      }
+      if (data.analysis) {
+        setAiAnalysis(data.analysis);
+        setAiSource(data.analysis_source ?? null);
       }
       setSuggestion(data.suggestion ?? "");
     } catch (e) {
@@ -278,14 +301,14 @@ export default function PracticePage() {
             <p className="text-muted-foreground mt-1 text-xs">
               Markdown · tối đa 3 lượt/ngày.
             </p>
-            <div className="prose prose-sm dark:prose-invert mt-2 min-h-[200px] max-w-none text-sm">
-              {suggestion ? (
-                <LessonMarkdown content={suggestion} />
-              ) : (
-                <p className="text-muted-foreground text-sm italic">
-                  Chạy code rồi bấm &quot;Hỏi AI&quot; để nhận phân tích.
-                </p>
-              )}
+            <div className="mt-2 min-h-[200px] text-sm">
+              <ErrorAnalysisPanel
+                analysis={aiAnalysis}
+                analysisSource={aiSource}
+                fallbackMarkdown={
+                  !aiAnalysis && suggestion.trim() ? suggestion : undefined
+                }
+              />
             </div>
           </div>
         </div>

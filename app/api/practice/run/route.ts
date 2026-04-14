@@ -1,4 +1,9 @@
-import { analyzeCodeWithAI } from "@/lib/ai/code-mentor";
+import {
+  analyzeCodeError,
+  formatErrorAnalysisMarkdown,
+  type AnalysisSource,
+  type ErrorAnalysis,
+} from "@/lib/ai/error-analyzer";
 import { executeCode, type RunCodeLanguage } from "@/lib/code-runner";
 import { getPublishedLessonIfEnrolled } from "@/lib/practice/assert-lesson-access";
 import { createClient } from "@/lib/supabase/server";
@@ -61,10 +66,13 @@ export async function POST(request: Request) {
   const { exercise_id, lesson_id, code, language, stdin, include_ai } =
     parsed.data;
 
+  let inputExample: string | undefined;
+  let expectedOutput: string | undefined;
+
   if (exercise_id) {
     const { data: exercise, error: exErr } = await supabase
       .from("practice_exercises")
-      .select("id, language")
+      .select("id, language, input_example, output_example")
       .eq("id", exercise_id)
       .maybeSingle();
 
@@ -80,6 +88,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    inputExample = exercise.input_example?.trim() || undefined;
+    expectedOutput = exercise.output_example?.trim() || undefined;
   } else if (lesson_id) {
     const lesson = await getPublishedLessonIfEnrolled(
       supabase,
@@ -107,14 +117,19 @@ export async function POST(request: Request) {
   });
 
   let aiSuggestion: string | null = null;
+  let analysis: ErrorAnalysis | null = null;
+  let analysisSource: AnalysisSource | null = null;
   if (include_ai) {
     try {
-      aiSuggestion = await analyzeCodeWithAI({
-        code,
-        language,
-        error: result.error?.trim() || undefined,
-        output: result.output?.trim() || undefined,
+      const r = await analyzeCodeError(code, language, {
+        stderr: result.error?.trim() || undefined,
+        stdout: result.output?.trim() || undefined,
+        inputExample,
+        expectedOutput,
       });
+      analysis = r.analysis;
+      analysisSource = r.source;
+      aiSuggestion = formatErrorAnalysisMarkdown(r.analysis);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[practice/run] AI:", msg);
@@ -152,6 +167,9 @@ export async function POST(request: Request) {
     error: result.error,
     exit_code: result.exit_code,
     ai_suggestion: aiSuggestion,
+    ...(include_ai
+      ? { analysis, analysis_source: analysisSource }
+      : {}),
     submission_id: row.id,
   });
 }

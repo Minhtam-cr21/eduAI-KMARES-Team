@@ -1,11 +1,12 @@
 "use client";
 
-import { LessonMarkdown } from "@/components/student/lesson-markdown";
+import { ErrorAnalysisPanel } from "@/components/code/error-analysis-panel";
 import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import type { AnalysisSource, ErrorAnalysis } from "@/lib/ai/error-analyzer";
 import type { PracticeExercise } from "@/types/database";
 import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
 import { Code2, Search } from "lucide-react";
@@ -44,6 +45,8 @@ export default function StudentPracticeListPage() {
   const [output, setOutput] = useState("");
   const [runError, setRunError] = useState("");
   const [exitCode, setExitCode] = useState<number | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<ErrorAnalysis | null>(null);
+  const [aiSource, setAiSource] = useState<AnalysisSource | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [running, setRunning] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
@@ -91,6 +94,8 @@ export default function StudentPracticeListPage() {
     setOutput("");
     setRunError("");
     setExitCode(null);
+    setAiAnalysis(null);
+    setAiSource(null);
     setAiSuggestion("");
   }
 
@@ -100,7 +105,11 @@ export default function StudentPracticeListPage() {
     setOutput("");
     setRunError("");
     setExitCode(null);
-    if (includeAi) setAiSuggestion("");
+    if (includeAi) {
+      setAiAnalysis(null);
+      setAiSource(null);
+      setAiSuggestion("");
+    }
     try {
       const res = await fetch("/api/practice/run", {
         method: "POST",
@@ -118,6 +127,8 @@ export default function StudentPracticeListPage() {
         error?: string;
         exit_code?: number;
         ai_suggestion?: string | null;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
       };
       if (!res.ok) {
         setRunError(data.error ?? `HTTP ${res.status}`);
@@ -126,8 +137,12 @@ export default function StudentPracticeListPage() {
       setOutput(data.output ?? "");
       setRunError(data.error ?? "");
       setExitCode(typeof data.exit_code === "number" ? data.exit_code : null);
-      if (includeAi && data.ai_suggestion) {
-        setAiSuggestion(data.ai_suggestion);
+      if (includeAi) {
+        if (data.analysis) {
+          setAiAnalysis(data.analysis);
+          setAiSource(data.analysis_source ?? null);
+        }
+        if (data.ai_suggestion) setAiSuggestion(data.ai_suggestion);
       }
     } catch (e) {
       setRunError(e instanceof Error ? e.message : "Network error");
@@ -139,6 +154,8 @@ export default function StudentPracticeListPage() {
   async function handleAskAi() {
     if (!selected) return;
     setAskingAi(true);
+    setAiAnalysis(null);
+    setAiSource(null);
     setAiSuggestion("");
     try {
       const res = await fetch("/api/ai-suggest", {
@@ -149,9 +166,20 @@ export default function StudentPracticeListPage() {
           language: selected.language ?? "python",
           ...(runError.trim() ? { error: runError } : {}),
           ...(output.trim() ? { output } : {}),
+          ...(selected.input_example?.trim()
+            ? { input_example: selected.input_example }
+            : {}),
+          ...(selected.output_example?.trim()
+            ? { expected_output: selected.output_example }
+            : {}),
         }),
       });
-      const data = (await res.json()) as { suggestion?: string; error?: string };
+      const data = (await res.json()) as {
+        suggestion?: string;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
+        error?: string;
+      };
       if (res.status === 429) {
         toast.error("Hết lượt AI", { description: data.error });
         return;
@@ -159,6 +187,10 @@ export default function StudentPracticeListPage() {
       if (!res.ok) {
         toast.error("AI không phản hồi", { description: data.error });
         return;
+      }
+      if (data.analysis) {
+        setAiAnalysis(data.analysis);
+        setAiSource(data.analysis_source ?? null);
       }
       setAiSuggestion(data.suggestion ?? "");
     } catch (e) {
@@ -369,14 +401,16 @@ export default function StudentPracticeListPage() {
                     Markdown · tối đa 3 lượt/ngày khi bấm Hỏi AI. &quot;Run + AI&quot; điền gợi ý
                     sau khi chạy.
                   </p>
-                  <div className="prose prose-sm dark:prose-invert mt-2 min-h-[120px] max-w-none text-sm">
-                    {aiSuggestion ? (
-                      <LessonMarkdown content={aiSuggestion} />
-                    ) : (
-                      <p className="text-sm italic text-muted-foreground">
-                        Chạy &quot;Run + AI&quot; hoặc &quot;Hỏi AI&quot; sau khi Run.
-                      </p>
-                    )}
+                  <div className="mt-2 min-h-[120px] text-sm">
+                    <ErrorAnalysisPanel
+                      analysis={aiAnalysis}
+                      analysisSource={aiSource}
+                      fallbackMarkdown={
+                        !aiAnalysis && aiSuggestion.trim()
+                          ? aiSuggestion
+                          : undefined
+                      }
+                    />
                   </div>
                 </div>
 

@@ -1,9 +1,11 @@
 "use client";
 
+import { ErrorAnalysisPanel } from "@/components/code/error-analysis-panel";
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { AnalysisSource, ErrorAnalysis } from "@/lib/ai/error-analyzer";
 import type { PracticeExercise } from "@/types/database";
 import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
 import Link from "next/link";
@@ -41,6 +43,8 @@ export default function PracticeRandomSmartPage() {
   const [output, setOutput] = useState("");
   const [runError, setRunError] = useState("");
   const [exitCode, setExitCode] = useState<number | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<ErrorAnalysis | null>(null);
+  const [aiSource, setAiSource] = useState<AnalysisSource | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [running, setRunning] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
@@ -49,6 +53,8 @@ export default function PracticeRandomSmartPage() {
   const generate = useCallback(async () => {
     setLoading(true);
     setSuggestReason(null);
+    setAiAnalysis(null);
+    setAiSource(null);
     setAiSuggestion("");
     setOutput("");
     setRunError("");
@@ -120,7 +126,11 @@ export default function PracticeRandomSmartPage() {
     setOutput("");
     setRunError("");
     setExitCode(null);
-    if (includeAi) setAiSuggestion("");
+    if (includeAi) {
+      setAiAnalysis(null);
+      setAiSource(null);
+      setAiSuggestion("");
+    }
     try {
       const res = await fetch("/api/practice/run", {
         method: "POST",
@@ -138,6 +148,8 @@ export default function PracticeRandomSmartPage() {
         error?: string;
         exit_code?: number;
         ai_suggestion?: string | null;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
       };
       if (!res.ok) {
         setRunError(raw.error ?? `HTTP ${res.status}`);
@@ -147,8 +159,12 @@ export default function PracticeRandomSmartPage() {
       setOutput(raw.output ?? "");
       setRunError(raw.error ?? "");
       setExitCode(typeof raw.exit_code === "number" ? raw.exit_code : null);
-      if (includeAi && raw.ai_suggestion) {
-        setAiSuggestion(raw.ai_suggestion);
+      if (includeAi) {
+        if (raw.analysis) {
+          setAiAnalysis(raw.analysis);
+          setAiSource(raw.analysis_source ?? null);
+        }
+        if (raw.ai_suggestion) setAiSuggestion(raw.ai_suggestion);
       }
       toast.success("Đã chạy và lưu lịch sử");
     } catch (e) {
@@ -161,6 +177,8 @@ export default function PracticeRandomSmartPage() {
   async function handleAskAi() {
     if (!exercise) return;
     setAskingAi(true);
+    setAiAnalysis(null);
+    setAiSource(null);
     setAiSuggestion("");
     try {
       const res = await fetch("/api/ai-suggest", {
@@ -171,9 +189,20 @@ export default function PracticeRandomSmartPage() {
           language: exercise.language ?? "python",
           ...(runError.trim() ? { error: runError } : {}),
           ...(output.trim() ? { output } : {}),
+          ...(exercise.input_example?.trim()
+            ? { input_example: exercise.input_example }
+            : {}),
+          ...(exercise.output_example?.trim()
+            ? { expected_output: exercise.output_example }
+            : {}),
         }),
       });
-      const data = (await res.json()) as { suggestion?: string; error?: string };
+      const data = (await res.json()) as {
+        suggestion?: string;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
+        error?: string;
+      };
       if (res.status === 429) {
         toast.error("Hết lượt AI", { description: data.error });
         return;
@@ -181,6 +210,10 @@ export default function PracticeRandomSmartPage() {
       if (!res.ok) {
         toast.error("AI không phản hồi", { description: data.error });
         return;
+      }
+      if (data.analysis) {
+        setAiAnalysis(data.analysis);
+        setAiSource(data.analysis_source ?? null);
       }
       setAiSuggestion(data.suggestion ?? "");
     } catch (e) {
@@ -321,14 +354,14 @@ export default function PracticeRandomSmartPage() {
             <p className="text-muted-foreground mt-1 text-xs">
               Markdown · tối đa 3 lượt/ngày (Hỏi AI). &quot;Run + AI&quot; gợi ý ngay sau khi chạy.
             </p>
-            <div className="prose prose-sm dark:prose-invert mt-2 min-h-[100px] max-w-none text-sm">
-              {aiSuggestion ? (
-                <LessonMarkdown content={aiSuggestion} />
-              ) : (
-                <p className="text-muted-foreground text-sm italic">
-                  Chạy &quot;Run + AI&quot; hoặc bấm &quot;Hỏi AI&quot; sau khi Run.
-                </p>
-              )}
+            <div className="mt-2 min-h-[100px] text-sm">
+              <ErrorAnalysisPanel
+                analysis={aiAnalysis}
+                analysisSource={aiSource}
+                fallbackMarkdown={
+                  !aiAnalysis && aiSuggestion.trim() ? aiSuggestion : undefined
+                }
+              />
             </div>
           </div>
         </div>

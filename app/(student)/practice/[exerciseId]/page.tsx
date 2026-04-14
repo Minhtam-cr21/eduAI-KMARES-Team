@@ -1,9 +1,11 @@
 "use client";
 
+import { ErrorAnalysisPanel } from "@/components/code/error-analysis-panel";
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { AnalysisSource, ErrorAnalysis } from "@/lib/ai/error-analyzer";
 import type { PracticeExercise } from "@/types/database";
 import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
 import Link from "next/link";
@@ -27,6 +29,8 @@ export default function PracticeExercisePage() {
   const [output, setOutput] = useState("");
   const [runError, setRunError] = useState("");
   const [exitCode, setExitCode] = useState<number | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<ErrorAnalysis | null>(null);
+  const [aiSource, setAiSource] = useState<AnalysisSource | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [running, setRunning] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
@@ -67,7 +71,11 @@ export default function PracticeExercisePage() {
     setOutput("");
     setRunError("");
     setExitCode(null);
-    if (includeAi) setAiSuggestion("");
+    if (includeAi) {
+      setAiAnalysis(null);
+      setAiSource(null);
+      setAiSuggestion("");
+    }
     try {
       const res = await fetch("/api/practice/run", {
         method: "POST",
@@ -85,6 +93,8 @@ export default function PracticeExercisePage() {
         error?: string;
         exit_code?: number;
         ai_suggestion?: string | null;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
       };
       if (!res.ok) {
         setRunError(raw.error ?? `HTTP ${res.status}`);
@@ -94,8 +104,12 @@ export default function PracticeExercisePage() {
       setOutput(data.output ?? "");
       setRunError(data.error ?? "");
       setExitCode(typeof data.exit_code === "number" ? data.exit_code : null);
-      if (includeAi && data.ai_suggestion) {
-        setAiSuggestion(data.ai_suggestion);
+      if (includeAi) {
+        if (data.analysis) {
+          setAiAnalysis(data.analysis);
+          setAiSource(data.analysis_source ?? null);
+        }
+        if (data.ai_suggestion) setAiSuggestion(data.ai_suggestion);
       }
     } catch (e) {
       setRunError(e instanceof Error ? e.message : "Network error");
@@ -105,7 +119,10 @@ export default function PracticeExercisePage() {
   }
 
   async function handleAskAi() {
+    if (!exercise) return;
     setAskingAi(true);
+    setAiAnalysis(null);
+    setAiSource(null);
     setAiSuggestion("");
     try {
       const res = await fetch("/api/ai-suggest", {
@@ -116,9 +133,20 @@ export default function PracticeExercisePage() {
           language,
           ...(runError.trim() ? { error: runError } : {}),
           ...(output.trim() ? { output } : {}),
+          ...(exercise.input_example?.trim()
+            ? { input_example: exercise.input_example }
+            : {}),
+          ...(exercise.output_example?.trim()
+            ? { expected_output: exercise.output_example }
+            : {}),
         }),
       });
-      const data = (await res.json()) as { suggestion?: string; error?: string };
+      const data = (await res.json()) as {
+        suggestion?: string;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
+        error?: string;
+      };
       if (res.status === 429) {
         toast.error("Hết lượt AI", { description: data.error });
         return;
@@ -126,6 +154,10 @@ export default function PracticeExercisePage() {
       if (!res.ok) {
         toast.error("AI không phản hồi", { description: data.error });
         return;
+      }
+      if (data.analysis) {
+        setAiAnalysis(data.analysis);
+        setAiSource(data.analysis_source ?? null);
       }
       setAiSuggestion(data.suggestion ?? "");
     } catch (e) {
@@ -199,14 +231,14 @@ export default function PracticeExercisePage() {
             <p className="text-muted-foreground mt-1 text-xs">
               Hiển thị Markdown · tối đa 3 lượt/ngày khi bấm Hỏi AI.
             </p>
-            <div className="prose prose-sm dark:prose-invert mt-2 min-h-[120px] max-w-none text-sm">
-              {aiSuggestion ? (
-                <LessonMarkdown content={aiSuggestion} />
-              ) : (
-                <p className="text-muted-foreground text-sm italic">
-                  Chạy &quot;Run + AI&quot; hoặc bấm &quot;Hỏi AI&quot; sau khi Run.
-                </p>
-              )}
+            <div className="mt-2 min-h-[120px] text-sm">
+              <ErrorAnalysisPanel
+                analysis={aiAnalysis}
+                analysisSource={aiSource}
+                fallbackMarkdown={
+                  !aiAnalysis && aiSuggestion.trim() ? aiSuggestion : undefined
+                }
+              />
             </div>
           </div>
         </div>

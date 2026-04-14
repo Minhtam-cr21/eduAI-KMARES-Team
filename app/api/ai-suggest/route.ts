@@ -1,4 +1,7 @@
-import { analyzeCodeWithAI } from "@/lib/ai/code-mentor";
+import {
+  analyzeCodeError,
+  formatErrorAnalysisMarkdown,
+} from "@/lib/ai/error-analyzer";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -10,6 +13,8 @@ const bodySchema = z.object({
   language: z.string(),
   error: z.string().optional(),
   output: z.string().optional(),
+  input_example: z.string().optional(),
+  expected_output: z.string().optional(),
   context: z
     .object({
       projectFiles: z
@@ -64,7 +69,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { code, language, error, output, context } = parsed.data;
+    const {
+      code,
+      language,
+      error,
+      output,
+      input_example,
+      expected_output,
+      context,
+    } = parsed.data;
 
     const supabase = createClient();
     const {
@@ -86,13 +99,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const suggestion = await analyzeCodeWithAI({
-      code,
-      language,
-      error,
-      output,
-      extraContext: extraContextFromBody(context),
+    const extraContext = extraContextFromBody(context);
+
+    const { analysis, source } = await analyzeCodeError(code, language, {
+      stderr: error?.trim() || undefined,
+      stdout: output?.trim() || undefined,
+      inputExample: input_example?.trim() || undefined,
+      expectedOutput: expected_output?.trim() || undefined,
+      extraContext: extraContext?.trim() || undefined,
     });
+
+    const suggestion = formatErrorAnalysisMarkdown(analysis);
 
     dailyAiUsage.set(rateKey, usedToday + 1);
 
@@ -112,7 +129,11 @@ export async function POST(req: NextRequest) {
       console.error("[ai-suggest] insert code_submissions:", subErr.message);
     }
 
-    return NextResponse.json({ suggestion });
+    return NextResponse.json({
+      suggestion,
+      analysis,
+      analysis_source: source,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[ai-suggest] Route error:", err);

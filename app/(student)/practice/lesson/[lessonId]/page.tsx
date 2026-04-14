@@ -1,10 +1,12 @@
 "use client";
 
+import { ErrorAnalysisPanel } from "@/components/code/error-analysis-panel";
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RunCodeLanguage } from "@/lib/code-runner";
+import type { AnalysisSource, ErrorAnalysis } from "@/lib/ai/error-analyzer";
 import { LazyMonacoEditor } from "@/components/code/lazy-monaco-editor";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -51,6 +53,8 @@ export default function PracticeLessonCodingPage() {
   const [output, setOutput] = useState("");
   const [runError, setRunError] = useState("");
   const [exitCode, setExitCode] = useState<number | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<ErrorAnalysis | null>(null);
+  const [aiSource, setAiSource] = useState<AnalysisSource | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [running, setRunning] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
@@ -91,7 +95,11 @@ export default function PracticeLessonCodingPage() {
     setOutput("");
     setRunError("");
     setExitCode(null);
-    if (includeAi) setAiSuggestion("");
+    if (includeAi) {
+      setAiAnalysis(null);
+      setAiSource(null);
+      setAiSuggestion("");
+    }
     try {
       const res = await fetch("/api/practice/run", {
         method: "POST",
@@ -109,6 +117,8 @@ export default function PracticeLessonCodingPage() {
         error?: string;
         exit_code?: number;
         ai_suggestion?: string | null;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
       };
       if (!res.ok) {
         setRunError(raw.error ?? `HTTP ${res.status}`);
@@ -118,8 +128,12 @@ export default function PracticeLessonCodingPage() {
       setOutput(raw.output ?? "");
       setRunError(raw.error ?? "");
       setExitCode(typeof raw.exit_code === "number" ? raw.exit_code : null);
-      if (includeAi && raw.ai_suggestion) {
-        setAiSuggestion(raw.ai_suggestion);
+      if (includeAi) {
+        if (raw.analysis) {
+          setAiAnalysis(raw.analysis);
+          setAiSource(raw.analysis_source ?? null);
+        }
+        if (raw.ai_suggestion) setAiSuggestion(raw.ai_suggestion);
       }
       toast.success("Đã chạy và lưu lịch sử (theo lesson)");
     } catch (e) {
@@ -131,6 +145,8 @@ export default function PracticeLessonCodingPage() {
 
   async function handleAskAi() {
     setAskingAi(true);
+    setAiAnalysis(null);
+    setAiSource(null);
     setAiSuggestion("");
     try {
       const res = await fetch("/api/ai-suggest", {
@@ -143,7 +159,12 @@ export default function PracticeLessonCodingPage() {
           ...(output.trim() ? { output } : {}),
         }),
       });
-      const data = (await res.json()) as { suggestion?: string; error?: string };
+      const data = (await res.json()) as {
+        suggestion?: string;
+        analysis?: ErrorAnalysis;
+        analysis_source?: AnalysisSource;
+        error?: string;
+      };
       if (res.status === 429) {
         toast.error("Hết lượt AI", { description: data.error });
         return;
@@ -151,6 +172,10 @@ export default function PracticeLessonCodingPage() {
       if (!res.ok) {
         toast.error("AI không phản hồi", { description: data.error });
         return;
+      }
+      if (data.analysis) {
+        setAiAnalysis(data.analysis);
+        setAiSource(data.analysis_source ?? null);
       }
       setAiSuggestion(data.suggestion ?? "");
     } catch (e) {
@@ -232,14 +257,14 @@ export default function PracticeLessonCodingPage() {
             <p className="text-muted-foreground mt-1 text-xs">
               Markdown · tối đa 3 lượt/ngày (Hỏi AI).
             </p>
-            <div className="prose prose-sm dark:prose-invert mt-2 min-h-[100px] max-w-none text-sm">
-              {aiSuggestion ? (
-                <LessonMarkdown content={aiSuggestion} />
-              ) : (
-                <p className="text-muted-foreground text-sm italic">
-                  Dùng &quot;Run + AI&quot; hoặc &quot;Hỏi AI&quot; sau khi chạy.
-                </p>
-              )}
+            <div className="mt-2 min-h-[100px] text-sm">
+              <ErrorAnalysisPanel
+                analysis={aiAnalysis}
+                analysisSource={aiSource}
+                fallbackMarkdown={
+                  !aiAnalysis && aiSuggestion.trim() ? aiSuggestion : undefined
+                }
+              />
             </div>
           </div>
         </div>
