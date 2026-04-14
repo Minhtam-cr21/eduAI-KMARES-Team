@@ -1,9 +1,8 @@
 "use client";
 
-import { ErrorAnalysisPanel } from "@/components/code/error-analysis-panel";
+import { PracticeAssistTabs } from "@/components/code/practice-assist-tabs";
 import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { AnalysisSource, ErrorAnalysis } from "@/lib/ai/error-analyzer";
@@ -50,6 +49,7 @@ export default function StudentPracticeListPage() {
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [running, setRunning] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
 
   const loadExercises = useCallback(async () => {
     setLoading(true);
@@ -97,6 +97,7 @@ export default function StudentPracticeListPage() {
     setAiAnalysis(null);
     setAiSource(null);
     setAiSuggestion("");
+    setSubmissionId(null);
   }
 
   async function handleRun(includeAi: boolean) {
@@ -105,6 +106,7 @@ export default function StudentPracticeListPage() {
     setOutput("");
     setRunError("");
     setExitCode(null);
+    setSubmissionId(null);
     if (includeAi) {
       setAiAnalysis(null);
       setAiSource(null);
@@ -129,6 +131,7 @@ export default function StudentPracticeListPage() {
         ai_suggestion?: string | null;
         analysis?: ErrorAnalysis;
         analysis_source?: AnalysisSource;
+        submission_id?: string;
       };
       if (!res.ok) {
         setRunError(data.error ?? `HTTP ${res.status}`);
@@ -137,6 +140,7 @@ export default function StudentPracticeListPage() {
       setOutput(data.output ?? "");
       setRunError(data.error ?? "");
       setExitCode(typeof data.exit_code === "number" ? data.exit_code : null);
+      if (data.submission_id) setSubmissionId(data.submission_id);
       if (includeAi) {
         if (data.analysis) {
           setAiAnalysis(data.analysis);
@@ -383,36 +387,24 @@ export default function StudentPracticeListPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-foreground">
-                      Gợi ý AI
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => void handleAskAi()}
-                      disabled={askingAi}
-                      className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
-                    >
-                      {askingAi ? "Đang hỏi…" : "Hỏi AI"}
-                    </button>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Markdown · tối đa 3 lượt/ngày khi bấm Hỏi AI. &quot;Run + AI&quot; điền gợi ý
-                    sau khi chạy.
-                  </p>
-                  <div className="mt-2 min-h-0 text-sm">
-                    <ErrorAnalysisPanel
-                      analysis={aiAnalysis}
-                      analysisSource={aiSource}
-                      fallbackMarkdown={
-                        !aiAnalysis && aiSuggestion.trim()
-                          ? aiSuggestion
-                          : undefined
-                      }
-                    />
-                  </div>
-                </div>
+                <PracticeAssistTabs
+                  key={selected.id}
+                  exerciseId={selected.id}
+                  lessonId={null}
+                  language={selected.language ?? "python"}
+                  description={selected.description}
+                  inputExample={selected.input_example}
+                  outputExample={selected.output_example}
+                  submissionId={submissionId}
+                  aiAnalysis={aiAnalysis}
+                  aiSource={aiSource}
+                  aiFallbackMarkdown={
+                    !aiAnalysis && aiSuggestion.trim() ? aiSuggestion : undefined
+                  }
+                  onAskAi={() => void handleAskAi()}
+                  askingAi={askingAi}
+                  disabled={!selected}
+                />
 
                 {/* Output */}
                 <div className="rounded-xl border border-border bg-card p-4">

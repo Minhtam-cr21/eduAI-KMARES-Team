@@ -6,6 +6,7 @@ export type LessonForPractice = {
   title: string;
   content: string | null;
   code_template: string | null;
+  solution_code: string | null;
   status: string;
 };
 
@@ -19,7 +20,7 @@ export async function getPublishedLessonIfEnrolled(
 ): Promise<LessonForPractice | null> {
   const { data: lesson, error: lErr } = await supabase
     .from("course_lessons")
-    .select("id, course_id, title, content, code_template, status")
+    .select("id, course_id, title, content, code_template, solution_code, status")
     .eq("id", lessonId)
     .eq("status", "published")
     .maybeSingle();

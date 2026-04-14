@@ -4,7 +4,7 @@ import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { cn } from "@/lib/utils";
 import type { AnalysisSource, ErrorAnalysis } from "@/lib/ai/error-analyzer";
 import type { LucideIcon } from "lucide-react";
-import { AlertCircle, Code2, Lightbulb, Sparkles, Wrench } from "lucide-react";
+import { AlertCircle, Code2, Wrench } from "lucide-react";
 
 type Props = {
   analysis: ErrorAnalysis | null;
@@ -59,30 +59,16 @@ function Section({
   );
 }
 
-const scrollBox =
-  "max-h-[min(42vh,360px)] overflow-y-auto overflow-x-hidden overscroll-contain pr-1";
-
 export function ErrorAnalysisPanel({
   analysis,
-  analysisSource,
   fallbackMarkdown,
   className,
 }: Props) {
-  const showHeuristicHint = analysisSource === "heuristic";
-
   if (!analysis) {
     if (fallbackMarkdown?.trim()) {
       return (
-        <div className={cn("space-y-2", className)}>
-          {showHeuristicHint ? (
-            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-100">
-              <Lightbulb className="mr-1 inline h-3 w-3 -translate-y-px" aria-hidden />
-              Chế độ cơ bản — thêm <strong>OpenAI</strong> hoặc <strong>DeepSeek</strong> key để gợi ý sâu hơn.
-            </p>
-          ) : null}
-          <div className={cn(scrollBox, "prose prose-sm dark:prose-invert")}>
-            <LessonMarkdown content={fallbackMarkdown.trim()} />
-          </div>
+        <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)}>
+          <LessonMarkdown content={fallbackMarkdown.trim()} />
         </div>
       );
     }
@@ -97,41 +83,27 @@ export function ErrorAnalysisPanel({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      {showHeuristicHint ? (
-        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-100">
-          <Lightbulb className="mr-1 inline h-3 w-3 -translate-y-px" aria-hidden />
-          Chế độ cơ bản — thêm <strong>OpenAI</strong> hoặc <strong>DeepSeek</strong> key nếu cần gợi ý chi tiết hơn.
-        </p>
-      ) : (
-        <p className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-[11px] text-foreground">
-          <Sparkles className="h-3 w-3 shrink-0 text-primary" aria-hidden />
-          {analysisSource === "openai" ? "OpenAI" : "DeepSeek"}
-        </p>
-      )}
+      <Section icon={AlertCircle} title="Nguyên nhân" tint="rose">
+        <div className="prose prose-sm dark:prose-invert">
+          <LessonMarkdown content={analysis.rootCause.trim() || "—"} />
+        </div>
+      </Section>
 
-      <div className={cn(scrollBox, "flex flex-col gap-2")}>
-        <Section icon={AlertCircle} title="Nguyên nhân" tint="rose">
+      <Section icon={Wrench} title="Cách sửa" tint="amber">
+        <div className="prose prose-sm dark:prose-invert">
+          <LessonMarkdown content={analysis.solution.trim() || "—"} />
+        </div>
+      </Section>
+
+      {showCode ? (
+        <Section icon={Code2} title="Ví dụ" tint="violet">
           <div className="prose prose-sm dark:prose-invert">
-            <LessonMarkdown content={analysis.rootCause.trim() || "—"} />
+            <LessonMarkdown
+              content={`\`\`\`\n${analysis.codeExample!.trim()}\n\`\`\``}
+            />
           </div>
         </Section>
-
-        <Section icon={Wrench} title="Cách sửa" tint="amber">
-          <div className="prose prose-sm dark:prose-invert">
-            <LessonMarkdown content={analysis.solution.trim() || "—"} />
-          </div>
-        </Section>
-
-        {showCode ? (
-          <Section icon={Code2} title="Ví dụ" tint="violet">
-            <div className="prose prose-sm dark:prose-invert">
-              <LessonMarkdown
-                content={`\`\`\`\n${analysis.codeExample!.trim()}\n\`\`\``}
-              />
-            </div>
-          </Section>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   );
 }

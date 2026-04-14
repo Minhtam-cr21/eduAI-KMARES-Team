@@ -1,6 +1,6 @@
 "use client";
 
-import { ErrorAnalysisPanel } from "@/components/code/error-analysis-panel";
+import { PracticeAssistTabs } from "@/components/code/practice-assist-tabs";
 import { LessonMarkdown } from "@/components/student/lesson-markdown";
 import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
@@ -49,6 +49,7 @@ export default function PracticeRandomSmartPage() {
   const [running, setRunning] = useState(false);
   const [askingAi, setAskingAi] = useState(false);
   const [suggestReason, setSuggestReason] = useState<string | null>(null);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -59,6 +60,7 @@ export default function PracticeRandomSmartPage() {
     setOutput("");
     setRunError("");
     setExitCode(null);
+    setSubmissionId(null);
     try {
       let lang: Lang = language;
       let diff: "easy" | "medium" | "hard" = "medium";
@@ -150,6 +152,7 @@ export default function PracticeRandomSmartPage() {
         ai_suggestion?: string | null;
         analysis?: ErrorAnalysis;
         analysis_source?: AnalysisSource;
+        submission_id?: string;
       };
       if (!res.ok) {
         setRunError(raw.error ?? `HTTP ${res.status}`);
@@ -159,6 +162,7 @@ export default function PracticeRandomSmartPage() {
       setOutput(raw.output ?? "");
       setRunError(raw.error ?? "");
       setExitCode(typeof raw.exit_code === "number" ? raw.exit_code : null);
+      if (raw.submission_id) setSubmissionId(raw.submission_id);
       if (includeAi) {
         if (raw.analysis) {
           setAiAnalysis(raw.analysis);
@@ -339,31 +343,24 @@ export default function PracticeRandomSmartPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Gợi ý AI</h2>
-              <button
-                type="button"
-                onClick={() => void handleAskAi()}
-                disabled={askingAi || !exercise}
-                className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
-              >
-                {askingAi ? "Đang hỏi…" : "Hỏi AI"}
-              </button>
-            </div>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Markdown · tối đa 3 lượt/ngày (Hỏi AI). &quot;Run + AI&quot; gợi ý ngay sau khi chạy.
-            </p>
-            <div className="mt-2 min-h-0 text-sm">
-              <ErrorAnalysisPanel
-                analysis={aiAnalysis}
-                analysisSource={aiSource}
-                fallbackMarkdown={
-                  !aiAnalysis && aiSuggestion.trim() ? aiSuggestion : undefined
-                }
-              />
-            </div>
-          </div>
+          <PracticeAssistTabs
+            key={exercise?.id ?? "no-exercise"}
+            exerciseId={exercise?.id ?? null}
+            lessonId={null}
+            language={exercise?.language ?? "python"}
+            description={exercise?.description}
+            inputExample={exercise?.input_example}
+            outputExample={exercise?.output_example}
+            submissionId={submissionId}
+            aiAnalysis={aiAnalysis}
+            aiSource={aiSource}
+            aiFallbackMarkdown={
+              !aiAnalysis && aiSuggestion.trim() ? aiSuggestion : undefined
+            }
+            onAskAi={() => void handleAskAi()}
+            askingAi={askingAi}
+            disabled={!exercise}
+          />
         </div>
 
         <div className="flex flex-col gap-4">

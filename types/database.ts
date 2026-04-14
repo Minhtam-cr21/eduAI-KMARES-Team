@@ -97,6 +97,7 @@ export interface PracticeExercise {
   description: string | null;
   initial_code: string | null;
   test_code: string | null;
+  solution_code?: string | null;
   language: PracticeExerciseLanguage | null;
   difficulty: PracticeExerciseDifficulty | null;
   input_example: string | null;
@@ -114,5 +115,6 @@ export interface PracticeSubmission {
   output: string | null;
   error: string | null;
   ai_suggestion: string | null;
+  viewed_solution?: boolean | null;
   created_at: string;
 }

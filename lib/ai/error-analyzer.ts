@@ -259,13 +259,12 @@ function analyzeHeuristic(
   const lang = language.toLowerCase();
 
   if (/eoferror|eof when reading a line/i.test(error)) {
-    const hint = opts.inputExample?.trim()
-      ? `- Dán vào ô Input (mỗi giá trị một dòng):\n${opts.inputExample.trim().split("\n").slice(0, 4).map((l) => `  - ${l}`).join("\n")}`
-      : `- Điền ô Input đủ số dòng với số lần gọi \`input()\`.\n- Ví dụ: gõ \`3\` Enter, rồi \`5\` Enter.`;
+    const lines = opts.inputExample?.trim().split(/\n/).map((l) => l.trim()).filter(Boolean) ?? [];
+    const sample = lines.length >= 2 ? lines.slice(0, 6).join("\n") : "3\n5";
     return {
       rootCause: "Chương trình cần nhập dữ liệu nhưng không có input.",
       explanation: "",
-      solution: hint,
+      solution: `Dán vào ô Input (mỗi giá trị một dòng):\n\n${sample}`,
       codeExample: "",
       preventionTip: "",
       debugSteps: [],
