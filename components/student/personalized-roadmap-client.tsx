@@ -118,6 +118,8 @@ export function PersonalizedRoadmapClient({
     : [];
 
   const status = latest?.status;
+  const isEndedByTeacher =
+    status === "cancelled" || status === "archived";
 
   return (
     <div className="space-y-6">
@@ -126,6 +128,15 @@ export function PersonalizedRoadmapClient({
           Giáo viên chưa tạo lộ trình cho bạn. Khi có đề xuất, trạng thái sẽ
           hiển thị tại đây.
         </p>
+      ) : isEndedByTeacher ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-muted-foreground">
+          <p className="font-medium text-destructive">
+            Lộ trình này đã bị giáo viên hủy.
+          </p>
+          <p className="mt-2">
+            Vui lòng liên hệ giáo viên để được hỗ trợ hoặc nhận lộ trình mới.
+          </p>
+        </div>
       ) : status === "pending_student_approval" ? (
         <div className="space-y-4 rounded-xl border border-border bg-card p-4">
           <p className="text-sm font-medium">

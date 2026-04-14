@@ -47,7 +47,38 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const list = rows ?? [];
+  const listRaw = rows ?? [];
+  const pathIds = Array.from(
+    new Set(
+      listRaw
+        .map((r) => r.path_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  let allowedPathIds = new Set<string>();
+  if (pathIds.length > 0) {
+    const { data: paths, error: pErr } = await supabase
+      .from("personalized_paths")
+      .select("id, status")
+      .in("id", pathIds);
+
+    if (pErr) {
+      return NextResponse.json({ error: pErr.message }, { status: 500 });
+    }
+    for (const p of paths ?? []) {
+      const st = (p.status as string) ?? "";
+      if (st === "active" || st === "paused") {
+        allowedPathIds.add(p.id as string);
+      }
+    }
+  }
+
+  const list = listRaw.filter((r) => {
+    const pid = r.path_id as string | null;
+    if (!pid) return true;
+    return allowedPathIds.has(pid);
+  });
   const lessonIds = Array.from(
     new Set(list.map((r) => r.lesson_id).filter(Boolean))
   ) as string[];

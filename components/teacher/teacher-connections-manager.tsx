@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +45,35 @@ const STATUS_BADGE: Record<string, string> = {
 
 type Props = { initialRows: ConnectionRow[] };
 
-type RejectCtx = { id: string; fromAccepted: boolean };
+type RejectCtx = {
+  connectionId: string;
+  student_id: string;
+  studentLabel: string;
+  fromAccepted: boolean;
+};
+
+type PathGateCtx = {
+  pathId: string;
+  studentLabel: string;
+  kind: "reject" | "delete";
+  connectionId: string;
+  rejectNote?: string | null;
+  fromAccepted?: boolean;
+};
+
+async function getActiveOrPausedPathId(studentId: string): Promise<string | null> {
+  const res = await fetch(
+    `/api/personalized-path/teacher/by-student/${encodeURIComponent(studentId)}`
+  );
+  const j = (await res.json()) as {
+    path?: { id: string; status: string } | null;
+    error?: string;
+  };
+  if (!res.ok || !j.path) return null;
+  const s = j.path.status;
+  if (s === "active" || s === "paused") return j.path.id;
+  return null;
+}
 
 export function TeacherConnectionsManager({ initialRows }: Props) {
   const router = useRouter();
@@ -55,15 +84,56 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
   const [editLinkId, setEditLinkId] = useState<string | null>(null);
   const [editLinkValue, setEditLinkValue] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [pathGate, setPathGate] = useState<PathGateCtx | null>(null);
+  const [cancelPathWithGate, setCancelPathWithGate] = useState(true);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setRows(initialRows);
   }, [initialRows]);
 
+  useEffect(() => {
+    if (pathGate) setCancelPathWithGate(true);
+  }, [pathGate]);
+
   const responding = rows.find((r) => r.id === respondId);
   const editing = rows.find((r) => r.id === editLinkId);
   const deleting = rows.find((r) => r.id === deleteId);
+
+  async function runRejectRequest(
+    connectionId: string,
+    note: string,
+    fromAccepted: boolean
+  ) {
+    const res = await fetch(`/api/connection-requests/${connectionId}/respond`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "rejected",
+        teacher_response: note.trim() || null,
+      }),
+    });
+    const j = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      toast.error(j.error ?? "Không cập nhật được");
+      return false;
+    }
+    toast.success(fromAccepted ? "Đã chuyển sang từ chối" : "Đã từ chối");
+    return true;
+  }
+
+  async function runDeleteRequest(connectionId: string) {
+    const res = await fetch(`/api/connection-requests/${connectionId}`, {
+      method: "DELETE",
+    });
+    const j = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      toast.error(j.error ?? "Không xóa được");
+      return false;
+    }
+    toast.success("Đã xóa yêu cầu");
+    return true;
+  }
 
   async function submitAccept(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -98,25 +168,30 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
     if (!rejectCtx) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/connection-requests/${rejectCtx.id}/respond`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "rejected",
-          teacher_response: rejectNote.trim() || null,
-        }),
-      });
-      const j = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        toast.error(j.error ?? "Không cập nhật được");
+      const pathId = await getActiveOrPausedPathId(rejectCtx.student_id);
+      if (pathId) {
+        setPathGate({
+          pathId,
+          studentLabel: rejectCtx.studentLabel,
+          kind: "reject",
+          connectionId: rejectCtx.connectionId,
+          rejectNote: rejectNote.trim() || null,
+          fromAccepted: rejectCtx.fromAccepted,
+        });
+        setRejectCtx(null);
+        setRejectNote("");
         return;
       }
-      toast.success(
-        rejectCtx.fromAccepted ? "Đã chuyển sang từ chối" : "Đã từ chối"
+      const ok = await runRejectRequest(
+        rejectCtx.connectionId,
+        rejectNote,
+        rejectCtx.fromAccepted
       );
-      setRejectCtx(null);
-      setRejectNote("");
-      router.refresh();
+      if (ok) {
+        setRejectCtx(null);
+        setRejectNote("");
+        router.refresh();
+      }
     } finally {
       setLoading(false);
     }
@@ -153,19 +228,61 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
 
   async function confirmDelete() {
     if (!deleteId) return;
+    const row = rows.find((r) => r.id === deleteId);
+    if (!row) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/connection-requests/${deleteId}`, {
-        method: "DELETE",
-      });
-      const j = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        toast.error(j.error ?? "Không xóa được");
+      const pathId = await getActiveOrPausedPathId(row.student_id);
+      if (pathId) {
+        setPathGate({
+          pathId,
+          studentLabel: row.student_name ?? row.student_id.slice(0, 8) + "…",
+          kind: "delete",
+          connectionId: row.id,
+        });
+        setDeleteId(null);
         return;
       }
-      toast.success("Đã xóa yêu cầu");
-      setDeleteId(null);
-      router.refresh();
+      const ok = await runDeleteRequest(row.id);
+      if (ok) {
+        setDeleteId(null);
+        router.refresh();
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmPathGate() {
+    if (!pathGate) return;
+    setLoading(true);
+    try {
+      if (cancelPathWithGate) {
+        const cr = await fetch(
+          `/api/personalized-path/teacher/${pathGate.pathId}/cancel`,
+          { method: "PUT" }
+        );
+        const j = (await cr.json()) as { error?: string };
+        if (!cr.ok) {
+          toast.error(j.error ?? "Không hủy được lộ trình");
+          return;
+        }
+        toast.success("Đã hủy lộ trình cá nhân hóa.");
+      }
+      let ok = false;
+      if (pathGate.kind === "reject") {
+        ok = await runRejectRequest(
+          pathGate.connectionId,
+          pathGate.rejectNote ?? "",
+          pathGate.fromAccepted ?? false
+        );
+      } else {
+        ok = await runDeleteRequest(pathGate.connectionId);
+      }
+      if (ok) {
+        setPathGate(null);
+        router.refresh();
+      }
     } finally {
       setLoading(false);
     }
@@ -174,6 +291,16 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
   function openEditLink(r: ConnectionRow) {
     setEditLinkId(r.id);
     setEditLinkValue(r.teacher_response?.trim() ?? "");
+  }
+
+  function openReject(r: ConnectionRow, fromAccepted: boolean) {
+    setRejectNote("");
+    setRejectCtx({
+      connectionId: r.id,
+      student_id: r.student_id,
+      studentLabel: r.student_name ?? r.student_id.slice(0, 8) + "…",
+      fromAccepted,
+    });
   }
 
   return (
@@ -263,10 +390,7 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => {
-                          setRejectNote("");
-                          setRejectCtx({ id: r.id, fromAccepted: false });
-                        }}
+                        onClick={() => openReject(r, false)}
                       >
                         Từ chối
                       </Button>
@@ -284,10 +408,7 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => {
-                          setRejectNote("");
-                          setRejectCtx({ id: r.id, fromAccepted: true });
-                        }}
+                        onClick={() => openReject(r, true)}
                       >
                         Từ chối
                       </Button>
@@ -384,6 +505,49 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
             </Button>
             <Button variant="destructive" disabled={loading} onClick={() => void submitReject()}>
               Xác nhận từ chối
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!pathGate}
+        onOpenChange={(o) => {
+          if (!o) setPathGate(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lộ trình đang hoạt động</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Học sinh <strong>{pathGate?.studentLabel}</strong> có lộ trình cá nhân
+            hóa đang <strong>active</strong> hoặc <strong>paused</strong>. Bạn có
+            muốn hủy lộ trình này không? (Khuyến nghị để ẩn lịch học và lộ trình
+            khỏi phía học sinh.)
+          </p>
+          <div className="flex items-start gap-2 rounded-md border border-border p-3">
+            <Checkbox
+              id="cancel-path-gate"
+              checked={cancelPathWithGate}
+              onCheckedChange={(v) => setCancelPathWithGate(v === true)}
+              className="mt-0.5"
+            />
+            <Label htmlFor="cancel-path-gate" className="cursor-pointer text-sm font-normal leading-snug">
+              Hủy lộ trình cá nhân hóa (chuyển sang trạng thái cancelled)
+            </Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {pathGate?.kind === "reject"
+              ? "Sau đó hệ thống sẽ từ chối yêu cầu kết nối."
+              : "Sau đó hệ thống sẽ xóa yêu cầu kết nối."}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPathGate(null)} disabled={loading}>
+              Huỷ
+            </Button>
+            <Button disabled={loading} onClick={() => void confirmPathGate()}>
+              Tiếp tục
             </Button>
           </DialogFooter>
         </DialogContent>
