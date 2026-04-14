@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { AICourseDraft } from "@/lib/ai/ai-course-draft";
+import { cn } from "@/lib/utils";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -24,45 +25,43 @@ type Props = {
   onSaved?: () => void;
 };
 
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => {
-      const s = r.result as string;
-      const i = s.indexOf(",");
-      resolve(i >= 0 ? s.slice(i + 1) : s);
-    };
-    r.onerror = () => reject(new Error("read"));
-    r.readAsDataURL(file);
-  });
-}
+type GenerateResponse = {
+  error?: string;
+  draft?: AICourseDraft;
+  source_file?: string | null;
+  meta?: { used_fallback?: boolean };
+};
 
 export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<"form" | "preview">("form");
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
+  const [source, setSource] = useState<"text" | "pdf" | null>(null);
   const [topic, setTopic] = useState("");
-  const [titleHint, setTitleHint] = useState("");
-  const [descriptionHint, setDescriptionHint] = useState("");
+  const [customTitle, setCustomTitle] = useState("");
+  const [additionalNote, setAdditionalNote] = useState("");
   const [textContent, setTextContent] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [enrichContext, setEnrichContext] = useState(true);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [enrichContext, setEnrichContext] = useState(false);
 
   const [draft, setDraft] = useState<AICourseDraft | null>(null);
   const [sourceFile, setSourceFile] = useState<string | null>(null);
 
   const resetForm = useCallback(() => {
     setStep("form");
+    setSource(null);
     setTopic("");
-    setTitleHint("");
-    setDescriptionHint("");
+    setCustomTitle("");
+    setAdditionalNote("");
     setTextContent("");
-    setFile(null);
-    setEnrichContext(true);
+    setPdfFile(null);
+    setEnrichContext(false);
     setDraft(null);
     setSourceFile(null);
+    setFormError(null);
   }, []);
 
   function handleClose(next: boolean) {
@@ -70,64 +69,101 @@ export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) 
     onOpenChange(next);
   }
 
-  async function handleGenerate(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const t = topic.trim();
-    if (!t) {
-      toast.error("Nhập chủ đề khóa học.");
+    setFormError(null);
+
+    if (!source) {
+      toast.error(
+        "Vui l\u00f2ng ch\u1ecdn ngu\u1ed3n n\u1ed9i dung"
+      );
       return;
     }
-    if (file) {
-      const n = file.name.toLowerCase();
-      if (!n.endsWith(".pdf") && !n.endsWith(".txt")) {
-        toast.error("Chỉ hỗ trợ PDF hoặc .txt.");
-        return;
-      }
+    if (source === "text" && !textContent.trim() && !topic.trim()) {
+      toast.error(
+        "Vui l\u00f2ng nh\u1eadp ch\u1ee7 \u0111\u1ec1 ho\u1eb7c n\u1ed9i dung v\u0103n b\u1ea3n"
+      );
+      return;
     }
+    if (source === "pdf" && !pdfFile) {
+      toast.error("Vui l\u00f2ng ch\u1ecdn file PDF");
+      return;
+    }
+
     setLoading(true);
+    const formData = new FormData();
+    formData.append("topic", topic);
+    if (source === "text") {
+      formData.append("textContent", textContent);
+    } else if (source === "pdf" && pdfFile) {
+      formData.append("pdfFile", pdfFile);
+    }
+    if (additionalNote.trim()) formData.append("additionalNote", additionalNote.trim());
+    if (customTitle.trim()) formData.append("customTitle", customTitle.trim());
+    if (enrichContext) formData.append("enrichContext", "true");
+
     try {
-      const body: Record<string, unknown> = {
-        topic: t,
-        title: titleHint.trim() || null,
-        description: descriptionHint.trim() || null,
-        textContent: textContent.trim() || null,
-        file_base64: null as string | null,
-        file_name: null as string | null,
-        enable_context_enrichment: enrichContext,
-      };
-      if (file) {
-        body.file_base64 = await fileToBase64(file);
-        body.file_name = file.name;
-      }
       const res = await fetch("/api/ai/generate-course", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: formData,
       });
-      const j = (await res.json()) as {
-        error?: string;
-        draft?: AICourseDraft;
-        source_file?: string | null;
-        meta?: { used_fallback?: boolean };
-      };
-      if (!res.ok) {
-        toast.error(j.error ?? "Không tạo được bản thảo");
-        return;
-      }
-      if (!j.draft?.lessons?.length) {
-        toast.error("Phản hồi AI không hợp lệ");
-        return;
-      }
-      setDraft(j.draft);
-      setSourceFile(j.source_file ?? null);
-      setStep("preview");
-      if (j.meta?.used_fallback) {
-        toast.message("Đã dùng bản mẫu — hãy chỉnh sửa trước khi xuất bản", {
-          description: "AI tạm thời không khả dụng hoặc phản hồi không đọc được.",
-        });
+      const raw = await res.text();
+      let data: GenerateResponse = {};
+      if (raw.trim()) {
+        try {
+          data = JSON.parse(raw) as GenerateResponse;
+        } catch {
+          const msg =
+            "Kh\u00f4ng th\u1ec3 t\u1ea1o kh\u00f3a h\u1ecdc, vui l\u00f2ng th\u1eed l\u1ea1i";
+          toast.error(msg);
+          setFormError(msg);
+          return;
+        }
       } else {
-        toast.success("Đã tạo bản xem trước");
+        const msg =
+          "Kh\u00f4ng th\u1ec3 t\u1ea1o kh\u00f3a h\u1ecdc, vui l\u00f2ng th\u1eed l\u1ea1i";
+        toast.error(msg);
+        setFormError(msg);
+        return;
       }
+
+      if (!res.ok) {
+        const errMsg =
+          data.error ||
+          "L\u1ed7i t\u1ea1o kh\u00f3a h\u1ecdc";
+        toast.error(errMsg);
+        setFormError(errMsg);
+        return;
+      }
+
+      if (!data.draft?.lessons?.length) {
+        const msg = "Ph\u1ea3n h\u1ed3i AI kh\u00f4ng h\u1ee3p l\u1ec7.";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
+
+      setDraft(data.draft);
+      setSourceFile(data.source_file ?? null);
+      setStep("preview");
+      if (data.meta?.used_fallback) {
+        toast.message(
+          "\u0110\u00e3 d\u00f9ng b\u1ea3n m\u1eabu \u2014 h\u00e3y ch\u1ec9nh s\u1eeda tr\u01b0\u1edbc khi xu\u1ea5t b\u1ea3n",
+          {
+            description:
+              "AI kh\u00f4ng tr\u1ea3 v\u1ec1 \u0111\u00fang \u0111\u1ecbnh d\u1ea1ng ho\u1eb7c API t\u1ea1m l\u1ed7i.",
+          }
+        );
+      } else {
+        toast.success("\u0110\u00e3 t\u1ea1o b\u1ea3n xem tr\u01b0\u1edbc");
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Kh\u00f4ng th\u1ec3 t\u1ea1o kh\u00f3a h\u1ecdc, vui l\u00f2ng th\u1eed l\u1ea1i";
+      toast.error(msg);
+      setFormError(msg);
     } finally {
       setLoading(false);
     }
@@ -136,19 +172,24 @@ export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) 
   async function handlePublish() {
     if (!draft) return;
     if (!draft.title.trim()) {
-      toast.error("Thiếu tiêu đề khóa học");
+      toast.error("Thi\u1ebfu ti\u00eau \u0111\u1ec1 kh\u00f3a h\u1ecdc");
       return;
     }
     if (!draft.category.trim()) {
-      toast.error("Thiếu danh mục");
+      toast.error("Thi\u1ebfu danh m\u1ee5c");
       return;
     }
     if (draft.lessons.length === 0) {
-      toast.error("Cần ít nhất một bài học");
+      toast.error("C\u1ea7n \u00edt nh\u1ea5t m\u1ed9t b\u00e0i h\u1ecdc");
       return;
     }
     setPublishing(true);
     try {
+      const contentForDb =
+        [draft.summary.trim(), draft.description.trim()].filter(Boolean).join("\n\n") ||
+        draft.content.trim() ||
+        null;
+
       const res = await fetch("/api/teacher/courses/from-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,7 +197,7 @@ export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) 
           courseData: {
             title: draft.title.trim(),
             description: draft.description.trim() || null,
-            content: draft.content.trim() || draft.description.trim() || null,
+            content: contentForDb,
             course_type: draft.course_type,
             category: draft.category.trim(),
             thumbnail_url: draft.thumbnail_url?.trim() || null,
@@ -170,17 +211,30 @@ export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) 
           source_file: sourceFile,
         }),
       });
-      const j = (await res.json()) as { error?: string; course_id?: string };
+
+      const text = await res.text();
+      let parsed: { error?: string; course_id?: string } = {};
+      if (text.trim()) {
+        try {
+          parsed = JSON.parse(text) as { error?: string; course_id?: string };
+        } catch {
+          toast.error(
+            "Ph\u1ea3n h\u1ed3i m\u00e1y ch\u1ee7 kh\u00f4ng h\u1ee3p l\u1ec7 khi l\u01b0u."
+          );
+          return;
+        }
+      }
+
       if (!res.ok) {
-        toast.error(j.error ?? "Không lưu được");
+        toast.error(parsed.error ?? "Kh\u00f4ng l\u01b0u \u0111\u01b0\u1ee3c");
         return;
       }
-      toast.success("Đã xuất bản khóa học");
+      toast.success("\u0110\u00e3 xu\u1ea5t b\u1ea3n kh\u00f3a h\u1ecdc");
       handleClose(false);
       onSaved?.();
       router.refresh();
-      if (j.course_id) {
-        router.push(`/teacher/courses/${j.course_id}/lessons`);
+      if (parsed.course_id) {
+        router.push(`/teacher/courses/${parsed.course_id}/lessons`);
       }
     } finally {
       setPublishing(false);
@@ -208,72 +262,143 @@ export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) 
                 onClick={() => setStep("form")}
               >
                 <ArrowLeft className="h-4 w-4" />
-                Quay lại
+                {"Quay l\u1ea1i"}
               </Button>
             ) : null}
             <Sparkles className="text-primary h-5 w-5 shrink-0" />
-            Tạo khóa học bằng AI
+            {"T\u1ea1o kh\u00f3a h\u1ecdc b\u1eb1ng AI"}
           </DialogTitle>
         </DialogHeader>
 
         {step === "form" ? (
           <form
-            onSubmit={(e) => void handleGenerate(e)}
+            onSubmit={(e) => void handleSubmit(e)}
             className="flex max-h-[inherit] flex-1 flex-col overflow-hidden"
           >
             <div className="max-h-[min(70vh,720px)] flex-1 space-y-3 overflow-y-auto px-4 py-3 sm:px-6">
               <p className="text-muted-foreground text-xs leading-relaxed">
-                Nhập chủ đề bắt buộc. Bạn có thể đính kèm PDF hoặc .txt (trích chữ được), hoặc dán nội dung
-                tham khảo. Sau đó xem trước, chỉnh sửa và xuất bản — không cần admin duyệt.
+                {"Ch\u1ecdn m\u1ed9t ngu\u1ed3n: "}
+                <strong>{"v\u0103n b\u1ea3n"}</strong>
+                {" ho\u1eb7c "}
+                <strong>PDF</strong>
+                {". \u0110i\u1ec1n ch\u1ee7 \u0111\u1ec1 ho\u1eb7c g\u1ee3i \u00fd ti\u00eau \u0111\u1ec1. Sau \u0111\u00f3 xem tr\u01b0\u1edbc, ch\u1ec9nh s\u1eeda v\u00e0 xu\u1ea5t b\u1ea3n."}
               </p>
+              {formError ? (
+                <p className="text-destructive text-sm" role="alert">
+                  {formError}
+                </p>
+              ) : null}
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  {"Ngu\u1ed3n n\u1ed9i dung"}
+                </Label>
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="contentSource"
+                      checked={source === "text"}
+                      onChange={() => {
+                        setSource("text");
+                        setPdfFile(null);
+                      }}
+                      className="border-input h-4 w-4"
+                    />
+                    {"Nh\u1eadp v\u0103n b\u1ea3n"}
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="contentSource"
+                      checked={source === "pdf"}
+                      onChange={() => {
+                        setSource("pdf");
+                        setTextContent("");
+                      }}
+                      className="border-input h-4 w-4"
+                    />
+                    {"T\u1ea3i file PDF"}
+                  </label>
+                </div>
+              </div>
+
               <div className="space-y-1.5">
-                <Label htmlFor="ai-gen-topic">Chủ đề *</Label>
+                <Label htmlFor="ai-gen-topic">{"Ch\u1ee7 \u0111\u1ec1"}</Label>
                 <Input
                   id="ai-gen-topic"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder="Ví dụ: Lập trình Python cơ bản cho người mới"
-                  required
+                  placeholder={"V\u00ed d\u1ee5: Python cho ng\u01b0\u1eddi m\u1edbi b\u1eaft \u0111\u1ea7u"}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ai-gen-title-hint">Gợi ý tiêu đề (tuỳ chọn)</Label>
+                <Label htmlFor="ai-gen-custom-title">
+                  {
+                    "G\u1ee3i \u00fd ti\u00eau \u0111\u1ec1 (tu\u1ef3 ch\u1ecdn \u2014 \u0111\u1ec3 tr\u1ed1ng \u0111\u1ec3 AI \u0111\u1eb7t)"
+                  }
+                </Label>
                 <Input
-                  id="ai-gen-title-hint"
-                  value={titleHint}
-                  onChange={(e) => setTitleHint(e.target.value)}
-                  placeholder="Để AI căn theo, hoặc bỏ trống"
+                  id="ai-gen-custom-title"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder={
+                    "\u0110\u1ec3 tr\u1ed1ng n\u1ebfu mu\u1ed1n AI t\u1ef1 \u0111\u1eb7t ti\u00eau \u0111\u1ec1"
+                  }
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ai-gen-desc-hint">Ghi chú / mô tả thêm (tuỳ chọn)</Label>
+                <Label htmlFor="ai-gen-additional">
+                  {"Ghi ch\u00fa th\u00eam (tu\u1ef3 ch\u1ecdn)"}
+                </Label>
                 <Textarea
-                  id="ai-gen-desc-hint"
-                  value={descriptionHint}
-                  onChange={(e) => setDescriptionHint(e.target.value)}
+                  id="ai-gen-additional"
+                  value={additionalNote}
+                  onChange={(e) => setAdditionalNote(e.target.value)}
                   rows={2}
-                  placeholder="Đối tượng, trọng tâm…"
+                  placeholder={
+                    "\u0110\u1ed1i t\u01b0\u1ee3ng, tr\u1ecdng t\u00e2m\u2026"
+                  }
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ai-gen-file">File PDF hoặc .txt (tuỳ chọn)</Label>
-                <Input
-                  id="ai-gen-file"
-                  type="file"
-                  accept=".pdf,.txt,application/pdf,text/plain"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ai-gen-paste">Nội dung văn bản tham khảo (tuỳ chọn)</Label>
-                <Textarea
-                  id="ai-gen-paste"
-                  value={textContent}
-                  onChange={(e) => setTextContent(e.target.value)}
-                  rows={6}
-                  placeholder="Dán nội dung tóm tắt, đề cương, hoặc tài liệu…"
-                />
-              </div>
+
+              {source === "text" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="ai-gen-paste">
+                    {"N\u1ed9i dung v\u0103n b\u1ea3n *"}
+                  </Label>
+                  <Textarea
+                    id="ai-gen-paste"
+                    value={textContent}
+                    onChange={(e) => setTextContent(e.target.value)}
+                    rows={8}
+                    placeholder={
+                      "D\u00e1n \u0111\u1ec1 c\u01b0\u01a1ng, t\u00e0i li\u1ec7u ho\u1eb7c m\u00f4 t\u1ea3 chi ti\u1ebft\u2026"
+                    }
+                    className={cn("min-h-[140px]")}
+                  />
+                </div>
+              ) : source === "pdf" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="ai-gen-pdf">File PDF *</Label>
+                  <Input
+                    id="ai-gen-pdf"
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+                  />
+                  <p className="text-muted-foreground text-[11px]">
+                    {
+                      "PDF c\u1ea7n c\u00f3 l\u1edbp ch\u1eef (kh\u00f4ng ph\u1ea3i \u1ea3nh scan), t\u1ed1i \u0111a 12MB."
+                    }
+                  </p>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  {"Ch\u1ecdn \u201cNh\u1eadp v\u0103n b\u1ea3n\u201d ho\u1eb7c \u201cT\u1ea3i file PDF\u201d \u0111\u1ec3 ti\u1ebfp t\u1ee5c."}
+                </p>
+              )}
+
               <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/25 p-3">
                 <input
                   type="checkbox"
@@ -282,32 +407,59 @@ export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) 
                   onChange={(e) => setEnrichContext(e.target.checked)}
                   className="border-input mt-0.5 h-4 w-4 shrink-0 rounded"
                 />
-                <Label htmlFor="ai-gen-enrich" className="cursor-pointer text-xs font-normal leading-snug">
-                  Bổ sung ngữ cảnh chương trình từ kiến thức chung (không thay nội dung trong file đính kèm).
+                <Label
+                  htmlFor="ai-gen-enrich"
+                  className="cursor-pointer text-xs font-normal leading-snug"
+                >
+                  {
+                    "B\u1ed5 sung ng\u1eef c\u1ea3nh ch\u01b0\u01a1ng tr\u00ecnh (ki\u1ebfn th\u1ee9c chung; kh\u00f4ng thay n\u1ed9i dung b\u1ea1n nh\u1eadp)."
+                  }
                 </Label>
               </div>
             </div>
             <DialogFooter className="border-t border-border/60 px-4 py-3 sm:px-6">
-              <Button type="button" variant="outline" onClick={() => handleClose(false)}>
-                Huỷ
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleClose(false)}
+              >
+                {"Hu\u1ef7"}
               </Button>
               <Button type="submit" disabled={loading} className="gap-1.5">
                 <Sparkles className="h-4 w-4" />
-                {loading ? "Đang gọi AI…" : "Tạo khóa học"}
+                {loading
+                  ? "\u0110ang g\u1ecdi AI\u2026"
+                  : "T\u1ea1o kh\u00f3a h\u1ecdc"}
               </Button>
             </DialogFooter>
           </form>
         ) : draft ? (
           <div className="flex max-h-[inherit] min-h-0 flex-1 flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-hidden px-4 py-3 sm:px-6">
-              <CoursePreviewEditor value={draft} onChange={setDraft} disabled={publishing} />
+              <CoursePreviewEditor
+                value={draft}
+                onChange={setDraft}
+                disabled={publishing}
+              />
             </div>
             <DialogFooter className="border-t border-border/60 px-4 py-3 sm:px-6">
-              <Button type="button" variant="outline" onClick={() => handleClose(false)} disabled={publishing}>
-                Đóng
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleClose(false)}
+                disabled={publishing}
+              >
+                {"\u0110\u00f3ng"}
               </Button>
-              <Button type="button" className="gap-1.5" disabled={publishing} onClick={() => void handlePublish()}>
-                {publishing ? "Đang lưu…" : "Xuất bản khóa học"}
+              <Button
+                type="button"
+                className="gap-1.5"
+                disabled={publishing}
+                onClick={() => void handlePublish()}
+              >
+                {publishing
+                  ? "\u0110ang l\u01b0u\u2026"
+                  : "Xu\u1ea5t b\u1ea3n kh\u00f3a h\u1ecdc"}
               </Button>
             </DialogFooter>
           </div>

@@ -1,13 +1,12 @@
-import { callDeepseek } from "./providers/deepseek";
 import { callOpenai } from "./providers/openai";
 import { ruleBasedAnalysis } from "./rule-based";
 import type { AIDebugResponse } from "./types";
 
 export type { AIDebugResponse } from "./types";
-export type AiProviderName = "deepseek" | "openai" | "rule";
+export type AiProviderName = "openai" | "rule";
 
 const PROVIDER_TIMEOUT_MS = 10_000;
-const DEFAULT_ORDER: AiProviderName[] = ["deepseek", "openai", "rule"];
+const DEFAULT_ORDER: AiProviderName[] = ["openai", "rule"];
 
 function parseProviderOrder(): AiProviderName[] {
   const raw = process.env.AI_PROVIDER_ORDER?.trim();
@@ -15,9 +14,7 @@ function parseProviderOrder(): AiProviderName[] {
   const parts = raw
     .split(",")
     .map((s) => s.trim().toLowerCase())
-    .filter((s): s is AiProviderName =>
-      s === "deepseek" || s === "openai" || s === "rule"
-    );
+    .filter((s): s is AiProviderName => s === "openai" || s === "rule");
   return parts.length > 0 ? parts : [...DEFAULT_ORDER];
 }
 
@@ -30,19 +27,19 @@ function buildUserPrompt(
   let extra = "";
   const files = context?.projectFiles;
   if (files?.length) {
-    extra = `\n\nFile liên quan:\n${files
+    extra = `\n\nFile li\u00ean quan:\n${files
       .map(
         (f) =>
-          `--- ${f.path} ---\n${f.content.slice(0, 4000)}${f.content.length > 4000 ? "\n…" : ""}`
+          `--- ${f.path} ---\n${f.content.slice(0, 4000)}${f.content.length > 4000 ? "\n\u2026" : ""}`
       )
       .join("\n\n")}`;
   }
-  return `Ngôn ngữ: ${language}
+  return `Ng\u00f4n ng\u1eef: ${language}
 
 Code:
 ${code}
 
-Lỗi / stderr:
+L\u1ed7i / stderr:
 ${error}
 ${extra}`;
 }
@@ -57,13 +54,11 @@ function withTimeout<T>(
 }
 
 export function isAiDebuggerConfigured(): boolean {
-  return Boolean(
-    process.env.DEEPSEEK_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim()
-  );
+  return Boolean(process.env.OPENAI_API_KEY?.trim());
 }
 
 /**
- * Fallback 3 cấp theo `AI_PROVIDER_ORDER` (mặc định: deepseek → openai → rule).
+ * Fallback theo `AI_PROVIDER_ORDER` (m\u1eb7c \u0111\u1ecbnh: openai \u2192 rule).
  */
 export async function analyzeCodeError(
   code: string,
@@ -80,17 +75,6 @@ export async function analyzeCodeError(
     }
 
     try {
-      if (step === "deepseek") {
-        if (!process.env.DEEPSEEK_API_KEY?.trim()) {
-          console.error("[ai-debugger] skip deepseek: DEEPSEEK_API_KEY empty");
-          continue;
-        }
-        return await withTimeout(
-          (sig) => callDeepseek(userPrompt, sig),
-          PROVIDER_TIMEOUT_MS
-        );
-      }
-
       if (step === "openai") {
         if (!process.env.OPENAI_API_KEY?.trim()) {
           console.error("[ai-debugger] skip openai: OPENAI_API_KEY empty");
@@ -125,28 +109,28 @@ export function formatAiDebugMarkdown(r: AIDebugResponse): string {
   const diffBlock =
     r.visualDiff !== undefined
       ? visualDiffToMarkdown(r.visualDiff.before, r.visualDiff.after)
-      : "_Không có diff minh họa._";
+      : "_Kh\u00f4ng c\u00f3 diff minh h\u1ecda._";
 
   const improvementsBlock =
     r.improvements?.length && r.improvements.length > 0
       ? r.improvements.map((x) => `- ${x}`).join("\n")
-      : "_Không có._";
+      : "_Kh\u00f4ng c\u00f3._";
 
-  return `## 🔴 ${r.errorType} – ${r.title}
+  return `## \u{1F534} ${r.errorType} \u2013 ${r.title}
 
-### 📌 Visual Diff
+### \u{1F4CC} Visual Diff
 ${diffBlock}
 
-### 🔍 Root Cause Analysis
+### \u{1F50D} Root Cause Analysis
 ${r.rootCause}
 
-### 🛠️ Cách sửa
+### \u{1F6E0}\uFE0F C\u00e1ch s\u1eeda
 ${r.solution}
 
-### ⚠️ Hậu quả dài hạn
+### \u26A0\uFE0F H\u1eadu qu\u1ea3 d\u00e0i h\u1ea1n
 ${r.impact}
 
-### 📈 Cải thiện hiệu năng / Bảo mật (nếu có)
+### \u{1F4C8} C\u1ea3i thi\u1ec7n hi\u1ec7u n\u0103ng / B\u1ea3o m\u1eadt (n\u1ebfu c\u00f3)
 ${improvementsBlock}
 `;
 }

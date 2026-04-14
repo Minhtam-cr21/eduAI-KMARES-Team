@@ -3,7 +3,6 @@ import type { AdminUserRow } from "@/components/admin/admin-users-table";
 import { BackButton } from "@/components/ui/back-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchInternalApi } from "@/lib/server/internal-fetch";
-import Link from "next/link";
 import { Suspense } from "react";
 
 export default async function AdminUsersPage({

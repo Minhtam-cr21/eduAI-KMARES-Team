@@ -11,6 +11,8 @@ export type AILessonDraft = {
 export type AICourseDraft = {
   title: string;
   description: string;
+  /** Main course summary (~80–120 words target). */
+  summary: string;
   content: string;
   course_type: CourseType;
   category: string;
@@ -23,10 +25,12 @@ export function mapOutlineToDraft(outline: GeneratedCourseOutline): AICourseDraf
     outline.category?.trim() ||
     outline.course_title.slice(0, 80).trim() ||
     "Tổng quát";
+  const desc = outline.course_description.trim();
   return {
     title: outline.course_title.trim(),
-    description: outline.course_description.trim(),
-    content: outline.course_description.trim(),
+    description: desc,
+    summary: desc,
+    content: desc,
     course_type: outline.course_type ?? "skill",
     category: category.slice(0, 120),
     thumbnail_url: null,

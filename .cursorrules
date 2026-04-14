@@ -198,5 +198,72 @@ RLS:
 
 ## Quy tắc an toàn bổ sung
 - **Tuyệt đối không hardcode secret** (API key, service role key) trong client component. Chỉ dùng trên server (API routes, server actions, edge functions).
-- **Không gọi trực tiếp OpenAI/Deepseek từ client**. Luôn qua API route hoặc server action.
+- **Không gọi trực tiếp OpenAI từ client**. Luôn qua API route hoặc server action.
 - **Kiểm tra RLS** cho các bảng mới: đảm bảo học sinh chỉ xem/ghi dữ liệu của mình, giáo viên và admin có quyền cao hơn.
+
+#Cấu trúc của roadmap train AI module
+eduai-mvp/
+├── app/
+├── components/
+├── lib/
+├── public/
+├── roadmaps/          <--- tạo thư mục này
+│   ├── python.pdf
+│   ├── java.pdf
+│   ├── sql.pdf
+│   └── ...
+├── scripts/
+├── package.json
+└── ...
+
+## QUY TẮC MỚI (áp dụng từ giai đoạn tái cấu trúc)
+
+### 1. Xóa hoàn toàn module Practice (phòng luyện code)
+- Không được giữ lại bất kỳ file, component, API, route nào liên quan đến practice, random, exercise, code runner (trừ khi đã được chuyển đổi sang quiz).
+- Các thư mục cần xóa: `app/(student)/practice/`, `app/api/practice/`, `components/student/practice-*`, `lib/ai/error-analyzer.ts` (nếu chỉ dùng cho practice).
+- Các bảng cũ: `practice_exercises`, `practice_submissions` sẽ bị xóa trong migration.
+- Thay thế bằng `quizzes`, `quiz_attempts`.
+
+### 2. Module mới: Bài tập trắc nghiệm (Quiz)
+- Mỗi bài học có thể có một quiz (15 câu trắc nghiệm).
+- Quiz được lưu trong bảng `quizzes` (JSON câu hỏi, đáp án, giải thích).
+- Học sinh làm quiz → lưu vào `quiz_attempts` (điểm, câu trả lời).
+- Giáo viên tạo quiz trong trang quản lý bài học (modal hoặc trang riêng).
+- AI có thể hỗ trợ tạo quiz từ nội dung lesson (gọi OpenAI).
+
+### 3. Theo dõi hành vi người dùng (Behavior Tracking)
+- Bảng `user_behavior` ghi nhận các sự kiện: `view_lesson`, `complete_quiz`, `watch_video`, `login`, `view_course`, ...
+- API `POST /api/behavior/track` (authenticated) để ghi lại sự kiện từ client.
+- Dữ liệu này dùng để phân tích tính kỷ luật, đề xuất lộ trình cá nhân hóa.
+- Chỉ admin/teacher có quyền xem thống kê hành vi (qua API hoặc trang riêng).
+
+### 4. Lịch trình thông minh (Study Schedule)
+- Học sinh có thể thêm `student_note` và đánh dấu `is_busy` vào `study_schedule` (khung giờ bận).
+- Giáo viên xem lịch của học sinh (chỉ thấy khoảng bận, không thấy nội dung note).
+- Deadline trượt tự động dời +1 ngày (đã có). Bổ sung: nếu học sinh đánh dấu bận, hệ thống ưu tiên dời lịch tránh khung đó.
+
+### 5. Tạo khóa học mới (không cần admin duyệt)
+- Giáo viên tạo khóa học trực tiếp, `status='published'` ngay lập tức.
+- Admin vẫn có thể xóa khóa học (nếu vi phạm) nhưng không cần duyệt.
+- Bổ sung trường `content` cho khóa học (mô tả chi tiết, trọng tâm kiến thức).
+- Giáo viên có thể import/đính kèm ảnh roadmap (lưu trong `thumbnail_url` hoặc `roadmap_image`).
+
+### 6. AI tạo khóa học (Course Generation)
+- Tạo API `POST /api/ai/generate-course` (teacher only).
+- Input: `topic`, `description`, `files?` (PDF/text).
+- Output: course structure (title, description, lessons content, quizzes).
+- Lưu vào bảng `courses` và `course_lessons` với status='draft', giáo viên chỉnh sửa rồi publish.
+- Không thay đổi các course hiện có.
+
+### 7. Xóa/điều chỉnh các route cũ
+- Xóa `/practice/*` khỏi middleware.
+- Cập nhật `student-nav.tsx`: chỉ còn Dashboard, Quizzes, Trắc nghiệm (gộp), Profile, Kết nối GV, Lộ trình.
+- Dashboard student: hiển thị thống kê học tập (số bài hoàn thành, biểu đồ, streak).
+
+### 8. Ưu tiên phát triển: Lộ trình và lịch trình
+- Tập trung vào cơ chế lộ trình cá nhân hóa, lịch học thông minh, deadline trượt.
+- Bỏ qua các tính năng luyện code (đã chuyển thành quiz).
+
+### 9. Code style & kiểm tra
+- Chạy `npm run build` sau mỗi thay đổi lớn.
+- Commit message rõ ràng: "refactor: ...", "feat: ...", "fix: ..."

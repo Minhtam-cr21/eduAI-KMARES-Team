@@ -130,6 +130,13 @@ export function CoursePreviewEditor({
 
   const lesson = value.lessons[selected];
 
+  function syncContent(next: AICourseDraft): AICourseDraft {
+    return {
+      ...next,
+      content: [next.summary.trim(), next.description.trim()].filter(Boolean).join("\n\n"),
+    };
+  }
+
   function patchLesson(patch: Partial<(typeof value.lessons)[0]>) {
     const next = [...value.lessons];
     next[selected] = { ...next[selected], ...patch };
@@ -178,18 +185,36 @@ export function CoursePreviewEditor({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pv-desc">Mô tả</Label>
+              <Label htmlFor="pv-desc">{"M\u00f4 t\u1ea3 ng\u1eafn (catalog)"}</Label>
               <Textarea
                 id="pv-desc"
                 rows={3}
                 value={value.description}
                 disabled={disabled}
                 onChange={(e) =>
-                  onChange({
-                    ...value,
-                    description: e.target.value,
-                    content: e.target.value,
-                  })
+                  onChange(
+                    syncContent({
+                      ...value,
+                      description: e.target.value,
+                    })
+                  )
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pv-summary">{"T\u00f3m t\u1eaft n\u1ed9i dung ch\u00ednh"}</Label>
+              <Textarea
+                id="pv-summary"
+                rows={5}
+                value={value.summary}
+                disabled={disabled}
+                onChange={(e) =>
+                  onChange(
+                    syncContent({
+                      ...value,
+                      summary: e.target.value,
+                    })
+                  )
                 }
               />
             </div>
