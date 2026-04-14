@@ -2,12 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
 const baseNav = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/practice/random", label: "Luyện random" },
-  { href: "/practice/exercises", label: "Bài tập khóa" },
-  { href: "/practice", label: "Luyện nhanh" },
-  { href: "/assessment", label: "Trắc nghiệm" },
+  { href: "/student", label: "Dashboard" },
+  { href: "/quizzes", label: "Quiz" },
+  { href: "/assessment", label: "Assessment" },
   { href: "/profile", label: "Profile" },
+  { href: "/student/teachers", label: "Kết nối GV" },
+  { href: "/personalized-roadmap", label: "Lộ trình" },
 ] as const;
 
 export async function StudentNav() {

@@ -125,13 +125,13 @@ export default async function LearnCourseLessonPage({
           <LessonScheduleCompleteSection lessonId={lessonId} />
 
           <Link
-            href={`/practice/lesson/${lessonId}`}
+            href="/quizzes"
             className={cn(
               buttonVariants({ variant: "default" }),
               "inline-flex"
             )}
           >
-            Thực hành
+            Quiz
           </Link>
 
           <Link

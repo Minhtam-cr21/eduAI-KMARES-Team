@@ -47,8 +47,8 @@ export function LandingHeader() {
   const navItems = [
     { label: "Lộ trình", action: () => scrollTo("roadmap") },
     ...(user?.loggedIn
-      ? [{ label: "Phòng luyện code", action: () => (window.location.href = "/practice") }]
-      : [{ label: "Phòng luyện code", action: () => (window.location.href = "/login") }]),
+      ? [{ label: "Quiz", action: () => (window.location.href = "/quizzes") }]
+      : [{ label: "Quiz", action: () => (window.location.href = "/login") }]),
     { label: "Giáo viên", action: () => scrollTo("teachers") },
     { label: "Liên hệ tư vấn", action: () => scrollTo("contact") },
   ];

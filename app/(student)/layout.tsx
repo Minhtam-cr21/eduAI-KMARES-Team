@@ -8,7 +8,7 @@ import Link from "next/link";
 export const metadata: Metadata = segmentMetadata({
   title: "Học tập",
   description:
-    "Dashboard học sinh EduAI: khóa học, luyện code, trắc nghiệm định hướng và lộ trình cá nhân hóa.",
+    "Dashboard học sinh EduAI: khóa học, quiz, trắc nghiệm định hướng và lộ trình cá nhân hóa.",
   noIndex: true,
 });
 

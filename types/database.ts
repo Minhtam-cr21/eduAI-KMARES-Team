@@ -87,34 +87,29 @@ export interface MbtiResult {
   test_date: string;
 }
 
-/** `practice_exercises` (migration 20250409000000). */
-export type PracticeExerciseLanguage = "cpp" | "java" | "python";
-export type PracticeExerciseDifficulty = "easy" | "medium" | "hard";
-
-export interface PracticeExercise {
+/** `quizzes` (migration 029). */
+export interface Quiz {
   id: string;
   title: string;
   description: string | null;
-  initial_code: string | null;
-  test_code: string | null;
-  solution_code?: string | null;
-  language: PracticeExerciseLanguage | null;
-  difficulty: PracticeExerciseDifficulty | null;
-  input_example: string | null;
-  output_example: string | null;
+  course_id: string | null;
+  lesson_id: string | null;
+  questions: unknown;
+  time_limit: number | null;
+  passing_score: number | null;
+  created_by: string | null;
+  is_published: boolean | null;
   created_at: string;
 }
 
-/** `practice_submissions`. */
-export interface PracticeSubmission {
+/** `quiz_attempts`. */
+export interface QuizAttempt {
   id: string;
   user_id: string;
-  exercise_id: string | null;
-  lesson_id: string | null;
-  code: string | null;
-  output: string | null;
-  error: string | null;
-  ai_suggestion: string | null;
-  viewed_solution?: boolean | null;
+  quiz_id: string;
+  score: number | null;
+  answers: unknown;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
 }

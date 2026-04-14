@@ -12,7 +12,7 @@ const PROTECTED_PREFIXES = [
   "/personalized-roadmap",
   "/career",
   "/student",
-  "/practice",
+  "/quizzes",
   "/study-schedule",
 ] as const;
 

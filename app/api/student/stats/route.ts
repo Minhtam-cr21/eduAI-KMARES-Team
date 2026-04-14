@@ -7,7 +7,7 @@ function utcYmd(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** GET — thống kê học tập của user đăng nhập (study_schedule + practice_submissions). */
+/** GET — learning stats: study_schedule + quiz_attempts. */
 export async function GET() {
   const supabase = createClient();
   const {
@@ -74,19 +74,17 @@ export async function GET() {
     count: counts[date] ?? 0,
   }));
 
-  const { data: subs, error: e4 } = await supabase
-    .from("practice_submissions")
-    .select("lesson_id, exercise_id")
-    .eq("user_id", user.id);
+  const { count: quizzesCompleted, error: e4 } = await supabase
+    .from("quiz_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .not("completed_at", "is", null);
 
-  let lessonPractice = 0;
-  let exercisePractice = 0;
-  if (!e4 && subs) {
-    for (const s of subs) {
-      if (s.lesson_id) lessonPractice += 1;
-      else if (s.exercise_id) exercisePractice += 1;
-    }
+  if (e4) {
+    return NextResponse.json({ error: e4.message }, { status: 500 });
   }
+
+  const qc = quizzesCompleted ?? 0;
 
   const totalCompleted = completed ?? 0;
   const totalAll = totalAssigned ?? 0;
@@ -99,9 +97,6 @@ export async function GET() {
     total_time_spent_minutes: null as number | null,
     progress_percent,
     weekly_progress,
-    practice_breakdown: [
-      { name: "Thực hành theo bài khóa", value: lessonPractice },
-      { name: "Bài luyện (exercise)", value: exercisePractice },
-    ],
+    quiz_breakdown: [{ name: "Bài quiz đã hoàn thành", value: qc }],
   });
 }

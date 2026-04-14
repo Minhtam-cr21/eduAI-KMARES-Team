@@ -23,7 +23,7 @@ export type StudentStatsPayload = {
   total_time_spent_minutes: number | null;
   progress_percent: number;
   weekly_progress: { date: string; count: number }[];
-  practice_breakdown: { name: string; value: number }[];
+  quiz_breakdown: { name: string; value: number }[];
 };
 
 const BAR_FILL = "#6366f1";
@@ -69,9 +69,9 @@ export function StudentStatsCharts() {
   }, [stats?.weekly_progress]);
 
   const pieData = useMemo(() => {
-    const raw = stats?.practice_breakdown ?? [];
+    const raw = stats?.quiz_breakdown ?? [];
     return raw.filter((x) => x.value > 0);
-  }, [stats?.practice_breakdown]);
+  }, [stats?.quiz_breakdown]);
 
   if (loading) {
     return (
@@ -92,7 +92,7 @@ export function StudentStatsCharts() {
   }
 
   return (
-    <Card className="mb-8 border-border/80 shadow-sm">
+    <Card id="student-learning-stats" className="mb-8 border-border/80 shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold">Thống kê học tập</CardTitle>
         <p className="text-muted-foreground text-sm font-normal">
@@ -141,11 +141,11 @@ export function StudentStatsCharts() {
 
         <div className="min-h-[260px] w-full min-w-0">
           <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
-            Phân bổ luyện tập
+            Quiz
           </p>
           {pieData.length === 0 ? (
             <p className="text-muted-foreground py-12 text-center text-sm">
-              Chưa có dữ liệu luyện tập.
+              Chưa có bài quiz hoàn thành.
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={240}>

@@ -1,4 +1,4 @@
-import { getPublishedLessonIfEnrolled } from "@/lib/practice/assert-lesson-access";
+import { getPublishedLessonIfEnrolled } from "@/lib/courses/published-lesson-access";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 

@@ -11,7 +11,6 @@ const links = [
   { href: "/admin/users", label: "Người dùng" },
   { href: "/admin/user-courses", label: "ĐK khóa & lộ trình" },
   { href: "/admin/topics", label: "Chủ đề" },
-  { href: "/admin/practice-questions", label: "Practice" },
 ] as const;
 
 export function AdminShellNav() {

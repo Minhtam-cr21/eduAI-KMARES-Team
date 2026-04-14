@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type LessonForPractice = {
+export type PublishedLessonForEnrollment = {
   id: string;
   course_id: string;
   title: string;
@@ -11,13 +11,13 @@ export type LessonForPractice = {
 };
 
 /**
- * Học sinh chỉ xem/chạy bài lesson khi đã đăng ký khóa và bài đã published.
+ * Student can access a lesson when enrolled in the course and the lesson is published.
  */
 export async function getPublishedLessonIfEnrolled(
   supabase: SupabaseClient,
   userId: string,
   lessonId: string
-): Promise<LessonForPractice | null> {
+): Promise<PublishedLessonForEnrollment | null> {
   const { data: lesson, error: lErr } = await supabase
     .from("course_lessons")
     .select("id, course_id, title, content, code_template, solution_code, status")
@@ -36,5 +36,5 @@ export async function getPublishedLessonIfEnrolled(
 
   if (eErr || !enr) return null;
 
-  return lesson as LessonForPractice;
+  return lesson as PublishedLessonForEnrollment;
 }

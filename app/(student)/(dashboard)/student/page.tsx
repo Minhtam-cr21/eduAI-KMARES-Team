@@ -10,9 +10,7 @@ import {
   BookOpen,
   CalendarDays,
   ClipboardList,
-  Code2,
   LayoutDashboard,
-  Library,
   User,
   Users,
 } from "lucide-react";
@@ -32,10 +30,8 @@ type EnrolledCourse = {
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/student", icon: LayoutDashboard },
-  { label: "Luyện random", href: "/practice/random", icon: Code2 },
-  { label: "Bài khóa", href: "/practice/exercises", icon: BookOpen },
-  { label: "Danh sách bài", href: "/student/practice", icon: Library },
-  { label: "Trắc nghiệm", href: "/assessment", icon: ClipboardList },
+  { label: "Quiz", href: "/quizzes", icon: ClipboardList },
+  { label: "Assessment", href: "/assessment", icon: ClipboardList },
   { label: "Profile", href: "/profile", icon: User },
   { label: "Kết nối GV", href: "/student/teachers", icon: Users },
 ];
