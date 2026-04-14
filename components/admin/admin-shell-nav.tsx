@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/admin", label: "Tổng quan" },
   { href: "/admin/courses", label: "Khóa học" },
-  { href: "/admin/lessons/pending", label: "Duyệt bài học" },
+  { href: "/admin/lessons/pending", label: "Bài học" },
   { href: "/admin/reports", label: "Báo cáo" },
   { href: "/admin/users", label: "Người dùng" },
   { href: "/admin/user-courses", label: "ĐK khóa & lộ trình" },

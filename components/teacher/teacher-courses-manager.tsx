@@ -1,5 +1,6 @@
 "use client";
 
+import { AICourseGeneratorDialog } from "@/components/teacher/ai-course-generator-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -27,7 +28,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TeacherCourseRow } from "@/lib/teacher/courses-with-counts";
 import { cn } from "@/lib/utils";
 import {
@@ -54,15 +54,12 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
   }, [initialCourses]);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
-  const [aiTopic, setAiTopic] = useState("");
-  const [aiTitle, setAiTitle] = useState("");
-  const [aiFile, setAiFile] = useState<File | null>(null);
-  const [createTab, setCreateTab] = useState("manual");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const editing = courses.find((c) => c.id === editId);
@@ -96,71 +93,6 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
       return true;
     });
   }, [courses, search, visibilityFilter, categoryFilter]);
-
-  async function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => {
-        const s = r.result as string;
-        const i = s.indexOf(",");
-        resolve(i >= 0 ? s.slice(i + 1) : s);
-      };
-      r.onerror = () => reject(new Error("read"));
-      r.readAsDataURL(file);
-    });
-  }
-
-  async function submitAiCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const topic = aiTopic.trim();
-    if (!topic && !aiFile) {
-      toast.error("Nhập chủ đề hoặc chọn file PDF / text.");
-      return;
-    }
-    if (!topic && aiFile) {
-      toast.error("Vẫn cần mô tả ngắn (chủ đề) để AI đặt tên khóa học.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const body: Record<string, unknown> = {
-        topic,
-        title: aiTitle.trim() || null,
-        description: null,
-        file_base64: null as string | null,
-        file_name: null as string | null,
-      };
-      if (aiFile) {
-        body.file_base64 = await fileToBase64(aiFile);
-        body.file_name = aiFile.name;
-      }
-      const res = await fetch("/api/ai/generate-course", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const j = (await res.json()) as { error?: string; course_id?: string };
-      if (!res.ok) {
-        toast.error(j.error ?? "Không tạo được");
-        return;
-      }
-      const cid = j.course_id;
-      if (!cid) {
-        toast.error("Thiếu course_id từ server");
-        return;
-      }
-      toast.success("Đã tạo khóa học bằng AI");
-      setCreateOpen(false);
-      setAiTopic("");
-      setAiTitle("");
-      setAiFile(null);
-      setCreateTab("manual");
-      router.push(`/teacher/courses/${cid}/lessons`);
-      router.refresh();
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function submitCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -249,10 +181,16 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
         <p className="text-sm text-muted-foreground">
           Quản lý tất cả khóa học của bạn.
         </p>
-        <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Tạo khóa học mới
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setAiDialogOpen(true)} className="gap-1.5">
+            <Sparkles className="h-4 w-4" />
+            Tạo khóa học bằng AI
+          </Button>
+          <Button type="button" onClick={() => setCreateOpen(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            Tạo khóa học mới
+          </Button>
+        </div>
       </div>
 
       {courses.length > 0 ? (
@@ -402,116 +340,58 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
       )}
 
       {/* Create Dialog */}
-      <Dialog
-        open={createOpen}
-        onOpenChange={(o) => {
-          setCreateOpen(o);
-          if (!o) {
-            setCreateTab("manual");
-            setAiTopic("");
-            setAiTitle("");
-            setAiFile(null);
-          }
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Tạo khóa học</DialogTitle>
           </DialogHeader>
-          <Tabs value={createTab} onValueChange={setCreateTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="manual">Thủ công</TabsTrigger>
-              <TabsTrigger value="ai" className="gap-1">
-                <Sparkles className="h-3.5 w-3.5" />
-                AI
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="manual" className="mt-4">
-              <form onSubmit={(e) => void submitCreate(e)} className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="c-title">Tiêu đề</Label>
-                  <Input id="c-title" name="title" required />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="c-desc">Mô tả</Label>
-                  <Textarea id="c-desc" name="description" rows={3} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="c-type">Loại</Label>
-                  <select
-                    id="c-type"
-                    name="course_type"
-                    required
-                    defaultValue="skill"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                  >
-                    <option value="skill">Kỹ năng</option>
-                    <option value="role">Vai trò</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="c-cat">Danh mục</Label>
-                  <Input id="c-cat" name="category" required />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="c-thumb">Thumbnail URL (tuỳ chọn)</Label>
-                  <Input id="c-thumb" name="thumbnail_url" type="url" />
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                    Huỷ
-                  </Button>
-                  <Button type="submit" disabled={loading}>
-                    Tạo
-                  </Button>
-                </DialogFooter>
-              </form>
-            </TabsContent>
-            <TabsContent value="ai" className="mt-4">
-              <form onSubmit={(e) => void submitAiCreate(e)} className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="ai-topic">Chủ đề / mô tả nội dung</Label>
-                  <Textarea
-                    id="ai-topic"
-                    value={aiTopic}
-                    onChange={(e) => setAiTopic(e.target.value)}
-                    rows={4}
-                    placeholder="Ví dụ: Python cho người mới bắt đầu…"
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ai-title">Tiêu đề khóa (tuỳ chọn)</Label>
-                  <Input
-                    id="ai-title"
-                    value={aiTitle}
-                    onChange={(e) => setAiTitle(e.target.value)}
-                    placeholder="Để trống để AI đặt tên"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ai-file">PDF hoặc .txt (tuỳ chọn)</Label>
-                  <Input
-                    id="ai-file"
-                    type="file"
-                    accept=".pdf,.txt,text/plain,application/pdf"
-                    onChange={(e) => setAiFile(e.target.files?.[0] ?? null)}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                    Huỷ
-                  </Button>
-                  <Button type="submit" disabled={loading} className="gap-1">
-                    <Sparkles className="h-4 w-4" />
-                    Tạo khóa học
-                  </Button>
-                </DialogFooter>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={(e) => void submitCreate(e)} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="c-title">Tiêu đề</Label>
+              <Input id="c-title" name="title" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-desc">Mô tả</Label>
+              <Textarea id="c-desc" name="description" rows={3} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-type">Loại</Label>
+              <select
+                id="c-type"
+                name="course_type"
+                required
+                defaultValue="skill"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              >
+                <option value="skill">Kỹ năng</option>
+                <option value="role">Vai trò</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-cat">Danh mục</Label>
+              <Input id="c-cat" name="category" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-thumb">Thumbnail URL (tuỳ chọn)</Label>
+              <Input id="c-thumb" name="thumbnail_url" type="url" />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                Huỷ
+              </Button>
+              <Button type="submit" disabled={loading}>
+                Tạo
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
+
+      <AICourseGeneratorDialog
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
+        onSaved={() => router.refresh()}
+      />
 
       {/* Edit Dialog */}
       <Dialog open={!!editId} onOpenChange={(o) => !o && setEditId(null)}>

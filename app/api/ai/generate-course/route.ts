@@ -1,20 +1,32 @@
-import { generateCourseOutlineFromText } from "@/lib/ai/generate-course-outline";
+import { enrichCourseContextFromTopic } from "@/lib/ai/enrich-course-context";
+import { mapOutlineToDraft } from "@/lib/ai/ai-course-draft";
+import {
+  buildFallbackCourseOutline,
+  generateCourseOutlineFromText,
+  type GenerateOutlineMeta,
+} from "@/lib/ai/generate-course-outline";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
+
+const MAX_SOURCE_CHARS = 200_000;
+const MIN_PDF_TEXT_CHARS = 80;
 
 const bodySchema = z.object({
-  topic: z.string().min(1).max(2000),
+  topic: z.string().min(1).max(8000),
   title: z.string().max(255).optional().nullable(),
   description: z.string().max(8000).optional().nullable(),
-  /** Base64 (no data: prefix required; optional filename for logging only) */
+  /** Nội dung văn bản tham khảo (bổ sung cho hoặc thay PDF). */
+  textContent: z.string().max(MAX_SOURCE_CHARS).optional().nullable(),
   file_base64: z.string().optional().nullable(),
   file_name: z.string().max(255).optional().nullable(),
+  enable_context_enrichment: z.boolean().optional().default(true),
 });
 
-/** POST — teacher only: AI generates course + lessons from topic and/or PDF text. */
+/** POST — teacher: AI sinh bản thảo khóa + bài học (không ghi DB). GV xem trước và lưu qua /api/teacher/courses/from-ai. */
 export async function POST(request: Request) {
   const supabase = createClient();
   const {
@@ -49,10 +61,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const { topic, title, description, file_base64, file_name } = parsed.data;
+  const {
+    topic,
+    title,
+    description,
+    textContent,
+    file_base64,
+    file_name,
+    enable_context_enrichment,
+  } = parsed.data;
 
+  const lowerName = (file_name ?? "").toLowerCase();
+  const isPdf = lowerName.endsWith(".pdf");
   let sourceText = "";
+  let hadFile = false;
+
   if (file_base64?.trim()) {
+    hadFile = true;
     let buf: Buffer;
     try {
       buf = Buffer.from(file_base64, "base64");
@@ -62,87 +87,100 @@ export async function POST(request: Request) {
     if (buf.length > 12 * 1024 * 1024) {
       return NextResponse.json({ error: "File too large (max 12MB)" }, { status: 400 });
     }
-    const lower = (file_name ?? "").toLowerCase();
-    if (lower.endsWith(".pdf")) {
+    if (isPdf) {
       const { PDFParse } = await import("pdf-parse");
       const parser = new PDFParse({ data: new Uint8Array(buf) });
       const pdfData = await parser.getText();
       sourceText = (pdfData.text ?? "").trim();
     } else {
-      sourceText = buf.toString("utf8").slice(0, 500_000);
+      sourceText = buf.toString("utf8").trim().slice(0, MAX_SOURCE_CHARS);
     }
+  }
+
+  if (isPdf && hadFile && sourceText.length < MIN_PDF_TEXT_CHARS) {
+    return NextResponse.json(
+      {
+        error:
+          "Could not extract text from this PDF (it may be scanned images). Use a text-based PDF, a .txt file, or paste text below.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const teacherText = textContent?.trim() ?? "";
+  if (teacherText) {
+    const block = `\n\n--- Nội dung văn bản tham khảo (giáo viên) ---\n${teacherText.slice(0, MAX_SOURCE_CHARS)}`;
+    sourceText = sourceText.trim() ? `${sourceText.slice(0, MAX_SOURCE_CHARS)}${block}` : teacherText;
   }
 
   if (!sourceText.trim()) {
     sourceText = topic;
   }
 
+  const sourceTruncated = sourceText.length > MAX_SOURCE_CHARS;
+  const meta: GenerateOutlineMeta = {
+    hadPdfUpload: isPdf && hadFile,
+    pdfCharsExtracted: isPdf && hadFile ? sourceText.length : 0,
+    pdfTextEmpty: !sourceText.trim(),
+    sourceTruncated,
+  };
+
+  if (enable_context_enrichment) {
+    try {
+      const hintParts: string[] = [];
+      if (meta.hadPdfUpload) {
+        hintParts.push(`PDF extract ~${meta.pdfCharsExtracted} chars`);
+      } else if (hadFile) {
+        hintParts.push(`text file ~${sourceText.length} chars`);
+      } else if (teacherText) {
+        hintParts.push(`pasted text ~${teacherText.length} chars`);
+      } else {
+        hintParts.push("no attachment");
+      }
+      meta.externalContextBrief = await enrichCourseContextFromTopic({
+        topic,
+        title: title ?? undefined,
+        sourceHint: hintParts.join("; "),
+      });
+    } catch (e) {
+      console.warn("[generate-course] context enrichment skipped:", e);
+    }
+  }
+
+  let usedFallback = false;
   let outline;
   try {
-    outline = await generateCourseOutlineFromText({
-      topic,
-      title: title ?? undefined,
-      description: description ?? undefined,
-      sourceText,
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "AI error";
-    return NextResponse.json({ error: msg }, { status: 502 });
-  }
-
-  const courseTitle = title?.trim() || outline.course_title;
-  const courseDesc = description?.trim() || outline.course_description;
-
-  const { data: course, error: cErr } = await supabase
-    .from("courses")
-    .insert({
-      title: courseTitle,
-      description: courseDesc,
-      content: outline.course_description,
-      course_type: "skill",
-      category: topic.slice(0, 80),
-      teacher_id: user.id,
-      status: "published",
-      is_published: true,
-      thumbnail_url: null,
-      ai_generated: true,
-      source_file: file_name?.trim() || null,
-    })
-    .select()
-    .single();
-
-  if (cErr || !course) {
-    return NextResponse.json(
-      { error: cErr?.message ?? "Insert course failed" },
-      { status: 500 }
+    outline = await generateCourseOutlineFromText(
+      {
+        topic,
+        title: title ?? undefined,
+        description: description ?? undefined,
+        sourceText,
+      },
+      meta
     );
+  } catch (e) {
+    console.warn("[generate-course] AI failed, using template:", e);
+    outline = buildFallbackCourseOutline(topic);
+    usedFallback = true;
   }
 
-  const courseId = course.id as string;
-  const lessonsPayload = outline.lessons.map((l, i) => ({
-    course_id: courseId,
-    title: l.title,
-    content: l.content,
-    video_url: l.video_url ?? null,
-    code_template: null as string | null,
-    order_index: i,
-    status: "published" as const,
-    created_by: user.id,
-  }));
-
-  const { data: lessons, error: lErr } = await supabase
-    .from("course_lessons")
-    .insert(lessonsPayload)
-    .select("id, title, order_index");
-
-  if (lErr) {
-    await supabase.from("courses").delete().eq("id", courseId);
-    return NextResponse.json({ error: lErr.message }, { status: 500 });
+  if (title?.trim()) {
+    outline = { ...outline, course_title: title.trim() };
   }
+
+  const draft = mapOutlineToDraft(outline);
+  draft.description = description?.trim() || draft.description;
+  draft.content = draft.description;
 
   return NextResponse.json({
-    course_id: courseId,
-    course,
-    lessons: lessons ?? [],
+    draft,
+    source_file: file_name?.trim() || null,
+    meta: {
+      pdf_chars: meta.hadPdfUpload ? meta.pdfCharsExtracted : null,
+      context_enriched: Boolean(meta.externalContextBrief),
+      source_truncated: sourceTruncated,
+      used_fallback: usedFallback,
+    },
   });
 }
