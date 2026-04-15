@@ -4,7 +4,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-async function assertTeacherOwnsCourse(supabase: ReturnType<typeof createClient>, courseId: string, userId: string) {
+async function assertTeacherOwnsCourseOrAdmin(
+  supabase: ReturnType<typeof createClient>,
+  courseId: string,
+  userId: string
+) {
+  const { data: profile, error: pErr } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (pErr) {
+    return { error: pErr.message as string, status: 500 as const };
+  }
+
   const { data: course, error: fetchErr } = await supabase
     .from("courses")
     .select("id, teacher_id")
@@ -17,10 +30,13 @@ async function assertTeacherOwnsCourse(supabase: ReturnType<typeof createClient>
   if (!course) {
     return { error: "Not found" as string, status: 404 as const };
   }
-  if (course.teacher_id !== userId) {
-    return { error: "Forbidden" as string, status: 403 as const };
+  if (profile?.role === "admin") {
+    return { course };
   }
-  return { course };
+  if (profile?.role === "teacher" && course.teacher_id === userId) {
+    return { course };
+  }
+  return { error: "Forbidden" as string, status: 403 as const };
 }
 
 /** GET — curriculum tree for teacher editor (all lesson statuses). */
@@ -36,7 +52,7 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const gate = await assertTeacherOwnsCourse(supabase, params.id, user.id);
+  const gate = await assertTeacherOwnsCourseOrAdmin(supabase, params.id, user.id);
   if ("error" in gate) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
@@ -68,6 +84,40 @@ export async function GET(
   const lessons = lessonRows ?? [];
   const chapters = chapterRows ?? [];
 
+  const lessonIds = lessons.map((l) => l.id as string);
+  type QuizRow = {
+    id: string;
+    title: string;
+    description: string | null;
+    questions: unknown;
+    time_limit: number | null;
+    passing_score: number | null;
+    is_published: boolean | null;
+  };
+  const quizByLesson = new Map<string, QuizRow>();
+
+  if (lessonIds.length > 0) {
+    const { data: quizRows, error: quizErr } = await supabase
+      .from("quizzes")
+      .select("id, lesson_id, title, description, questions, time_limit, passing_score, is_published")
+      .in("lesson_id", lessonIds);
+    if (!quizErr && quizRows) {
+      for (const q of quizRows) {
+        const lid = q.lesson_id as string | null;
+        if (lid)
+          quizByLesson.set(lid, {
+            id: q.id as string,
+            title: q.title as string,
+            description: (q.description as string | null) ?? null,
+            questions: q.questions,
+            time_limit: (q.time_limit as number | null) ?? null,
+            passing_score: (q.passing_score as number | null) ?? null,
+            is_published: (q.is_published as boolean | null) ?? null,
+          });
+      }
+    }
+  }
+
   type L = (typeof lessons)[number];
   const byChapter = new Map<string | null, L[]>();
   for (const le of lessons) {
@@ -77,15 +127,29 @@ export async function GET(
     byChapter.set(k, arr);
   }
 
-  const mapLesson = (le: L) => ({
-    id: le.id as string,
-    title: le.title as string,
-    type: (le.type as string) === "video" || (le.type as string) === "quiz" ? le.type : "text",
-    content: (le.content as string | null) ?? null,
-    video_url: (le.video_url as string | null) ?? null,
-    time_estimate: (le.time_estimate as number | null) ?? null,
-    order_index: (le.order_index as number | null) ?? 0,
-  });
+  const mapLesson = (le: L) => {
+    const q = quizByLesson.get(le.id as string);
+    return {
+      id: le.id as string,
+      title: le.title as string,
+      type: (le.type as string) === "video" || (le.type as string) === "quiz" ? le.type : "text",
+      content: (le.content as string | null) ?? null,
+      video_url: (le.video_url as string | null) ?? null,
+      time_estimate: (le.time_estimate as number | null) ?? null,
+      order_index: (le.order_index as number | null) ?? 0,
+      quiz: q
+        ? {
+            id: q.id,
+            title: q.title,
+            description: q.description,
+            questions: q.questions,
+            time_limit: q.time_limit,
+            passing_score: q.passing_score,
+            is_published: q.is_published,
+          }
+        : null,
+    };
+  };
 
   const out: Array<{
     id: string | null;
@@ -138,7 +202,7 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const gate = await assertTeacherOwnsCourse(supabase, params.id, user.id);
+  const gate = await assertTeacherOwnsCourseOrAdmin(supabase, params.id, user.id);
   if ("error" in gate) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }

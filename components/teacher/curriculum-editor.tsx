@@ -44,6 +44,7 @@ import {
   ClipboardList,
   FileText,
   GripVertical,
+  ListChecks,
   Pencil,
   Plus,
   Trash2,
@@ -51,6 +52,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { QuizEditorDialog } from "@/components/teacher/quiz-editor";
 
 const ORPHAN_ID = "__orphan__";
 
@@ -64,6 +66,15 @@ type ApiLesson = {
   video_url: string | null;
   time_estimate: number | null;
   order_index: number;
+  quiz?: {
+    id: string;
+    title: string;
+    description: string | null;
+    questions: unknown;
+    time_limit: number | null;
+    passing_score: number | null;
+    is_published: boolean | null;
+  } | null;
 };
 
 type ApiChapter = {
@@ -162,10 +173,12 @@ function SortableLessonRow({
   lesson,
   onEdit,
   onDelete,
+  onOpenQuiz,
 }: {
   lesson: EdLesson;
   onEdit: (l: EdLesson) => void;
   onDelete: (l: EdLesson) => void;
+  onOpenQuiz: (l: EdLesson) => void;
 }) {
   const {
     attributes,
@@ -207,6 +220,16 @@ function SortableLessonRow({
       <LessonTypeIcon type={lesson.type} />
       <span className="min-w-0 flex-1 truncate font-medium">{lesson.title}</span>
       <span className="text-muted-foreground shrink-0 tabular-nums text-xs">{mins}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 shrink-0"
+        title="Quiz"
+        onClick={() => onOpenQuiz(lesson)}
+      >
+        <ListChecks className="h-3.5 w-3.5" />
+      </Button>
       <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onEdit(lesson)}>
         <Pencil className="h-3.5 w-3.5" />
       </Button>
@@ -232,6 +255,7 @@ function SortableChapterCard({
   onAddLesson,
   onEditLesson,
   onDeleteLesson,
+  onOpenQuiz,
 }: {
   chapter: EdChapter;
   open: boolean;
@@ -241,6 +265,7 @@ function SortableChapterCard({
   onAddLesson: () => void;
   onEditLesson: (l: EdLesson) => void;
   onDeleteLesson: (l: EdLesson) => void;
+  onOpenQuiz: (l: EdLesson) => void;
 }) {
   const {
     attributes,
@@ -314,6 +339,7 @@ function SortableChapterCard({
                   lesson={le}
                   onEdit={onEditLesson}
                   onDelete={onDeleteLesson}
+                  onOpenQuiz={onOpenQuiz}
                 />
               ))}
             </div>
@@ -346,6 +372,7 @@ export function CurriculumEditor({
   const [lessonModal, setLessonModal] = useState<LessonModalState>(null);
   const [chapterDelete, setChapterDelete] = useState<EdChapter | null>(null);
   const [lessonDelete, setLessonDelete] = useState<EdLesson | null>(null);
+  const [quizLesson, setQuizLesson] = useState<EdLesson | null>(null);
 
   const [formTitle, setFormTitle] = useState("");
   const [formType, setFormType] = useState<LessonType>("text");
@@ -600,6 +627,14 @@ export function CurriculumEditor({
     window.open(`/student/courses/${courseId}`, "_blank", "noopener,noreferrer");
   }
 
+  function openQuizEditor(le: EdLesson) {
+    if (!le.serverId) {
+      toast.error("Luu giao trinh truoc de co ID bai hoc, roi mo Quiz.");
+      return;
+    }
+    setQuizLesson(le);
+  }
+
   const chapterIds = chapters.map((c) => `ch-${c.clientId}`);
 
   if (loading) {
@@ -683,6 +718,7 @@ export function CurriculumEditor({
                   onAddLesson={() => openCreateLesson(ch.clientId)}
                   onEditLesson={(l) => openEditLesson(ch.clientId, l)}
                   onDeleteLesson={confirmRemoveLesson}
+                  onOpenQuiz={openQuizEditor}
                 />
               ))}
             </div>
@@ -751,6 +787,23 @@ export function CurriculumEditor({
                 onChange={(e) => setFormContent(e.target.value)}
               />
             </div>
+            {lessonModal?.mode === "edit" && lessonModal.lesson.serverId ? (
+              <div className="border-t pt-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full gap-2"
+                  onClick={() => {
+                    const le = lessonModal.lesson;
+                    setLessonModal(null);
+                    openQuizEditor(le);
+                  }}
+                >
+                  <ListChecks className="h-4 w-4" />
+                  Quan ly quiz (trac nghiem)
+                </Button>
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setLessonModal(null)}>
@@ -787,6 +840,19 @@ export function CurriculumEditor({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {quizLesson?.serverId ? (
+        <QuizEditorDialog
+          open={!!quizLesson}
+          onOpenChange={(o) => {
+            if (!o) setQuizLesson(null);
+          }}
+          courseId={courseId}
+          lessonId={quizLesson.serverId}
+          lessonTitle={quizLesson.title}
+          onSaved={() => void loadStructure()}
+        />
+      ) : null}
 
       <Dialog open={!!lessonDelete} onOpenChange={(o) => !o && setLessonDelete(null)}>
         <DialogContent showCloseButton>

@@ -1,3 +1,4 @@
+import { LessonQuizSection } from "@/components/student/lesson-quiz-section";
 import { LessonCompleteActions } from "@/components/student/lesson-complete-actions";
 import {
   LessonActivityPing,
@@ -133,6 +134,12 @@ export default async function LearnCourseLessonPage({
           )}
         </div>
 
+        <LessonQuizSection
+          courseId={String(lesson.course_id)}
+          lessonId={lessonId}
+          enrolled={!!enroll}
+        />
+
         <div className="mt-10 flex flex-col gap-4 border-t border-border pt-6 sm:flex-row sm:flex-wrap sm:items-center">
           <LessonCompleteActions
             courseId={String(lesson.course_id)}
@@ -142,16 +149,6 @@ export default async function LearnCourseLessonPage({
             initialCompleted={lessonCompleted === true}
           />
           <LessonScheduleCompleteSection lessonId={lessonId} />
-
-          <Link
-            href="/quizzes"
-            className={cn(
-              buttonVariants({ variant: "default" }),
-              "inline-flex"
-            )}
-          >
-            Quiz
-          </Link>
 
           <Link
             href={`/student/courses/${String(lesson.course_id)}`}
