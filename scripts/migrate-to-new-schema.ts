@@ -3,11 +3,39 @@
  * Requires: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY in .env.local
  *
  * Run: npx tsx scripts/migrate-to-new-schema.ts
+ * (tsx không tự load .env.local — script tự đọc giống seed-courses.)
  *
  * Idempotent-ish: skips courses that already have an edu_course with same title + instructor.
  */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createServiceRoleClient } from "../lib/supabase/service-role";
+
+function loadEnvFile(filename: string) {
+  try {
+    const content = readFileSync(resolve(process.cwd(), filename), "utf-8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const idx = trimmed.indexOf("=");
+      if (idx < 1) continue;
+      const key = trimmed.slice(0, idx).trim();
+      let val = trimmed.slice(idx + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (!process.env[key]) {
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    /* file missing */
+  }
+}
 
 function mapLevel(level: string | null | undefined): "beginner" | "intermediate" | "advanced" {
   if (level === "intermediate") return "intermediate";
@@ -251,6 +279,29 @@ async function main() {
 
   console.log("Done. Migrated courses:", migrated);
 }
+
+loadEnvFile(".env.local");
+loadEnvFile(".env");
+
+function requireEnvOrExit() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()) {
+    console.error(
+      "Missing NEXT_PUBLIC_SUPABASE_URL. Add it to .env.local next to package.json."
+    );
+    process.exit(1);
+  }
+  if (
+    !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() &&
+    !process.env.SUPABASE_SERVICE_ROLE_JWT_KEY?.trim()
+  ) {
+    console.error(
+      "Missing SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_JWT_KEY) in .env.local."
+    );
+    process.exit(1);
+  }
+}
+
+requireEnvOrExit();
 
 main().catch((e) => {
   console.error(e);
