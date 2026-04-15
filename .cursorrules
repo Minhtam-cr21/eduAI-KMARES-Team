@@ -1,4 +1,4 @@
-# Dự án: EduAI MVP
+﻿# Dự án: EduAI MVP
 # Techstack: Next.js 14 (App Router), TypeScript, Tailwind, shadcn/ui, Supabase
 
 ## Cấu trúc thư mục (sơ đồ cây)
@@ -267,3 +267,19 @@ eduai-mvp/
 ### 9. Code style & kiểm tra
 - Chạy `npm run build` sau mỗi thay đổi lớn.
 - Commit message rõ ràng: "refactor: ...", "feat: ...", "fix: ..."
+
+## Kiến trúc dữ liệu mới (Edu-AI System)
+
+- **Course (edu_courses)**: title, description, level, category, instructor_id, duration_hours, total_lessons, is_published, is_archived, thumbnail_url, language
+- **Module (edu_modules)**: chương (course_id, title, description, order, is_locked, duration_hours)
+- **Lesson (edu_lessons)**: bài trong module (module_id, title, description, order, lesson_type lecture|interactive|code-along|quiz|project, duration_minutes, is_locked)
+- **LessonContent (edu_lesson_contents)**: lesson_id, content_type video|text|code_editor|quiz|resource, order, content_data JSONB
+- **Resource (edu_resources)**: lesson_id, title, file_url, file_type, file_size, order
+- **Enrollment (edu_enrollments)**: student_id, course_id
+- **StudentProgress (edu_student_progress)**: student_id, lesson_id, course_id, status, completion_percentage, time_spent_minutes, last_accessed, completed_at
+- **Submission (edu_submissions)**: student_id, lesson_id, submission_type quiz|code|assignment, submitted_code, answers JSONB, score, feedback, is_correct, submitted_at, graded_at
+
+### Quy tắc chuyển đổi
+
+- Bảng cũ giữ nguyên (deprecated). Schema mới: edu_*. API mới: pp/api/v2/.
+- Middleware không chặn /api/v2; kiểm tra quyền trong handler.

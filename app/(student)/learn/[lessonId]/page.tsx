@@ -1,3 +1,4 @@
+import { EduLessonLearnClient } from "@/components/student/edu-lesson-learn-client";
 import { LessonQuizSection } from "@/components/student/lesson-quiz-section";
 import { LessonCompleteActions } from "@/components/student/lesson-complete-actions";
 import {
@@ -28,6 +29,102 @@ export default async function LearnCourseLessonPage({
 
   if (!user) {
     redirect(`/login?next=${encodeURIComponent(`/learn/${lessonId}`)}`);
+  }
+
+  const { data: eduLesson, error: eduErr } = await supabase
+    .from("edu_lessons")
+    .select("id, title, description, lesson_type, module_id")
+    .eq("id", lessonId)
+    .maybeSingle();
+
+  if (!eduErr && eduLesson) {
+    const { data: eduMod } = await supabase
+      .from("edu_modules")
+      .select("id, course_id, title")
+      .eq("id", eduLesson.module_id as string)
+      .maybeSingle();
+    if (!eduMod) {
+      notFound();
+    }
+    const { data: eduCourse } = await supabase
+      .from("edu_courses")
+      .select("id, title, category, is_published, is_archived")
+      .eq("id", eduMod.course_id as string)
+      .maybeSingle();
+    if (
+      !eduCourse ||
+      eduCourse.is_published !== true ||
+      eduCourse.is_archived === true
+    ) {
+      notFound();
+    }
+
+    const { data: eduEnroll } = await supabase
+      .from("edu_enrollments")
+      .select("id")
+      .eq("course_id", eduMod.course_id as string)
+      .eq("student_id", user.id)
+      .maybeSingle();
+
+    const { data: eduContents } = await supabase
+      .from("edu_lesson_contents")
+      .select('id, content_type, "order", content_data')
+      .eq("lesson_id", lessonId)
+      .order("order", { ascending: true });
+
+    const { data: eduProg } = await supabase
+      .from("edu_student_progress")
+      .select("status")
+      .eq("lesson_id", lessonId)
+      .eq("student_id", user.id)
+      .maybeSingle();
+
+    const blocks = (eduContents ?? []).map((row) => ({
+      id: row.id as string,
+      content_type: row.content_type as string,
+      order: row.order as number,
+      content_data: (row.content_data ?? {}) as Record<string, unknown>,
+    }));
+
+    return (
+      <>
+        <LessonActivityPing />
+        <article className="mx-auto max-w-3xl px-4 py-8">
+          <BackButton fallbackHref="/student/courses/explore" className="mb-4" />
+          <p className="text-muted-foreground text-sm">
+            {eduCourse.title ? <span>{String(eduCourse.title)}</span> : null}
+            {eduCourse.category ? (
+              <span className="text-muted-foreground/80">
+                {eduCourse.title ? " · " : null}
+                {String(eduCourse.category)}
+              </span>
+            ) : null}
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
+            {eduLesson.title as string}
+          </h1>
+          <div className="mt-8">
+            <EduLessonLearnClient
+              courseId={String(eduMod.course_id)}
+              lessonId={lessonId}
+              courseTitle={String(eduCourse.title ?? "")}
+              lessonTitle={String(eduLesson.title ?? "")}
+              contents={blocks}
+              enrolled={!!eduEnroll}
+              initialCompleted={eduProg?.status === "completed"}
+            />
+          </div>
+          <div className="mt-10">
+            <Link
+              href={`/student/courses/${String(eduMod.course_id)}`}
+              className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
+            >
+              Về khóa học
+            </Link>
+          </div>
+        </article>
+      </>
+    );
   }
 
   const { data: lesson, error: lErr } = await supabase

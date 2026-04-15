@@ -1,5 +1,6 @@
 "use client";
 
+import { StudentEduCourseDetail } from "@/components/student/student-edu-course-detail";
 import { CourseDetailStatsList } from "@/components/student/course-detail-stats-list";
 import { CourseDetailTabs } from "@/components/student/course-detail-tabs";
 import { lessonTypeStats, levelLabelVi } from "@/lib/courses/lesson-type-stats";
@@ -92,6 +93,23 @@ export default function StudentCourseDetailPage() {
   const params = useParams();
   const courseId = typeof params.courseId === "string" ? params.courseId : "";
 
+  const [eduV2Check, setEduV2Check] = useState<"pending" | "yes" | "no">("pending");
+
+  useEffect(() => {
+    if (!courseId) {
+      setEduV2Check("no");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/v2/courses/${courseId}`);
+      if (!cancelled) setEduV2Check(res.ok ? "yes" : "no");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
+
   const [detail, setDetail] = useState<CourseDetailApi | null>(null);
   const [detailErr, setDetailErr] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
@@ -128,8 +146,8 @@ export default function StudentCourseDetailPage() {
   }, [courseId]);
 
   useEffect(() => {
-    void loadDetail();
-  }, [loadDetail]);
+    if (eduV2Check === "no") void loadDetail();
+  }, [eduV2Check, loadDetail]);
 
   useEffect(() => {
     if (!courseId) return;
@@ -217,7 +235,7 @@ export default function StudentCourseDetailPage() {
     const next = withPr.find((x) => x.pr?.progress_status !== "completed");
     const pick = next?.l ?? lessons[0];
     return `/learn/${pick.id}`;
-  }, [detail, lessonProgress, courseId]);
+  }, [detail, lessonProgress]);
 
   async function enroll() {
     setEnrolling(true);
@@ -266,6 +284,19 @@ export default function StudentCourseDetailPage() {
     } finally {
       setSubmittingReview(false);
     }
+  }
+
+  if (eduV2Check === "pending") {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-8">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="mt-6 h-64 w-full rounded-2xl" />
+      </main>
+    );
+  }
+
+  if (eduV2Check === "yes" && courseId) {
+    return <StudentEduCourseDetail courseId={courseId} />;
   }
 
   if (loadingDetail) {

@@ -18,6 +18,8 @@ export type StudentCatalogCourse = {
   id: string;
   title: string;
   description: string | null;
+  /** Legacy catalog vs Edu V2 (`edu_courses`). */
+  catalogBackend?: "legacy" | "edu_v2";
   price?: number | null;
   original_price?: number | null;
   duration_hours?: number | null;
@@ -58,11 +60,17 @@ export function StudentCourseCard({
     e.stopPropagation();
     setEnrolling(true);
     try {
-      const res = await fetch("/api/user/courses/enroll", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId: course.id }),
-      });
+      const isV2 = course.catalogBackend === "edu_v2";
+      const res = await fetch(
+        isV2
+          ? `/api/v2/courses/${course.id}/enroll`
+          : "/api/user/courses/enroll",
+        {
+          method: "POST",
+          headers: isV2 ? undefined : { "Content-Type": "application/json" },
+          body: isV2 ? undefined : JSON.stringify({ courseId: course.id }),
+        }
+      );
       const j = (await res.json()) as { error?: string };
       if (!res.ok) {
         if (res.status === 409) {

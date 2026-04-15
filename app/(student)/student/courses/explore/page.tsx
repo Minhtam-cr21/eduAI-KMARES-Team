@@ -55,6 +55,10 @@ export default function ExploreCoursesPage() {
     null,
   );
   const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set());
+  const [eduV2Courses, setEduV2Courses] = useState<StudentCatalogCourse[]>([]);
+  const [eduV2EnrolledIds, setEduV2EnrolledIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [enrollmentFilter, setEnrollmentFilter] = useState<
     "all" | "enrolled" | "not_enrolled"
   >("all");
@@ -92,25 +96,39 @@ export default function ExploreCoursesPage() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/user/courses/enrolled");
-        if (!res.ok) return;
+  const refreshAllEnrolled = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/courses/enrolled");
+      if (res.ok) {
         const j = (await res.json()) as {
           courses?: Array<{ course: { id: string } }>;
         };
-        if (cancelled) return;
         setEnrolledIds(new Set((j.courses ?? []).map((c) => c.course.id)));
-      } catch {
-        /* ignore */
       }
+    } catch {
+      /* ignore */
+    }
+    try {
+      const res2 = await fetch("/api/v2/me/enrollments");
+      if (res2.ok) {
+        const j2 = (await res2.json()) as { courseIds?: string[] };
+        setEduV2EnrolledIds(new Set(j2.courseIds ?? []));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await refreshAllEnrolled();
+      if (cancelled) return;
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshAllEnrolled]);
 
   const loadCourses = useCallback(async () => {
     setLoading(true);
@@ -132,10 +150,38 @@ export default function ExploreCoursesPage() {
         toast.error(j.error ?? "Không tải catalog");
         setCourses([]);
         setCount(null);
+        setEduV2Courses([]);
         return;
       }
       setCourses(j.data ?? []);
       setCount(j.count ?? null);
+
+      const v2Search = debouncedSearch
+        ? `&q=${encodeURIComponent(debouncedSearch)}`
+        : "";
+      const resV2 = await fetch(
+        `/api/v2/courses?page=${page}&limit=${PAGE_SIZE}${v2Search}`,
+      );
+      const jV2 = (await resV2.json()) as {
+        data?: Array<Record<string, unknown>>;
+      };
+      if (resV2.ok && jV2.data) {
+        const mapped: StudentCatalogCourse[] = jV2.data.map((r) => ({
+          id: String(r.id),
+          title: String(r.title ?? ""),
+          description: (r.description as string | null) ?? null,
+          duration_hours: (r.duration_hours as number | null) ?? null,
+          total_lessons: (r.total_lessons as number | null) ?? null,
+          thumbnail_url: (r.thumbnail_url as string | null) ?? null,
+          catalogBackend: "edu_v2",
+          category: r.category
+            ? { name: String(r.category), slug: "" }
+            : null,
+        }));
+        setEduV2Courses(mapped);
+      } else {
+        setEduV2Courses([]);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi mạng");
     } finally {
@@ -159,7 +205,21 @@ export default function ExploreCoursesPage() {
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 150);
     return () => window.clearTimeout(t);
-  }, [highlightCourseId, loading, courses]);
+  }, [highlightCourseId, loading, courses, eduV2Courses]);
+
+  const displayCourses = useMemo(() => {
+    const legacy = courses.map((c) => ({
+      ...c,
+      catalogBackend: "legacy" as const,
+    }));
+    let v2 = eduV2Courses;
+    if (enrollmentFilter === "enrolled") {
+      v2 = v2.filter((c) => eduV2EnrolledIds.has(c.id));
+    } else if (enrollmentFilter === "not_enrolled") {
+      v2 = v2.filter((c) => !eduV2EnrolledIds.has(c.id));
+    }
+    return [...legacy, ...v2];
+  }, [courses, eduV2Courses, enrollmentFilter, eduV2EnrolledIds]);
 
   const totalPages = useMemo(() => {
     const c = count ?? 0;
@@ -167,17 +227,16 @@ export default function ExploreCoursesPage() {
   }, [count]);
 
   const refreshEnrolled = useCallback(async () => {
-    try {
-      const res = await fetch("/api/user/courses/enrolled");
-      if (!res.ok) return;
-      const j = (await res.json()) as {
-        courses?: Array<{ course: { id: string } }>;
-      };
-      setEnrolledIds(new Set((j.courses ?? []).map((x) => x.course.id)));
-    } catch {
-      /* ignore */
-    }
-  }, []);
+    await refreshAllEnrolled();
+  }, [refreshAllEnrolled]);
+
+  const isCourseEnrolled = useCallback(
+    (c: StudentCatalogCourse) => {
+      if (c.catalogBackend === "edu_v2") return eduV2EnrolledIds.has(c.id);
+      return enrolledIds.has(c.id);
+    },
+    [enrolledIds, eduV2EnrolledIds],
+  );
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
@@ -251,7 +310,7 @@ export default function ExploreCoursesPage() {
         <div className="min-w-0 flex-1">
           {loading ? (
             <CourseSkeleton />
-          ) : courses.length === 0 ? (
+          ) : displayCourses.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center py-12 text-center">
                 <BookOpen className="mb-3 h-10 w-10 text-muted-foreground/40" />
@@ -262,11 +321,11 @@ export default function ExploreCoursesPage() {
             </Card>
           ) : (
             <CourseGrid>
-              {courses.map((c) => (
+              {displayCourses.map((c) => (
                 <StudentCourseCard
-                  key={c.id}
+                  key={`${c.catalogBackend ?? "legacy"}-${c.id}`}
                   course={c}
-                  enrolled={enrolledIds.has(c.id)}
+                  enrolled={isCourseEnrolled(c)}
                   highlight={highlightCourseId === c.id}
                   onEnrollSuccess={refreshEnrolled}
                 />

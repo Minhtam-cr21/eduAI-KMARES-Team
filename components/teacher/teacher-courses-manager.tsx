@@ -306,6 +306,16 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
             <Plus className="h-4 w-4" />
             Tạo khóa học mới
           </Button>
+          <Link
+            href="/teacher/courses/new-v2"
+            className={cn(
+              buttonVariants({ variant: "secondary" }),
+              "inline-flex items-center gap-1.5"
+            )}
+          >
+            <Plus className="h-4 w-4" />
+            Tao khoa (Edu V2)
+          </Link>
         </div>
       </div>
 

@@ -19,7 +19,9 @@
     "seed:codelearn": "npx tsx scripts/seed-courses-codelearn.ts",
     "supabase:deploy:deadlines": "node scripts/deploy-edge-deadlines.mjs",
     "gh:missed-deadlines": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-missed-deadlines-workflow.ps1",
-    "test:flow": "npx tsx scripts/test-flow.ts"
+    "test:flow": "npx tsx scripts/test-flow.ts",
+    "create:demo-teacher": "npx tsx scripts/create-demo-teacher.ts",
+    "migrate:edu-v2": "npx tsx scripts/migrate-to-new-schema.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
