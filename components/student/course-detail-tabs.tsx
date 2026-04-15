@@ -11,8 +11,40 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Award, CheckCircle2, MessageCircle, Play, Star } from "lucide-react";
+import { DEFAULT_COURSE_BENEFIT_CARDS } from "@/lib/i18n/course-detail-vi";
+import {
+  Award,
+  Calendar,
+  CheckCircle2,
+  Gift,
+  MessageCircle,
+  Play,
+  Star,
+  TicketPercent,
+  Trophy,
+} from "lucide-react";
 import Link from "next/link";
+
+export type BenefitRow = {
+  id: string;
+  icon: string | null;
+  title: string;
+  description: string | null;
+  display_order: number | null;
+};
+
+export type CurriculumChapterRow = {
+  id: string | null;
+  title: unknown;
+  lessons: Array<{
+    id: string;
+    title: string;
+    order_index: number | null;
+    video_url: string | null;
+    type?: string | null;
+    time_estimate?: number | null;
+  }>;
+};
 
 export type CourseDetailForTabs = {
   lessons: Array<{
@@ -20,6 +52,8 @@ export type CourseDetailForTabs = {
     title: string;
     order_index: number | null;
     video_url: string | null;
+    type?: string | null;
+    time_estimate?: number | null;
   }>;
   reviews: Array<{
     id: string;
@@ -63,9 +97,104 @@ function BulletList({ items }: { items: string[] | null | undefined }) {
   );
 }
 
+function lessonTypeLabel(t: string | null | undefined): string {
+  switch (t) {
+    case "video":
+      return "Video";
+    case "quiz":
+      return "Ki\u1EC3m tra";
+    default:
+      return "B\u00E0i \u0111\u1ECDc";
+  }
+}
+
+function BenefitGlyph({ name }: { name: string | null | undefined }) {
+  const n = (name ?? "award").toLowerCase();
+  const cls = "h-8 w-8 shrink-0 text-primary";
+  if (n === "trophy") return <Trophy className={cls} />;
+  if (n === "calendar") return <Calendar className={cls} />;
+  if (n === "gift") return <Gift className={cls} />;
+  return <Award className={cls} />;
+}
+
+function LessonAccordionItems({
+  lessons,
+  enrolled,
+  lessonProgress,
+}: {
+  lessons: CourseDetailForTabs["lessons"];
+  enrolled: boolean;
+  lessonProgress: Map<
+    string,
+    { progress_status: string | null; completed_at: string | null }
+  >;
+}) {
+  if (lessons.length === 0) return null;
+  return (
+    <Accordion type="multiple" className="w-full">
+      {lessons.map((lesson, idx) => {
+        const pr = lessonProgress.get(lesson.id);
+        const done = pr?.progress_status === "completed";
+        const mins =
+          typeof lesson.time_estimate === "number" && lesson.time_estimate > 0
+            ? `${lesson.time_estimate} phút`
+            : null;
+        const typeLbl = lessonTypeLabel(lesson.type);
+        return (
+          <AccordionItem key={lesson.id} value={lesson.id}>
+            <AccordionTrigger className="text-left text-sm">
+              <span className="flex w-full min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {lesson.order_index ?? idx + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{lesson.title}</span>
+                  <span className="text-muted-foreground block text-xs font-normal">
+                    {typeLbl}
+                    {mins ? ` · ${mins}` : ""}
+                  </span>
+                </span>
+                {done ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                ) : (
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {enrolled ? "Chưa xong" : "—"}
+                  </span>
+                )}
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="flex flex-wrap gap-2 pb-2">
+                {enrolled ? (
+                  <Link
+                    href={`/learn/${lesson.id}`}
+                    className={cn(
+                      buttonVariants({ size: "sm" }),
+                      "inline-flex items-center justify-center"
+                    )}
+                  >
+                    <Play className="mr-1 h-3.5 w-3.5" />
+                    Vào bài học
+                  </Link>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Đăng ký khóa để học bài này.</p>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        );
+      })}
+    </Accordion>
+  );
+}
+
 export type CourseDetailTabsProps = {
   courseId: string;
   detail: CourseDetailForTabs;
+  curriculumChapters?: CurriculumChapterRow[] | null;
+  benefitRows?: BenefitRow[];
+  highlights?: string[] | null;
+  outcomesAfter?: string[] | null;
   enrolled: boolean;
   loadingProgress: boolean;
   lessonProgress: Map<
@@ -92,6 +221,10 @@ export type CourseDetailTabsProps = {
 export function CourseDetailTabs({
   courseId,
   detail,
+  curriculumChapters = null,
+  benefitRows = [],
+  highlights = null,
+  outcomesAfter = null,
   enrolled,
   loadingProgress,
   lessonProgress,
@@ -111,19 +244,72 @@ export function CourseDetailTabs({
   submittingReview,
   onSubmitReview,
 }: CourseDetailTabsProps) {
+  const benefitDisplay: BenefitRow[] =
+    benefitRows.length > 0
+      ? [...benefitRows].sort(
+          (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+        )
+      : DEFAULT_COURSE_BENEFIT_CARDS.map((c, i) => ({
+          id: `default-benefit-${i}`,
+          icon: c.icon,
+          title: c.title,
+          description: c.description,
+          display_order: i,
+        }));
+
+  const chapterLayout =
+    curriculumChapters &&
+    curriculumChapters.length > 0 &&
+    curriculumChapters.some((ch) => ch.lessons.length > 0);
+
   return (
     <Tabs defaultValue="intro" className="w-full">
       <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-muted/50 p-1">
         <TabsTrigger value="intro">Giới thiệu</TabsTrigger>
-        <TabsTrigger value="curriculum">Nội dung</TabsTrigger>
+        <TabsTrigger value="curriculum">Giáo trình</TabsTrigger>
+        <TabsTrigger value="vouchers">Kích hoạt mã</TabsTrigger>
         <TabsTrigger value="reviews">Đánh giá</TabsTrigger>
         <TabsTrigger value="certificate">Chứng chỉ</TabsTrigger>
         <TabsTrigger value="comments">Thảo luận</TabsTrigger>
       </TabsList>
 
       <TabsContent value="intro" className="mt-6 space-y-8">
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold tracking-tight">Đặc quyền</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {benefitDisplay.map((b) => (
+              <div
+                key={b.id}
+                className="flex gap-3 rounded-xl border border-border/80 bg-card/50 p-4"
+              >
+                <BenefitGlyph name={b.icon} />
+                <div className="min-w-0">
+                  <p className="font-medium leading-snug">{b.title}</p>
+                  {b.description ? (
+                    <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                      {b.description}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <Card>
           <CardContent className="space-y-6 p-6">
+            {highlights?.length ? (
+              <div>
+                <h3 className="mb-2 font-semibold">{"\u0110i\u1ec3m n\u1ed5i b\u1eadt"}</h3>
+                <BulletList items={highlights} />
+              </div>
+            ) : null}
+            {outcomesAfter?.length ? (
+              <div>
+                <h3 className="mb-2 font-semibold">Sau khóa học</h3>
+                <BulletList items={outcomesAfter} />
+              </div>
+            ) : null}
             <div>
               <h3 className="mb-2 font-semibold">Mục tiêu</h3>
               <BulletList items={objectives} />
@@ -181,53 +367,65 @@ export function CourseDetailTabs({
               <p className="text-sm text-muted-foreground">
                 Chưa có bài học được xuất bản.
               </p>
-            ) : (
+            ) : chapterLayout && curriculumChapters ? (
               <Accordion type="multiple" className="w-full">
-                {detail.lessons.map((lesson, idx) => {
-                  const pr = lessonProgress.get(lesson.id);
-                  const done = pr?.progress_status === "completed";
+                {curriculumChapters.map((ch, chi) => {
+                  const chKey = ch.id ?? `orphan-${chi}`;
+                  const chTitle = String(ch.title ?? "Chương");
                   return (
-                    <AccordionItem key={lesson.id} value={lesson.id}>
+                    <AccordionItem key={String(chKey)} value={String(chKey)}>
                       <AccordionTrigger className="text-left text-sm">
-                        <span className="flex w-full items-center gap-2">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                            {lesson.order_index ?? idx + 1}
+                        <span className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="font-medium">{chTitle}</span>
+                          <span className="text-muted-foreground text-xs font-normal">
+                            ({ch.lessons.length} bài)
                           </span>
-                          <span className="flex-1">{lesson.title}</span>
-                          {done ? (
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                          ) : (
-                            <span className="shrink-0 text-xs text-muted-foreground">
-                              {enrolled ? "Chưa xong" : "—"}
-                            </span>
-                          )}
                         </span>
                       </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="flex flex-wrap gap-2 pb-2">
-                          {enrolled ? (
-                            <Link
-                              href={`/learn/${lesson.id}`}
-                              className={cn(
-                                buttonVariants({ size: "sm" }),
-                                "inline-flex items-center justify-center"
-                              )}
-                            >
-                              <Play className="mr-1 h-3.5 w-3.5" />
-                              Vào bài học
-                            </Link>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">
-                              Đăng ký khóa để học bài này.
-                            </p>
-                          )}
-                        </div>
+                      <AccordionContent className="pt-0">
+                        <LessonAccordionItems
+                          lessons={ch.lessons}
+                          enrolled={enrolled}
+                          lessonProgress={lessonProgress}
+                        />
                       </AccordionContent>
                     </AccordionItem>
                   );
                 })}
               </Accordion>
+            ) : (
+              <LessonAccordionItems
+                lessons={detail.lessons}
+                enrolled={enrolled}
+                lessonProgress={lessonProgress}
+              />
             )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="vouchers" className="mt-6">
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <div className="flex gap-3">
+              <TicketPercent className="text-muted-foreground mt-0.5 h-9 w-9 shrink-0" />
+              <div className="min-w-0 space-y-1">
+                <h3 className="font-semibold">Mã kích hoạt &amp; voucher</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  {
+                    "Nh\u1EADp m\u00E3 gi\u1EA3m gi\u00E1 ho\u1EB7c m\u00E3 k\u00EDch ho\u1EA1t kh\u00F3a h\u1ECDc (t\u00EDnh n\u0103ng \u0111ang ho\u00E0n thi\u1EC7n). Hi\u1EC7n t\u1EA1i b\u1EA1n c\u00F3 th\u1EC3 \u0111\u0103ng k\u00FD tr\u1EF1c ti\u1EBFp b\u1EB1ng n\u00FAt \"\u0110\u0103ng k\u00FD ngay\" tr\u00EAn trang kh\u00F3a."
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" disabled>
+                Nhập mã kích hoạt
+              </Button>
+              <Button type="button" variant="outline" disabled>
+                Mua mã / gói quà tặng
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </TabsContent>

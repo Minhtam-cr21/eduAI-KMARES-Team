@@ -1,6 +1,8 @@
 "use client";
 
+import { CourseDetailStatsList } from "@/components/student/course-detail-stats-list";
 import { CourseDetailTabs } from "@/components/student/course-detail-tabs";
+import { lessonTypeStats, levelLabelVi } from "@/lib/courses/lesson-type-stats";
 import { StarRating } from "@/components/student/star-rating";
 import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
@@ -14,16 +16,32 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+type CourseLessonApi = {
+  id: string;
+  title: string;
+  order_index: number | null;
+  video_url: string | null;
+  type?: string | null;
+  time_estimate?: number | null;
+};
+
 type CourseDetailApi = {
   course: Record<string, unknown> & {
     teacher?: unknown;
     category?: unknown;
   };
-  lessons: Array<{
+  lessons: CourseLessonApi[];
+  chapters: Array<{
+    id: string | null;
+    title: unknown;
+    lessons: CourseLessonApi[];
+  }>;
+  benefits: Array<{
     id: string;
+    icon: string | null;
     title: string;
-    order_index: number | null;
-    video_url: string | null;
+    description: string | null;
+    display_order: number | null;
   }>;
   reviews: Array<{
     id: string;
@@ -192,6 +210,13 @@ export default function StudentCourseDetailPage() {
     return m;
   }, [progress]);
 
+  const lessonCounts = useMemo(() => {
+    if (!detail?.lessons) {
+      return { video: 0, textRead: 0, quiz: 0, total: 0, totalMinutes: 0 };
+    }
+    return lessonTypeStats(detail.lessons);
+  }, [detail]);
+
   const firstLessonHref = useMemo(() => {
     const lessons = detail?.lessons ?? [];
     if (lessons.length === 0) return null;
@@ -305,6 +330,14 @@ export default function StudentCourseDetailPage() {
   const requirements = course.requirements as string[] | null;
   const faq = course.faq;
 
+  const highlightsList = Array.isArray(course.highlights)
+    ? (course.highlights as string[]).filter((x) => String(x).trim().length > 0)
+    : null;
+  const outcomesAfterList = Array.isArray(course.outcomes_after)
+    ? (course.outcomes_after as string[]).filter((x) => String(x).trim().length > 0)
+    : null;
+  const highlightBadges = (highlightsList ?? []).slice(0, 4);
+
   const canReview = enrolled && !detail.my_review;
 
   const ctaPrimary = enrolled ? (
@@ -381,7 +414,14 @@ export default function StudentCourseDetailPage() {
           <div className="flex flex-col justify-center p-6 lg:p-10">
             <div className="flex flex-wrap items-center gap-2">
               {category?.name ? <Badge variant="outline">{category.name}</Badge> : null}
-              {level ? <Badge variant="secondary">{level}</Badge> : null}
+              {level ? (
+                <Badge variant="secondary">{levelLabelVi(String(level))}</Badge>
+              ) : null}
+              {highlightBadges.map((h, i) => (
+                <Badge key={i} variant="outline" className="max-w-[200px] truncate font-normal">
+                  {h}
+                </Badge>
+              ))}
             </div>
             <h1 className="mt-3 text-2xl font-bold tracking-tight lg:text-3xl">{title}</h1>
             {description ? (
@@ -428,6 +468,10 @@ export default function StudentCourseDetailPage() {
           <CourseDetailTabs
             courseId={courseId}
             detail={detail}
+            curriculumChapters={detail.chapters}
+            benefitRows={detail.benefits}
+            highlights={highlightsList?.length ? highlightsList : null}
+            outcomesAfter={outcomesAfterList?.length ? outcomesAfterList : null}
             enrolled={enrolled}
             loadingProgress={loadingProgress}
             lessonProgress={lessonProgress}
@@ -472,6 +516,18 @@ export default function StudentCourseDetailPage() {
                   Đã đăng ký
                 </Badge>
               ) : null}
+              <div className="border-t border-border pt-4">
+                <p className="text-muted-foreground mb-2 text-xs font-medium">Nội dung khóa</p>
+                <CourseDetailStatsList durationHours={durationHours} counts={lessonCounts} />
+              </div>
+              <div className="flex flex-col gap-2 border-t border-border pt-4">
+                <Button type="button" variant="outline" className="w-full" disabled>
+                  Kích hoạt mã
+                </Button>
+                <Button type="button" variant="outline" className="w-full" disabled>
+                  Mua mã / voucher
+                </Button>
+              </div>
               <div className="border-t border-border pt-4">
                 <p className="text-muted-foreground text-xs font-medium">Giảng viên</p>
                 {teacher?.full_name ? (
