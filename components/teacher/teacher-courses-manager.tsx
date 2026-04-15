@@ -450,7 +450,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-1">
                       <Link
-                        href={`/teacher/courses/${c.id}/lessons`}
+                        href={`/teacher/courses/${c.id}/curriculum`}
                         className={cn(
                           buttonVariants({ variant: "outline", size: "sm" })
                         )}

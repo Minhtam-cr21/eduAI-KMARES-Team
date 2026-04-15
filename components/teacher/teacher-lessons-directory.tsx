@@ -82,7 +82,7 @@ export function TeacherLessonsDirectory({ lessons }: { lessons: Row[] }) {
               </TableCell>
               <TableCell className="text-right">
                 <Link
-                  href={`/teacher/courses/${l.course_id}/lessons`}
+                  href={`/teacher/courses/${l.course_id}/curriculum`}
                   className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                 >
                   Mở khóa

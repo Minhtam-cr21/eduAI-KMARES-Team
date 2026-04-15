@@ -235,7 +235,7 @@ export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) 
       onSaved?.();
       router.refresh();
       if (parsed.course_id) {
-        router.push(`/teacher/courses/${parsed.course_id}/lessons`);
+        router.push(`/teacher/courses/${parsed.course_id}/curriculum`);
       }
     } finally {
       setPublishing(false);

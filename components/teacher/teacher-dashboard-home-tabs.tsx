@@ -177,7 +177,7 @@ export function TeacherDashboardHomeTabs({
                           </p>
                         </div>
                         <Link
-                          href={`/teacher/courses/${c.id}/lessons`}
+                          href={`/teacher/courses/${c.id}/curriculum`}
                           className={cn(
                             buttonVariants({ variant: "outline", size: "sm" }),
                             "shrink-0"

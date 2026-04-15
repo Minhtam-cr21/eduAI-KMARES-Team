@@ -4,6 +4,124 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+async function assertTeacherOwnsCourse(supabase: ReturnType<typeof createClient>, courseId: string, userId: string) {
+  const { data: course, error: fetchErr } = await supabase
+    .from("courses")
+    .select("id, teacher_id")
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (fetchErr) {
+    return { error: fetchErr.message as string, status: 500 as const };
+  }
+  if (!course) {
+    return { error: "Not found" as string, status: 404 as const };
+  }
+  if (course.teacher_id !== userId) {
+    return { error: "Forbidden" as string, status: 403 as const };
+  }
+  return { course };
+}
+
+/** GET — curriculum tree for teacher editor (all lesson statuses). */
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const gate = await assertTeacherOwnsCourse(supabase, params.id, user.id);
+  if ("error" in gate) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
+  }
+
+  const courseId = params.id;
+
+  const { data: chapterRows, error: cErr } = await supabase
+    .from("course_chapters")
+    .select("id, title, description, order_index")
+    .eq("course_id", courseId)
+    .order("order_index", { ascending: true });
+
+  if (cErr) {
+    return NextResponse.json({ error: cErr.message }, { status: 500 });
+  }
+
+  const { data: lessonRows, error: lErr } = await supabase
+    .from("course_lessons")
+    .select(
+      "id, title, type, content, video_url, time_estimate, order_index, chapter_id, status"
+    )
+    .eq("course_id", courseId)
+    .order("order_index", { ascending: true });
+
+  if (lErr) {
+    return NextResponse.json({ error: lErr.message }, { status: 500 });
+  }
+
+  const lessons = lessonRows ?? [];
+  const chapters = chapterRows ?? [];
+
+  type L = (typeof lessons)[number];
+  const byChapter = new Map<string | null, L[]>();
+  for (const le of lessons) {
+    const k = (le.chapter_id as string | null) ?? null;
+    const arr = byChapter.get(k) ?? [];
+    arr.push(le);
+    byChapter.set(k, arr);
+  }
+
+  const mapLesson = (le: L) => ({
+    id: le.id as string,
+    title: le.title as string,
+    type: (le.type as string) === "video" || (le.type as string) === "quiz" ? le.type : "text",
+    content: (le.content as string | null) ?? null,
+    video_url: (le.video_url as string | null) ?? null,
+    time_estimate: (le.time_estimate as number | null) ?? null,
+    order_index: (le.order_index as number | null) ?? 0,
+  });
+
+  const out: Array<{
+    id: string | null;
+    title: string;
+    description: string | null;
+    order_index: number;
+    lessons: ReturnType<typeof mapLesson>[];
+  }> = chapters.map((ch) => {
+    const o = ch as Record<string, unknown>;
+    const chId = o.id as string;
+    const bucket = byChapter.get(chId) ?? [];
+    bucket.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    return {
+      id: chId,
+      title: String(o.title ?? ""),
+      description: (o.description as string | null) ?? null,
+      order_index: (o.order_index as number | null) ?? 0,
+      lessons: bucket.map(mapLesson),
+    };
+  });
+
+  const orphans = byChapter.get(null) ?? [];
+  if (orphans.length > 0) {
+    orphans.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    out.push({
+      id: null,
+      title: "Nội dung chưa phân chương",
+      description: null,
+      order_index: out.length,
+      lessons: orphans.map(mapLesson),
+    });
+  }
+
+  return NextResponse.json({ chapters: out });
+}
+
 /**
  * PUT — replace curriculum (chapters + lessons) and benefits for a course.
  * Teacher owns course; lessons are saved as status = published.
@@ -20,20 +138,9 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: course, error: fetchErr } = await supabase
-    .from("courses")
-    .select("id, teacher_id")
-    .eq("id", params.id)
-    .maybeSingle();
-
-  if (fetchErr) {
-    return NextResponse.json({ error: fetchErr.message }, { status: 500 });
-  }
-  if (!course) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  if (course.teacher_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const gate = await assertTeacherOwnsCourse(supabase, params.id, user.id);
+  if ("error" in gate) {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
   let body: unknown;
