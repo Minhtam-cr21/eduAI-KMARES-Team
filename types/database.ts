@@ -77,6 +77,8 @@ export interface ConnectionRequest {
   available_time: string | null;
   status: ConnectionRequestStatus;
   teacher_response: string | null;
+  meeting_code?: string | null;
+  meeting_link?: string | null;
   created_at: string;
   responded_at: string | null;
   last_updated?: string | null;

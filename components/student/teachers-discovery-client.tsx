@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TeacherDiscoveryCard } from "@/lib/types/teacher-discovery";
 import { cn } from "@/lib/utils";
 import type { ConnectionRequest } from "@/types/database";
-import { BookOpen, Search, User, Users } from "lucide-react";
+import { BookOpen, ExternalLink, Search, User, Users } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -452,23 +452,47 @@ export function TeachersDiscoveryClient() {
                         Xem profile
                       </Link>
                     </p>
-                    {r.teacher_response ? (
-                      <div className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">
-                          Phản hồi GV:{" "}
-                        </span>
-                        {/^https?:\/\//i.test(r.teacher_response.trim()) ? (
-                          <a
-                            href={r.teacher_response.trim()}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="break-all text-primary underline"
-                          >
-                            {r.teacher_response.trim()}
-                          </a>
-                        ) : (
-                          <span>{r.teacher_response}</span>
-                        )}
+                    {r.status === "accepted" &&
+                    (r.meeting_code || r.meeting_link || r.teacher_response) ? (
+                      <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-2 text-xs text-muted-foreground">
+                        {r.meeting_code ? (
+                          <p>
+                            <span className="font-medium text-foreground">Mã lớp: </span>
+                            <span className="font-mono text-foreground">{r.meeting_code}</span>
+                          </p>
+                        ) : null}
+                        {r.meeting_link ? (
+                          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                            <a
+                              href={r.meeting_link.trim()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="break-all text-primary underline"
+                            >
+                              {r.meeting_link.trim()}
+                            </a>
+                            <a
+                              href={r.meeting_link.trim()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cn(
+                                buttonVariants({ size: "sm" }),
+                                "shrink-0 gap-1 no-underline"
+                              )}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              Tham gia
+                            </a>
+                          </div>
+                        ) : null}
+                        {r.teacher_response ? (
+                          <p>
+                            <span className="font-medium text-foreground">Ghi chú GV: </span>
+                            <span className="whitespace-pre-wrap text-foreground">
+                              {r.teacher_response}
+                            </span>
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
                   </CardContent>

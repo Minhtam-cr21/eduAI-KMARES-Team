@@ -1,6 +1,7 @@
 "use client";
 
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -10,7 +11,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       defaultTheme="light"
       enableSystem={false}
     >
-      {children}
+      <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
       <Toaster richColors position="top-center" />
     </ThemeProvider>
   );

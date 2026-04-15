@@ -35,6 +35,7 @@ export type TeacherCourseRow = {
   created_at: string;
   updated_at: string;
   lesson_count: number;
+  chapter_count: number;
 };
 
 export async function loadTeacherCoursesWithCounts(
@@ -52,6 +53,7 @@ export async function loadTeacherCoursesWithCounts(
   const rows = courses ?? [];
   const ids = rows.map((c) => c.id as string);
   const counts = new Map<string, number>();
+  const chapterCounts = new Map<string, number>();
   if (ids.length > 0) {
     const { data: les, error: lErr } = await supabase
       .from("course_lessons")
@@ -61,6 +63,15 @@ export async function loadTeacherCoursesWithCounts(
     for (const l of les ?? []) {
       const cid = l.course_id as string;
       counts.set(cid, (counts.get(cid) ?? 0) + 1);
+    }
+    const { data: chRows, error: chErr } = await supabase
+      .from("course_chapters")
+      .select("course_id")
+      .in("course_id", ids);
+    if (chErr) throw new Error(chErr.message);
+    for (const c of chRows ?? []) {
+      const cid = c.course_id as string;
+      chapterCounts.set(cid, (chapterCounts.get(cid) ?? 0) + 1);
     }
   }
 
@@ -96,6 +107,7 @@ export async function loadTeacherCoursesWithCounts(
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
       lesson_count: counts.get(row.id as string) ?? 0,
+      chapter_count: chapterCounts.get(row.id as string) ?? 0,
     };
   });
 }

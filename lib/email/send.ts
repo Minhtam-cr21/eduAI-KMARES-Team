@@ -67,6 +67,8 @@ export async function sendConnectionUpdateEmail(
     teacherName: string;
     action: ConnectionUpdateAction;
     teacherResponse?: string | null;
+    meetingLink?: string | null;
+    meetingCode?: string | null;
   }
 ): Promise<void> {
   const verb: Record<ConnectionUpdateAction, string> = {
@@ -84,6 +86,20 @@ export async function sendConnectionUpdateEmail(
   };
 
   const resp = opts.teacherResponse?.trim();
+  const meetLink = opts.meetingLink?.trim();
+  const meetCode = opts.meetingCode?.trim();
+  const meetingBlock =
+    meetLink || meetCode
+      ? `<p>${
+          meetCode
+            ? `Mã lớp: <strong>${escapeHtml(meetCode)}</strong><br/>`
+            : ""
+        }${
+          meetLink
+            ? `Tham gia: <a href="${escapeHtml(meetLink)}">${escapeHtml(meetLink)}</a>`
+            : ""
+        }</p>`
+      : "";
   const linkBlock =
     resp && /^https?:\/\//i.test(resp)
       ? `<p>Link liên hệ: <a href="${escapeHtml(resp)}">${escapeHtml(resp)}</a></p>`
@@ -96,6 +112,7 @@ export async function sendConnectionUpdateEmail(
     subject: subjectMap[opts.action],
     html: `<p>Xin chào,</p>
 <p><strong>${escapeHtml(opts.teacherName)}</strong> ${verb[opts.action]}.</p>
+${meetingBlock}
 ${linkBlock}
 <p>Vào mục <strong>Kết nối giáo viên</strong> trên EduAI để xem chi tiết.</p>`,
   });

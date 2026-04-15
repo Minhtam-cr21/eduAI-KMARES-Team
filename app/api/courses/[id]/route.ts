@@ -27,7 +27,27 @@ export async function GET(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: course, error: cErr } = await supabase
+  let allowUnpublished = false;
+  if (user) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (prof?.role === "admin") {
+      allowUnpublished = true;
+    } else if (prof?.role === "teacher") {
+      const { data: own } = await supabase
+        .from("courses")
+        .select("id")
+        .eq("id", params.id)
+        .eq("teacher_id", user.id)
+        .maybeSingle();
+      allowUnpublished = !!own;
+    }
+  }
+
+  let courseQuery = supabase
     .from("courses")
     .select(
       `
@@ -41,9 +61,13 @@ export async function GET(
       profiles!courses_teacher_id_fkey ( id, full_name, avatar_url )
     `
     )
-    .eq("id", params.id)
-    .eq("is_published", true)
-    .maybeSingle();
+    .eq("id", params.id);
+
+  if (!allowUnpublished) {
+    courseQuery = courseQuery.eq("is_published", true);
+  }
+
+  const { data: course, error: cErr } = await courseQuery.maybeSingle();
 
   if (cErr) {
     return NextResponse.json({ error: cErr.message }, { status: 500 });

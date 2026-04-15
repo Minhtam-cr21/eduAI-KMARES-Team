@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +66,7 @@ type ApiLesson = {
   content: string | null;
   video_url: string | null;
   time_estimate: number | null;
+  is_free_preview?: boolean;
   order_index: number;
   quiz?: {
     id: string;
@@ -93,6 +95,7 @@ type EdLesson = {
   content: string | null;
   video_url: string | null;
   time_estimate: number | null;
+  is_free_preview: boolean;
 };
 
 type EdChapter = {
@@ -122,6 +125,7 @@ function apiToState(rows: ApiChapter[]): EdChapter[] {
       content: le.content,
       video_url: le.video_url,
       time_estimate: le.time_estimate,
+      is_free_preview: le.is_free_preview === true,
     })),
   }));
 }
@@ -141,6 +145,7 @@ function toPayload(chapters: EdChapter[]) {
         video_url: le.video_url?.trim() || null,
         time_estimate:
           le.time_estimate != null && le.time_estimate >= 0 ? le.time_estimate : null,
+        is_free_preview: le.is_free_preview === true,
         order_index: li,
       })),
     })),
@@ -219,6 +224,11 @@ function SortableLessonRow({
       </button>
       <LessonTypeIcon type={lesson.type} />
       <span className="min-w-0 flex-1 truncate font-medium">{lesson.title}</span>
+      {lesson.is_free_preview ? (
+        <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
+          Xem trư��c
+        </Badge>
+      ) : null}
       <span className="text-muted-foreground shrink-0 tabular-nums text-xs">{mins}</span>
       <Button
         type="button"
@@ -379,6 +389,7 @@ export function CurriculumEditor({
   const [formVideo, setFormVideo] = useState("");
   const [formContent, setFormContent] = useState("");
   const [formMins, setFormMins] = useState("");
+  const [formFreePreview, setFormFreePreview] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -506,6 +517,7 @@ export function CurriculumEditor({
     setFormVideo("");
     setFormContent("");
     setFormMins("");
+    setFormFreePreview(false);
     setLessonModal({ mode: "create", chapterClientId });
   }
 
@@ -519,6 +531,7 @@ export function CurriculumEditor({
         ? String(lesson.time_estimate)
         : ""
     );
+    setFormFreePreview(lesson.is_free_preview === true);
     setLessonModal({ mode: "edit", chapterClientId, lesson });
   }
 
@@ -544,6 +557,7 @@ export function CurriculumEditor({
             content: formContent.trim() || null,
             video_url: formVideo.trim() || null,
             time_estimate: timeEst,
+            is_free_preview: formFreePreview,
           };
           return { ...ch, lessons: [...ch.lessons, nu] };
         }
@@ -558,6 +572,7 @@ export function CurriculumEditor({
                   content: formContent.trim() || null,
                   video_url: formVideo.trim() || null,
                   time_estimate: timeEst,
+                  is_free_preview: formFreePreview,
                 }
               : l
           ),
@@ -777,6 +792,16 @@ export function CurriculumEditor({
                 value={formMins}
                 onChange={(e) => setFormMins(e.target.value)}
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="m-free"
+                checked={formFreePreview}
+                onCheckedChange={(v) => setFormFreePreview(v === true)}
+              />
+              <Label htmlFor="m-free" className="cursor-pointer text-sm font-normal">
+                {"Cho ph\u00e9p xem tr\u01b0\u1edbc (ch\u01b0a \u0111\u0103ng k\u00fd)"}
+              </Label>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="m-content">Nội dung / mô tả</Label>

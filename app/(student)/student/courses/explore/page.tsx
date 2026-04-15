@@ -9,7 +9,6 @@ import { CourseGrid } from "@/components/student/course-grid";
 import { BackButton } from "@/components/ui/back-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PaginationBar } from "@/components/ui/pagination";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { BookOpen } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -52,7 +51,9 @@ export default function ExploreCoursesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [highlightCourseId, setHighlightCourseId] = useState<string | null>(null);
+  const [highlightCourseId, setHighlightCourseId] = useState<string | null>(
+    null,
+  );
   const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set());
   const [enrollmentFilter, setEnrollmentFilter] = useState<
     "all" | "enrolled" | "not_enrolled"
@@ -65,7 +66,10 @@ export default function ExploreCoursesPage() {
   }, []);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 300);
+    const t = window.setTimeout(
+      () => setDebouncedSearch(searchInput.trim()),
+      300,
+    );
     return () => window.clearTimeout(t);
   }, [searchInput]);
 
@@ -121,7 +125,7 @@ export default function ExploreCoursesPage() {
       const enrollQ =
         enrollmentFilter !== "all" ? `&enrollment=${enrollmentFilter}` : "";
       const res = await fetch(
-        `/api/courses?page=${page}&limit=${PAGE_SIZE}${catQ}${searchQ}${enrollQ}`
+        `/api/courses?page=${page}&limit=${PAGE_SIZE}${catQ}${searchQ}${enrollQ}`,
       );
       const j = (await res.json()) as CatalogResponse;
       if (!res.ok) {
@@ -177,111 +181,112 @@ export default function ExploreCoursesPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <TooltipProvider delayDuration={200}>
-        <BackButton fallbackHref="/student" className="mb-4" />
+      <BackButton fallbackHref="/student" className="mb-4" />
 
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400">
-              <BookOpen className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Khám phá khóa học</h1>
-              <p className="text-sm text-muted-foreground">
-                Lọc theo danh mục — đăng ký hoặc tiếp tục học.
-              </p>
-            </div>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400">
+            <BookOpen className="h-5 w-5" />
           </div>
-          <Link
-            href="/student/courses"
-            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            Khóa của tôi
-          </Link>
-        </div>
-
-        <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-          <aside className="w-full shrink-0 space-y-4 rounded-xl border border-border bg-card p-4 lg:w-64">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Danh mục
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Khám phá khóa học
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Lọc theo danh mục — đăng ký hoặc tiếp tục học.
             </p>
-            <CourseFilterBar
-              categories={categories}
-              categoriesLoading={catLoading}
-              categorySlug={categorySlug}
-              onCategoryChange={setCategorySlug}
-              search={searchInput}
-              onSearchChange={setSearchInput}
-              searchPlaceholder="Tìm theo tên khóa học…"
-            />
-            <div className="space-y-2 border-t border-border pt-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Ghi danh
-              </p>
-              <div className="flex flex-col gap-1 text-sm">
-                {(
-                  [
-                    ["all", "Tất cả"],
-                    ["enrolled", "Đã đăng ký"],
-                    ["not_enrolled", "Chưa đăng ký"],
-                  ] as const
-                ).map(([val, lab]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setEnrollmentFilter(val)}
-                    className={`rounded-lg px-3 py-2 text-left transition ${
-                      enrollmentFilter === val
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted"
-                    }`}
-                  >
-                    {lab}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </aside>
-
-          <div className="min-w-0 flex-1">
-            {loading ? (
-              <CourseSkeleton />
-            ) : courses.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center py-12 text-center">
-                  <BookOpen className="mb-3 h-10 w-10 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">
-                    Không có khóa học phù hợp. Thử bộ lọc hoặc từ khóa khác.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <CourseGrid>
-                {courses.map((c) => (
-                  <StudentCourseCard
-                    key={c.id}
-                    course={c}
-                    enrolled={enrolledIds.has(c.id)}
-                    highlight={highlightCourseId === c.id}
-                    onEnrollSuccess={refreshEnrolled}
-                  />
-                ))}
-              </CourseGrid>
-            )}
-
-            <PaginationBar
-              page={page}
-              totalPages={totalPages}
-              onPageChange={setPage}
-            />
-
-            {count != null && !loading ? (
-              <p className="text-muted-foreground mt-4 text-center text-xs">
-                {count} khóa học trong catalog
-              </p>
-            ) : null}
           </div>
         </div>
-      </TooltipProvider>
+        <Link
+          href="/student/courses"
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          Khóa của tôi
+        </Link>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
+        <aside className="w-full shrink-0 space-y-4 rounded-xl border border-border bg-card p-4 lg:w-64">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Danh mục
+          </p>
+          <CourseFilterBar
+            categories={categories}
+            categoriesLoading={catLoading}
+            categorySlug={categorySlug}
+            onCategoryChange={setCategorySlug}
+            search={searchInput}
+            onSearchChange={setSearchInput}
+            searchPlaceholder="Tìm theo tên khóa học…"
+          />
+          <div className="space-y-2 border-t border-border pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Ghi danh
+            </p>
+            <div className="flex flex-col gap-1 text-sm">
+              {(
+                [
+                  ["all", "Tất cả"],
+                  ["enrolled", "Đã đăng ký"],
+                  ["not_enrolled", "Chưa đăng ký"],
+                ] as const
+              ).map(([val, lab]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setEnrollmentFilter(val)}
+                  className={`rounded-lg px-3 py-2 text-left transition ${
+                    enrollmentFilter === val
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted"
+                  }`}
+                >
+                  {lab}
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          {loading ? (
+            <CourseSkeleton />
+          ) : courses.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center py-12 text-center">
+                <BookOpen className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">
+                  Không có khóa học phù hợp. Thử bộ lọc hoặc từ khóa khác.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <CourseGrid>
+              {courses.map((c) => (
+                <StudentCourseCard
+                  key={c.id}
+                  course={c}
+                  enrolled={enrolledIds.has(c.id)}
+                  highlight={highlightCourseId === c.id}
+                  onEnrollSuccess={refreshEnrolled}
+                />
+              ))}
+            </CourseGrid>
+          )}
+
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+
+          {count != null && !loading ? (
+            <p className="text-muted-foreground mt-4 text-center text-xs">
+              {count} khóa học trong catalog
+            </p>
+          ) : null}
+        </div>
+      </div>
     </main>
   );
 }

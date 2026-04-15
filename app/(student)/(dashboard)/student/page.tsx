@@ -25,8 +25,6 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { TooltipProvider } from "@/components/ui/tooltip";
-
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/student", icon: LayoutDashboard },
   { label: "Quiz", href: "/quizzes", icon: ClipboardList },
@@ -288,18 +286,16 @@ export default function StudentDashboardPage() {
               .
             </p>
           ) : (
-            <TooltipProvider delayDuration={200}>
-              <div className="-mx-1 flex gap-4 overflow-x-auto pb-2 pt-1 [scrollbar-width:thin]">
-                {suggested.slice(0, 6).map((c) => (
-                  <div
-                    key={c.id}
-                    className="w-[min(100%,280px)] shrink-0 px-1 sm:w-[260px]"
-                  >
-                    <StudentCourseCard course={c} enrolled={enrolledIds.has(c.id)} />
-                  </div>
-                ))}
-              </div>
-            </TooltipProvider>
+            <div className="-mx-1 flex gap-4 overflow-x-auto pb-2 pt-1 [scrollbar-width:thin]">
+              {suggested.slice(0, 6).map((c) => (
+                <div
+                  key={c.id}
+                  className="w-[min(100%,280px)] shrink-0 px-1 sm:w-[260px]"
+                >
+                  <StudentCourseCard course={c} enrolled={enrolledIds.has(c.id)} />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </section>

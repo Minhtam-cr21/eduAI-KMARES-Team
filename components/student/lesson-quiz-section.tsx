@@ -84,7 +84,7 @@ export function LessonQuizSection({
     if (!quiz) return;
     for (let i = 0; i < quiz.questions.length; i++) {
       if (!answers[i]) {
-        toast.error("Please answer question " + (i + 1));
+        toast.error("Vui lòng trả lời câu " + (i + 1));
         return;
       }
     }
@@ -106,7 +106,7 @@ export function LessonQuizSection({
         details?: DetailRow[];
       };
       if (!res.ok) {
-        toast.error(j.error ?? "Submit failed");
+        toast.error(j.error ?? "Nộp bài thất bại");
         return;
       }
       setResult({
@@ -116,7 +116,7 @@ export function LessonQuizSection({
         details: j.details ?? [],
       });
       setMode("done");
-      toast.success("Score: " + j.score + "%");
+      toast.success("Điểm: " + j.score + "%");
     } finally {
       setSubmitting(false);
     }
@@ -141,13 +141,13 @@ export function LessonQuizSection({
       ) : null}
       {quiz.time_limit != null ? (
         <p className="text-muted-foreground mt-1 text-xs">
-          Suggested time: {quiz.time_limit} min - Pass at {quiz.passing_score ?? 70}%
+          Thời gian gợi ý: {quiz.time_limit} phút · Ngưỡng đạt: {quiz.passing_score ?? 70}%
         </p>
       ) : null}
 
       {mode === "idle" ? (
         <Button type="button" className="mt-4" onClick={startQuiz}>
-          Take quiz
+          Làm bài kiểm tra
         </Button>
       ) : null}
 
@@ -188,16 +188,16 @@ export function LessonQuizSection({
           ))}
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={() => setMode("idle")}>
-              Cancel
+              Hủy
             </Button>
             <Button type="button" onClick={() => void submit()} disabled={submitting}>
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Grading...
+                  Đang chấm điểm...
                 </>
               ) : (
-                "Submit"
+                "Nộp bài"
               )}
             </Button>
           </div>
@@ -215,16 +215,16 @@ export function LessonQuizSection({
             )}
           >
             <p className="font-semibold">
-              Score: {result.score}% (need {result.passing_score}% to pass)
+              Điểm: {result.score}% (cần {result.passing_score}% để đạt)
             </p>
             <p className="mt-1">
               {result.passed
-                ? "You passed."
-                : "Not passed yet — review explanations below."}
+                ? "Bạn đã đạt yêu cầu."
+                : "Chưa đạt — xem giải thích bên dưới."}
             </p>
           </div>
           <div className="space-y-4">
-            <Label className="text-base font-semibold">Review</Label>
+            <Label className="text-base font-semibold">Chi tiết bài làm</Label>
             {result.details.map((d) => (
               <div
                 key={d.index}
@@ -236,14 +236,15 @@ export function LessonQuizSection({
                 )}
               >
                 <p className="font-medium">
-                  Q{d.index + 1}: {d.correct ? "Correct" : "Wrong"}
+                  Câu {d.index + 1}: {d.correct ? "Đúng" : "Sai"}
                 </p>
                 <p className="text-muted-foreground mt-1">
-                  Your answer: <span className="text-foreground">{d.userAnswer || "—"}</span>
+                  Bạn đã chọn:{" "}
+                  <span className="text-foreground">{d.userAnswer || "—"}</span>
                 </p>
                 {!d.correct ? (
                   <p className="mt-1">
-                    Correct:{" "}
+                    Đáp án đúng:{" "}
                     <span className="font-medium text-foreground">{d.correctAnswer}</span>
                   </p>
                 ) : null}
@@ -252,7 +253,7 @@ export function LessonQuizSection({
             ))}
           </div>
           <Button type="button" variant="outline" onClick={startQuiz}>
-            Retry
+            Làm lại
           </Button>
         </div>
       ) : null}

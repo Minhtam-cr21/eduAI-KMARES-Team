@@ -380,6 +380,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                 <TableHead className="text-right">Giờ</TableHead>
                 <TableHead>Cấp độ</TableHead>
                 <TableHead>Catalog / AI</TableHead>
+                <TableHead className="text-right">Chương</TableHead>
                 <TableHead className="text-right">Bài học</TableHead>
                 <TableHead className="text-right tabular-nums">Ngày tạo</TableHead>
                 <TableHead className="text-right">Thao tác</TableHead>
@@ -389,7 +390,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
               {filteredCourses.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={9}
+                    colSpan={10}
                     className="text-center text-muted-foreground"
                   >
                     Không có khóa học khớp bộ lọc.
@@ -440,6 +441,9 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                         </Badge>
                       ) : null}
                     </div>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {c.chapter_count ?? 0}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {c.lesson_count}

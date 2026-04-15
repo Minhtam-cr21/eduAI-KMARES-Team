@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Trash2, Users } from "lucide-react";
+import { Loader2, Trash2, Users, Video } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -32,6 +32,8 @@ export type ConnectionRow = {
   created_at: string;
   responded_at: string | null;
   teacher_response: string | null;
+  meeting_code: string | null;
+  meeting_link: string | null;
   student_name: string | null;
 };
 
@@ -83,11 +85,17 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
   const [rejectCtx, setRejectCtx] = useState<RejectCtx | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [editLinkId, setEditLinkId] = useState<string | null>(null);
-  const [editLinkValue, setEditLinkValue] = useState("");
+  const [editMeetCode, setEditMeetCode] = useState("");
+  const [editMeetLink, setEditMeetLink] = useState("");
+  const [editNote, setEditNote] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [pathGate, setPathGate] = useState<PathGateCtx | null>(null);
   const [cancelPathWithGate, setCancelPathWithGate] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [acceptUseAuto, setAcceptUseAuto] = useState(true);
+  const [acceptMeetCode, setAcceptMeetCode] = useState("");
+  const [acceptMeetLink, setAcceptMeetLink] = useState("");
+  const [acceptNote, setAcceptNote] = useState("");
 
   useEffect(() => {
     setRows(initialRows);
@@ -96,6 +104,15 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
   useEffect(() => {
     if (pathGate) setCancelPathWithGate(true);
   }, [pathGate]);
+
+  useEffect(() => {
+    if (respondId) {
+      setAcceptUseAuto(true);
+      setAcceptMeetCode("");
+      setAcceptMeetLink("");
+      setAcceptNote("");
+    }
+  }, [respondId]);
 
   const responding = rows.find((r) => r.id === respondId);
   const editing = rows.find((r) => r.id === editLinkId);
@@ -136,13 +153,44 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
     return true;
   }
 
-  async function submitAccept(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function prefetchJitsiForAccept() {
     if (!respondId) return;
-    const fd = new FormData(e.currentTarget);
-    const link = String(fd.get("teacher_response") ?? "").trim();
-    if (!link) {
-      toast.error("Nhập link liên hệ (Zalo/Meet/…).");
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/connection-requests/${respondId}/generate-meeting`,
+        { method: "POST" }
+      );
+      const j = (await res.json()) as {
+        meeting_code?: string;
+        meeting_link?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(j.error ?? "Không tạo được phòng");
+        return;
+      }
+      setAcceptUseAuto(false);
+      setAcceptMeetCode(j.meeting_code ?? "");
+      setAcceptMeetLink(j.meeting_link ?? "");
+      toast.success("Đã tạo phòng Jitsi — kiểm tra và gửi");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitAccept() {
+    if (!respondId) return;
+    const code = acceptMeetCode.trim();
+    const link = acceptMeetLink.trim();
+    const note = acceptNote.trim();
+    if (
+      !acceptUseAuto &&
+      !code &&
+      !link &&
+      !note
+    ) {
+      toast.error("Chọn tạo phòng tự động, hoặc nhập mã/link/ghi chú.");
       return;
     }
     setLoading(true);
@@ -150,7 +198,13 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
       const res = await fetch(`/api/connection-requests/${respondId}/respond`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "accepted", teacher_response: link }),
+        body: JSON.stringify({
+          status: "accepted",
+          generate_meeting: acceptUseAuto,
+          teacher_response: note || null,
+          meeting_code: acceptUseAuto ? null : code || null,
+          meeting_link: acceptUseAuto ? null : link || null,
+        }),
       });
       const j = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -198,12 +252,39 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
     }
   }
 
-  async function submitEditLink(e: React.FormEvent) {
+  async function prefetchJitsiForEdit() {
+    if (!editLinkId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/connection-requests/${editLinkId}/generate-meeting`,
+        { method: "POST" }
+      );
+      const j = (await res.json()) as {
+        meeting_code?: string;
+        meeting_link?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(j.error ?? "Không tạo được phòng");
+        return;
+      }
+      setEditMeetCode(j.meeting_code ?? "");
+      setEditMeetLink(j.meeting_link ?? "");
+      toast.success("Đã tạo phòng Jitsi mới");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitEditMeeting(e: React.FormEvent) {
     e.preventDefault();
     if (!editLinkId) return;
-    const link = editLinkValue.trim();
-    if (!link) {
-      toast.error("Nhập link liên hệ.");
+    const code = editMeetCode.trim();
+    const link = editMeetLink.trim();
+    const note = editNote.trim();
+    if (!code && !link && !note) {
+      toast.error("Nhập mã, link phòng hoặc ghi chú.");
       return;
     }
     setLoading(true);
@@ -211,16 +292,24 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
       const res = await fetch(`/api/connection-requests/${editLinkId}/respond`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "accepted", teacher_response: link }),
+        body: JSON.stringify({
+          status: "accepted",
+          generate_meeting: false,
+          meeting_code: code || null,
+          meeting_link: link || null,
+          teacher_response: note || null,
+        }),
       });
       const j = (await res.json()) as { error?: string };
       if (!res.ok) {
         toast.error(j.error ?? "Không cập nhật được");
         return;
       }
-      toast.success("Đã cập nhật link");
+      toast.success("Đã cập nhật phòng họp");
       setEditLinkId(null);
-      setEditLinkValue("");
+      setEditMeetCode("");
+      setEditMeetLink("");
+      setEditNote("");
       router.refresh();
     } finally {
       setLoading(false);
@@ -291,7 +380,9 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
 
   function openEditLink(r: ConnectionRow) {
     setEditLinkId(r.id);
-    setEditLinkValue(r.teacher_response?.trim() ?? "");
+    setEditMeetCode(r.meeting_code?.trim() ?? "");
+    setEditMeetLink(r.meeting_link?.trim() ?? "");
+    setEditNote(r.teacher_response?.trim() ?? "");
   }
 
   function openReject(r: ConnectionRow, fromAccepted: boolean) {
@@ -370,22 +461,37 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                   </p>
                 )}
 
-                {r.status !== "pending" && r.teacher_response ? (
-                  <p className="text-xs text-muted-foreground">
-                    Đã gửi link/phản hồi:{" "}
-                    {/^https?:\/\//i.test(r.teacher_response.trim()) ? (
-                      <a
-                        href={r.teacher_response.trim()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline"
-                      >
-                        {r.teacher_response.trim()}
-                      </a>
-                    ) : (
-                      <span className="text-foreground">{r.teacher_response}</span>
-                    )}
-                  </p>
+                {r.status !== "pending" &&
+                (r.meeting_code || r.meeting_link || r.teacher_response) ? (
+                  <div className="space-y-1 rounded-md border border-border/60 bg-muted/30 p-2 text-xs text-muted-foreground">
+                    {r.meeting_code ? (
+                      <p>
+                        <span className="font-medium text-foreground">Mã lớp: </span>
+                        <span className="font-mono text-foreground">{r.meeting_code}</span>
+                      </p>
+                    ) : null}
+                    {r.meeting_link ? (
+                      <p>
+                        <span className="font-medium text-foreground">Phòng họp: </span>
+                        <a
+                          href={r.meeting_link.trim()}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="break-all text-primary underline"
+                        >
+                          {r.meeting_link.trim()}
+                        </a>
+                      </p>
+                    ) : null}
+                    {r.teacher_response ? (
+                      <p>
+                        <span className="font-medium text-foreground">Ghi chú: </span>
+                        <span className="whitespace-pre-wrap text-foreground">
+                          {r.teacher_response}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -410,7 +516,7 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                         variant="outline"
                         onClick={() => openEditLink(r)}
                       >
-                        Sửa link
+                        Sửa phòng họp
                       </Button>
                       <Button
                         size="sm"
@@ -440,31 +546,88 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
       )}
 
       <Dialog open={!!respondId} onOpenChange={(o) => !o && setRespondId(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Chấp nhận kết nối</DialogTitle>
           </DialogHeader>
           {responding ? (
-            <form onSubmit={(e) => void submitAccept(e)} className="space-y-3">
+            <div className="space-y-4">
               <p className="text-sm text-muted-foreground">{responding.goal}</p>
+              <div className="flex items-start gap-2 rounded-md border border-border p-3">
+                <Checkbox
+                  id="accept-auto"
+                  checked={acceptUseAuto}
+                  onCheckedChange={(v) => setAcceptUseAuto(v === true)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="accept-auto" className="cursor-pointer text-sm font-medium">
+                    Tạo phòng Jitsi tự động (khuyến nghị)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Hệ thống sinh mã lớp và link tham gia; không cần dán link thủ công.
+                  </p>
+                </div>
+              </div>
+              {!acceptUseAuto ? (
+                <div className="space-y-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5"
+                    disabled={loading}
+                    onClick={() => void prefetchJitsiForAccept()}
+                  >
+                    <Video className="h-3.5 w-3.5" />
+                    Sinh phòng Jitsi
+                  </Button>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="acc-code">Mã lớp (tùy chọn)</Label>
+                    <Input
+                      id="acc-code"
+                      value={acceptMeetCode}
+                      onChange={(e) => setAcceptMeetCode(e.target.value)}
+                      placeholder="VD: ABC123"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="acc-link">Link phòng (tùy chọn)</Label>
+                    <Input
+                      id="acc-link"
+                      value={acceptMeetLink}
+                      onChange={(e) => setAcceptMeetLink(e.target.value)}
+                      placeholder="https://…"
+                    />
+                  </div>
+                </div>
+              ) : null}
               <div className="space-y-1.5">
-                <Label htmlFor="link">Link liên hệ (Zalo / Meet / …)</Label>
-                <Input
-                  id="link"
-                  name="teacher_response"
-                  required
-                  placeholder="https://..."
+                <Label htmlFor="acc-note">Ghi chú thêm (tùy chọn)</Label>
+                <Textarea
+                  id="acc-note"
+                  value={acceptNote}
+                  onChange={(e) => setAcceptNote(e.target.value)}
+                  placeholder="Lịch hẹn, kênh Zalo, …"
+                  className="min-h-[72px]"
                 />
               </div>
-              <DialogFooter>
+              <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" onClick={() => setRespondId(null)}>
                   Huỷ
                 </Button>
-                <Button type="submit" disabled={loading}>
-                  Gửi
+                <Button type="button" disabled={loading} onClick={() => void submitAccept()}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang gửi…
+                    </>
+                  ) : (
+                    "Xác nhận chấp nhận"
+                  )}
                 </Button>
               </DialogFooter>
-            </form>
+            </div>
           ) : null}
         </DialogContent>
       </Dialog>
@@ -566,24 +729,54 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
         onOpenChange={(o) => {
           if (!o) {
             setEditLinkId(null);
-            setEditLinkValue("");
+            setEditMeetCode("");
+            setEditMeetLink("");
+            setEditNote("");
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Sửa link liên hệ</DialogTitle>
+            <DialogTitle>Cập nhật phòng họp</DialogTitle>
           </DialogHeader>
           {editing ? (
-            <form onSubmit={(e) => void submitEditLink(e)} className="space-y-3">
+            <form onSubmit={(e) => void submitEditMeeting(e)} className="space-y-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="gap-1.5"
+                disabled={loading}
+                onClick={() => void prefetchJitsiForEdit()}
+              >
+                <Video className="h-3.5 w-3.5" />
+                Tạo phòng Jitsi mới
+              </Button>
               <div className="space-y-1.5">
-                <Label htmlFor="edit-link">Link mới</Label>
+                <Label htmlFor="edit-code">Mã lớp</Label>
                 <Input
-                  id="edit-link"
-                  value={editLinkValue}
-                  onChange={(e) => setEditLinkValue(e.target.value)}
-                  required
-                  placeholder="https://..."
+                  id="edit-code"
+                  value={editMeetCode}
+                  onChange={(e) => setEditMeetCode(e.target.value)}
+                  placeholder="Mã hiển thị cho HS"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-meet-link">Link phòng</Label>
+                <Input
+                  id="edit-meet-link"
+                  value={editMeetLink}
+                  onChange={(e) => setEditMeetLink(e.target.value)}
+                  placeholder="https://…"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-note">Ghi chú</Label>
+                <Textarea
+                  id="edit-note"
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                  className="min-h-[64px]"
                 />
               </div>
               <DialogFooter>
@@ -592,7 +785,9 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                   variant="outline"
                   onClick={() => {
                     setEditLinkId(null);
-                    setEditLinkValue("");
+                    setEditMeetCode("");
+                    setEditMeetLink("");
+                    setEditNote("");
                   }}
                 >
                   Huỷ

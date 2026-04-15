@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -45,7 +44,11 @@ export function useTeacherNavItems(badges: {
     { href: "/teacher/lessons", label: "Bài học", icon: ListVideo },
     { href: "/teacher/connections", label: "Yêu cầu kết nối", icon: Link2 },
     { href: "/teacher/students", label: "Học sinh", icon: Users },
-    { href: "/teacher/personalized-paths", label: "Lộ trình cá nhân", icon: GitBranch },
+    {
+      href: "/teacher/personalized-paths",
+      label: "Lộ trình cá nhân",
+      icon: GitBranch,
+    },
     {
       href: "/teacher/ai-roadmaps",
       label: "Lộ trình AI",
@@ -79,7 +82,7 @@ function CollapsedNavLinks({ items }: { items: TeacherNavItem[] }) {
                   "flex h-11 w-11 items-center justify-center rounded-lg transition-colors",
                   active
                     ? "bg-primary/12 text-primary"
-                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
                 )}
               >
                 <Icon className="h-5 w-5" />
@@ -103,68 +106,66 @@ export function TeacherSidebarDesktop({
   navItems: TeacherNavItem[];
 }) {
   return (
-    <TooltipProvider delayDuration={0}>
-      <motion.aside
-        initial={false}
-        animate={{ width: collapsed ? 72 : 256 }}
-        transition={{ type: "spring", stiffness: 380, damping: 32 }}
-        className="relative hidden h-screen shrink-0 border-r border-border/80 bg-card/95 backdrop-blur-md md:flex md:flex-col"
+    <motion.aside
+      initial={false}
+      animate={{ width: collapsed ? 72 : 256 }}
+      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+      className="relative hidden h-screen shrink-0 border-r border-border/80 bg-card/95 backdrop-blur-md md:flex md:flex-col"
+    >
+      <div
+        className={cn(
+          "flex h-14 items-center border-b border-border/60 px-3",
+          collapsed ? "justify-center" : "gap-2",
+        )}
       >
-        <div
+        <Link
+          href="/teacher"
           className={cn(
-            "flex h-14 items-center border-b border-border/60 px-3",
-            collapsed ? "justify-center" : "gap-2"
+            "flex items-center gap-2 font-semibold text-foreground",
+            collapsed && "justify-center",
           )}
         >
-          <Link
-            href="/teacher"
-            className={cn(
-              "flex items-center gap-2 font-semibold text-foreground",
-              collapsed && "justify-center"
-            )}
-          >
-            <Image
-              src="/images/logo.png"
-              alt=""
-              width={32}
-              height={32}
-              className="h-8 w-8 rounded-lg"
-            />
-            {!collapsed ? (
-              <span className="truncate text-sm">EduAI Teacher</span>
-            ) : null}
-          </Link>
-        </div>
+          <Image
+            src="/images/logo.png"
+            alt=""
+            width={32}
+            height={32}
+            className="h-8 w-8 rounded-lg"
+          />
+          {!collapsed ? (
+            <span className="truncate text-sm">EduAI Teacher</span>
+          ) : null}
+        </Link>
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto p-2">
+        {collapsed ? (
+          <CollapsedNavLinks items={navItems} />
+        ) : (
+          <TeacherNavLinks items={navItems} />
+        )}
+      </div>
+
+      <div className="border-t border-border/60 p-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={cn("w-full gap-2", collapsed && "px-0")}
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
+        >
           {collapsed ? (
-            <CollapsedNavLinks items={navItems} />
+            <ChevronRight className="h-4 w-4" />
           ) : (
-            <TeacherNavLinks items={navItems} />
+            <>
+              <ChevronLeft className="h-4 w-4" />
+              <span className="text-xs">Thu gọn</span>
+            </>
           )}
-        </div>
-
-        <div className="border-t border-border/60 p-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={cn("w-full gap-2", collapsed && "px-0")}
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <>
-                <ChevronLeft className="h-4 w-4" />
-                <span className="text-xs">Thu gọn</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </motion.aside>
-    </TooltipProvider>
+        </Button>
+      </div>
+    </motion.aside>
   );
 }
 

@@ -7,6 +7,7 @@ const lessonStruct = z.object({
   content: z.string().nullish(),
   video_url: z.string().nullish(),
   time_estimate: z.coerce.number().int().min(0).max(24 * 60).nullish(),
+  is_free_preview: z.boolean().optional(),
   order_index: z.coerce.number().int().min(0),
 });
 

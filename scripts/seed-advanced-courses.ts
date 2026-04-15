@@ -1476,15 +1476,17 @@ async function upsertCourseStructure(
             );
           } else {
             for (let i = 0; i < data.length; i++) {
-              await upsertQuizForLesson(
-                client,
-                courseId,
-                data[i].id as string,
-                data[i].title as string,
-                sourceLessons[i],
-                teacherId,
-                quizSalt++
-              );
+              if (sourceLessons[i].type === "quiz") {
+                await upsertQuizForLesson(
+                  client,
+                  courseId,
+                  data[i].id as string,
+                  data[i].title as string,
+                  sourceLessons[i],
+                  teacherId,
+                  quizSalt++
+                );
+              }
             }
           }
         }

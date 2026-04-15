@@ -72,7 +72,7 @@ export async function GET(
   const { data: lessonRows, error: lErr } = await supabase
     .from("course_lessons")
     .select(
-      "id, title, type, content, video_url, time_estimate, order_index, chapter_id, status"
+      "id, title, type, content, video_url, time_estimate, is_free_preview, order_index, chapter_id, status"
     )
     .eq("course_id", courseId)
     .order("order_index", { ascending: true });
@@ -136,6 +136,7 @@ export async function GET(
       content: (le.content as string | null) ?? null,
       video_url: (le.video_url as string | null) ?? null,
       time_estimate: (le.time_estimate as number | null) ?? null,
+      is_free_preview: Boolean((le as { is_free_preview?: boolean }).is_free_preview),
       order_index: (le.order_index as number | null) ?? 0,
       quiz: q
         ? {
@@ -347,6 +348,7 @@ export async function PUT(
           content,
           video_url: video,
           time_estimate: le.time_estimate ?? null,
+          is_free_preview: le.is_free_preview === true,
           order_index: le.order_index,
           status: "published" as const,
         };
