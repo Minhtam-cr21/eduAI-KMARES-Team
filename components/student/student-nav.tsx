@@ -8,6 +8,7 @@ const baseNav = [
   { href: "/assessment", label: "Trắc nghiệm cá nhân" },
   { href: "/profile", label: "Profile" },
   { href: "/student/teachers", label: "Kết nối GV" },
+  { href: "/student/connections", label: "Yêu cầu kết nối" },
   { href: "/personalized-roadmap", label: "Lộ trình" },
 ] as const;
 

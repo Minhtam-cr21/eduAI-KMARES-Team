@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -12,14 +12,26 @@ export function generateClassCode(length = 6): string {
   return s;
 }
 
-/** Random Jitsi room URL + display code. */
-export function createJitsiMeeting(): { meeting_code: string; meeting_link: string } {
-  const meeting_code = generateClassCode(6);
-  const entropy = randomBytes(5).toString("hex");
-  const room = `EduAI-${meeting_code}-${entropy}`;
+export function jitsiRoomUrl(roomId: string): string {
+  const id = roomId.trim();
+  if (!id) return "";
+  return `https://meet.jit.si/${encodeURIComponent(`EduAI-${id}`)}`;
+}
+
+/**
+ * Auto Jitsi room: persist `teacher_response` = roomId (UUID),
+ * `meeting_link` = full URL for email / iframe.
+ */
+export function createJitsiMeeting(): {
+  roomId: string;
+  meeting_code: null;
+  meeting_link: string;
+} {
+  const roomId = randomUUID();
   return {
-    meeting_code,
-    meeting_link: `https://meet.jit.si/${encodeURIComponent(room)}`,
+    roomId,
+    meeting_code: null,
+    meeting_link: jitsiRoomUrl(roomId),
   };
 }
 

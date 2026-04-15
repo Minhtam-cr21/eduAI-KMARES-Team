@@ -33,17 +33,6 @@ export type EnrolledCourseRow = {
   total_lessons?: number;
 };
 
-function formatVnd(n: number | null | undefined) {
-  const free = "Mi\u1EC5n ph\u00ED";
-  if (n == null || Number.isNaN(Number(n))) return free;
-  if (Number(n) <= 0) return free;
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(n));
-}
-
 function coverUrl(c: EnrolledCourseRow["course"]) {
   return c.image_url?.trim() || c.thumbnail_url?.trim() || null;
 }
@@ -60,7 +49,6 @@ export function EnrolledCourseCard({
   const [enrolling, setEnrolling] = useState(false);
   const c = row.course;
   const img = coverUrl(c);
-  const price = c.price != null ? Number(c.price) : 0;
   const teacherName = row.teacher?.full_name?.trim() || "Giáo viên EduAI";
   const rating = Number(c.rating) > 0 ? Number(c.rating) : MOCK_RATING;
   const reviewsCount = c.reviews_count ?? 0;
@@ -136,7 +124,6 @@ export function EnrolledCourseCard({
               </span>
               <span>{lessons} bài</span>
             </div>
-            <p className="text-primary text-lg font-bold">{formatVnd(price)}</p>
             <div className="mt-auto flex gap-2 pt-2">
               <Link
                 href={`/student/courses/${c.id}`}

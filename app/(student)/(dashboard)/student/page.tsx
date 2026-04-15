@@ -18,6 +18,7 @@ import {
   BookOpen,
   ClipboardList,
   LayoutDashboard,
+  Link2,
   Sparkles,
   User,
   Users,
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { label: "Trắc nghiệm cá nhân", href: "/assessment", icon: ClipboardList },
   { label: "Profile", href: "/profile", icon: User },
   { label: "Kết nối GV", href: "/student/teachers", icon: Users },
+  { label: "Yêu cầu kết nối", href: "/student/connections", icon: Link2 },
 ];
 
 function EnrolledGridSkeleton() {

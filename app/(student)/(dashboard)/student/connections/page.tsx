@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import { StudentConnectionsClient } from "@/components/student/student-connections-client";
 
-/** Route cũ: chuyển sang khám phá giáo viên dạng grid. */
-export default function StudentConnectionsRedirectPage() {
-  redirect("/student/teachers");
+export default function StudentConnectionsPage() {
+  return <StudentConnectionsClient />;
 }

@@ -53,6 +53,13 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  emptyQuizQuestion,
+  normalizeQuizQuestionsForApi,
+  TeacherLessonQuizFields,
+  validateQuizQuestionsForCreate,
+  type QuizQuestionForm,
+} from "@/components/teacher/lesson-dialog";
 import { QuizEditorDialog } from "@/components/teacher/quiz-editor";
 
 const ORPHAN_ID = "__orphan__";
@@ -96,6 +103,8 @@ type EdLesson = {
   video_url: string | null;
   time_estimate: number | null;
   is_free_preview: boolean;
+  /** Đã có bản ghi quiz gắn với bài (GET structure). */
+  hasQuiz?: boolean;
 };
 
 type EdChapter = {
@@ -126,6 +135,7 @@ function apiToState(rows: ApiChapter[]): EdChapter[] {
       video_url: le.video_url,
       time_estimate: le.time_estimate,
       is_free_preview: le.is_free_preview === true,
+      hasQuiz: le.type === "quiz" ? !!le.quiz : false,
     })),
   }));
 }
@@ -226,7 +236,12 @@ function SortableLessonRow({
       <span className="min-w-0 flex-1 truncate font-medium">{lesson.title}</span>
       {lesson.is_free_preview ? (
         <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
-          Xem trư��c
+          Xem trước
+        </Badge>
+      ) : null}
+      {lesson.type === "quiz" && lesson.hasQuiz ? (
+        <Badge variant="outline" className="border-primary/40 shrink-0 text-[10px] font-normal">
+          Có quiz
         </Badge>
       ) : null}
       <span className="text-muted-foreground shrink-0 tabular-nums text-xs">{mins}</span>
@@ -390,6 +405,10 @@ export function CurriculumEditor({
   const [formContent, setFormContent] = useState("");
   const [formMins, setFormMins] = useState("");
   const [formFreePreview, setFormFreePreview] = useState(false);
+  const [formQuizQuestions, setFormQuizQuestions] = useState<QuizQuestionForm[]>([
+    emptyQuizQuestion(),
+  ]);
+  const [lessonModalSubmitting, setLessonModalSubmitting] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -518,6 +537,7 @@ export function CurriculumEditor({
     setFormContent("");
     setFormMins("");
     setFormFreePreview(false);
+    setFormQuizQuestions([emptyQuizQuestion()]);
     setLessonModal({ mode: "create", chapterClientId });
   }
 
@@ -532,10 +552,11 @@ export function CurriculumEditor({
         : ""
     );
     setFormFreePreview(lesson.is_free_preview === true);
+    setFormQuizQuestions([emptyQuizQuestion()]);
     setLessonModal({ mode: "edit", chapterClientId, lesson });
   }
 
-  function submitLessonModal() {
+  async function submitLessonModal() {
     if (!lessonModal) return;
     const title = formTitle.trim();
     if (!title) {
@@ -545,6 +566,73 @@ export function CurriculumEditor({
     const minsRaw = formMins.trim();
     const timeEst =
       minsRaw === "" ? null : Math.min(24 * 60, Math.max(0, parseInt(minsRaw, 10) || 0));
+
+    if (lessonModal.mode === "create" && formType === "quiz") {
+      const ch = chapters.find((c) => c.clientId === lessonModal.chapterClientId);
+      if (!ch?.serverId) {
+        toast.error(
+          "Lưu giáo trình để tạo chương trên máy chủ trước khi thêm bài kiểm tra."
+        );
+        return;
+      }
+      const quizErr = validateQuizQuestionsForCreate(formQuizQuestions);
+      if (quizErr) {
+        toast.error(quizErr);
+        return;
+      }
+      const questions = normalizeQuizQuestionsForApi(formQuizQuestions);
+      setLessonModalSubmitting(true);
+      try {
+        const res = await fetch("/api/course-lessons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            course_id: courseId,
+            chapter_id: ch.serverId,
+            title,
+            type: "quiz",
+            content: formContent.trim() || null,
+            order_index: ch.lessons.length,
+            quizData: { questions },
+          }),
+        });
+        const j = (await res.json()) as { id?: string; error?: string };
+        if (!res.ok) {
+          toast.error(j.error ?? "Không tạo được bài kiểm tra");
+          return;
+        }
+        if (!j.id) {
+          toast.error("Phản hồi từ máy chủ không hợp lệ");
+          return;
+        }
+        const nu: EdLesson = {
+          clientId: j.id,
+          serverId: j.id,
+          title,
+          type: "quiz",
+          content: formContent.trim() || null,
+          video_url: null,
+          time_estimate: timeEst,
+          is_free_preview: formFreePreview,
+          hasQuiz: true,
+        };
+        setChapters((prev) =>
+          prev.map((x) =>
+            x.clientId === lessonModal.chapterClientId
+              ? { ...x, lessons: [...x.lessons, nu] }
+              : x
+          )
+        );
+        setLessonModal(null);
+        toast.success(
+          "Đã tạo bài kiểm tra (nháp). Nhấn Lưu để xuất bản bài cho học viên."
+        );
+        await loadStructure();
+      } finally {
+        setLessonModalSubmitting(false);
+      }
+      return;
+    }
 
     setChapters((prev) =>
       prev.map((ch) => {
@@ -580,7 +668,11 @@ export function CurriculumEditor({
       })
     );
     setLessonModal(null);
-    toast.success(lessonModal.mode === "create" ? "Đã thêm bài (nhớ Lưu)" : "Đã cập nhật (nhớ Lưu)");
+    toast.success(
+      lessonModal.mode === "create"
+        ? "Đã thêm bài (nhớ Lưu)"
+        : "Đã cập nhật (nhớ Lưu)"
+    );
   }
 
   function confirmRemoveLesson(le: EdLesson) {
@@ -760,7 +852,16 @@ export function CurriculumEditor({
             </div>
             <div className="space-y-1.5">
               <Label>Loại bài</Label>
-              <Select value={formType} onValueChange={(v) => setFormType(v as LessonType)}>
+              <Select
+                value={formType}
+                onValueChange={(v) => {
+                  const t = v as LessonType;
+                  setFormType(t);
+                  if (t === "quiz") {
+                    setFormQuizQuestions([emptyQuizQuestion()]);
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -771,15 +872,17 @@ export function CurriculumEditor({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="m-video">Video URL</Label>
-              <Input
-                id="m-video"
-                value={formVideo}
-                onChange={(e) => setFormVideo(e.target.value)}
-                placeholder="https://…"
-              />
-            </div>
+            {formType !== "quiz" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="m-video">Video URL</Label>
+                <Input
+                  id="m-video"
+                  value={formVideo}
+                  onChange={(e) => setFormVideo(e.target.value)}
+                  placeholder="https://…"
+                />
+              </div>
+            ) : null}
             <div className="space-y-1.5">
               <Label htmlFor="m-mins">
                 {"Th\u1EDDi l\u01B0\u1EE3ng \u01B0\u1EDBc t\u00EDnh (ph\u00FAt)"}
@@ -804,7 +907,9 @@ export function CurriculumEditor({
               </Label>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="m-content">Nội dung / mô tả</Label>
+              <Label htmlFor="m-content">
+                {formType === "quiz" ? "Mô tả / hướng dẫn (tuỳ chọn)" : "Nội dung / mô tả"}
+              </Label>
               <Textarea
                 id="m-content"
                 rows={5}
@@ -812,6 +917,12 @@ export function CurriculumEditor({
                 onChange={(e) => setFormContent(e.target.value)}
               />
             </div>
+            {lessonModal?.mode === "create" && formType === "quiz" ? (
+              <TeacherLessonQuizFields
+                questions={formQuizQuestions}
+                onChange={setFormQuizQuestions}
+              />
+            ) : null}
             {lessonModal?.mode === "edit" && lessonModal.lesson.serverId ? (
               <div className="border-t pt-3">
                 <Button
@@ -831,11 +942,24 @@ export function CurriculumEditor({
             ) : null}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setLessonModal(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={lessonModalSubmitting}
+              onClick={() => setLessonModal(null)}
+            >
               {"Hu\u1EF7"}
             </Button>
-            <Button type="button" onClick={submitLessonModal}>
-              {lessonModal?.mode === "create" ? "Thêm" : "Lưu"}
+            <Button
+              type="button"
+              disabled={lessonModalSubmitting}
+              onClick={() => void submitLessonModal()}
+            >
+              {lessonModalSubmitting
+                ? "Đang xử lý…"
+                : lessonModal?.mode === "create"
+                  ? "Thêm"
+                  : "Lưu"}
             </Button>
           </DialogFooter>
         </DialogContent>

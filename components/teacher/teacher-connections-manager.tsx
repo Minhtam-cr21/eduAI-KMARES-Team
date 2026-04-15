@@ -11,12 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Loader2, Trash2, Users, Video } from "lucide-react";
+import { Trash2, Users, Video } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -64,6 +63,14 @@ type PathGateCtx = {
   fromAccepted?: boolean;
 };
 
+function isStoredJitsiRoomId(s: string | null | undefined): boolean {
+  const t = s?.trim() ?? "";
+  if (!t) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    t
+  );
+}
+
 async function getActiveOrPausedPathId(studentId: string): Promise<string | null> {
   const res = await fetch(
     `/api/personalized-path/teacher/by-student/${encodeURIComponent(studentId)}`
@@ -81,21 +88,12 @@ async function getActiveOrPausedPathId(studentId: string): Promise<string | null
 export function TeacherConnectionsManager({ initialRows }: Props) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
-  const [respondId, setRespondId] = useState<string | null>(null);
   const [rejectCtx, setRejectCtx] = useState<RejectCtx | null>(null);
   const [rejectNote, setRejectNote] = useState("");
-  const [editLinkId, setEditLinkId] = useState<string | null>(null);
-  const [editMeetCode, setEditMeetCode] = useState("");
-  const [editMeetLink, setEditMeetLink] = useState("");
-  const [editNote, setEditNote] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [pathGate, setPathGate] = useState<PathGateCtx | null>(null);
   const [cancelPathWithGate, setCancelPathWithGate] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [acceptUseAuto, setAcceptUseAuto] = useState(true);
-  const [acceptMeetCode, setAcceptMeetCode] = useState("");
-  const [acceptMeetLink, setAcceptMeetLink] = useState("");
-  const [acceptNote, setAcceptNote] = useState("");
 
   useEffect(() => {
     setRows(initialRows);
@@ -105,17 +103,6 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
     if (pathGate) setCancelPathWithGate(true);
   }, [pathGate]);
 
-  useEffect(() => {
-    if (respondId) {
-      setAcceptUseAuto(true);
-      setAcceptMeetCode("");
-      setAcceptMeetLink("");
-      setAcceptNote("");
-    }
-  }, [respondId]);
-
-  const responding = rows.find((r) => r.id === respondId);
-  const editing = rows.find((r) => r.id === editLinkId);
   const deleting = rows.find((r) => r.id === deleteId);
 
   async function runRejectRequest(
@@ -153,66 +140,20 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
     return true;
   }
 
-  async function prefetchJitsiForAccept() {
-    if (!respondId) return;
+  async function acceptAndCreateRoom(connectionId: string, regenerate: boolean) {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/connection-requests/${respondId}/generate-meeting`,
-        { method: "POST" }
-      );
-      const j = (await res.json()) as {
-        meeting_code?: string;
-        meeting_link?: string;
-        error?: string;
-      };
+      const res = await fetch(`/api/connection-requests/${connectionId}/respond`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "accepted" }),
+      });
+      const j = (await res.json()) as { error?: string };
       if (!res.ok) {
         toast.error(j.error ?? "Không tạo được phòng");
         return;
       }
-      setAcceptUseAuto(false);
-      setAcceptMeetCode(j.meeting_code ?? "");
-      setAcceptMeetLink(j.meeting_link ?? "");
-      toast.success("Đã tạo phòng Jitsi — kiểm tra và gửi");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function submitAccept() {
-    if (!respondId) return;
-    const code = acceptMeetCode.trim();
-    const link = acceptMeetLink.trim();
-    const note = acceptNote.trim();
-    if (
-      !acceptUseAuto &&
-      !code &&
-      !link &&
-      !note
-    ) {
-      toast.error("Chọn tạo phòng tự động, hoặc nhập mã/link/ghi chú.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/connection-requests/${respondId}/respond`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "accepted",
-          generate_meeting: acceptUseAuto,
-          teacher_response: note || null,
-          meeting_code: acceptUseAuto ? null : code || null,
-          meeting_link: acceptUseAuto ? null : link || null,
-        }),
-      });
-      const j = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        toast.error(j.error ?? "Không gửi được");
-        return;
-      }
-      toast.success("Đã chấp nhận");
-      setRespondId(null);
+      toast.success(regenerate ? "Đã tạo phòng họp mới" : "Đã tạo phòng họp");
       router.refresh();
     } finally {
       setLoading(false);
@@ -247,70 +188,6 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
         setRejectNote("");
         router.refresh();
       }
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function prefetchJitsiForEdit() {
-    if (!editLinkId) return;
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/connection-requests/${editLinkId}/generate-meeting`,
-        { method: "POST" }
-      );
-      const j = (await res.json()) as {
-        meeting_code?: string;
-        meeting_link?: string;
-        error?: string;
-      };
-      if (!res.ok) {
-        toast.error(j.error ?? "Không tạo được phòng");
-        return;
-      }
-      setEditMeetCode(j.meeting_code ?? "");
-      setEditMeetLink(j.meeting_link ?? "");
-      toast.success("Đã tạo phòng Jitsi mới");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function submitEditMeeting(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editLinkId) return;
-    const code = editMeetCode.trim();
-    const link = editMeetLink.trim();
-    const note = editNote.trim();
-    if (!code && !link && !note) {
-      toast.error("Nhập mã, link phòng hoặc ghi chú.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/connection-requests/${editLinkId}/respond`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "accepted",
-          generate_meeting: false,
-          meeting_code: code || null,
-          meeting_link: link || null,
-          teacher_response: note || null,
-        }),
-      });
-      const j = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        toast.error(j.error ?? "Không cập nhật được");
-        return;
-      }
-      toast.success("Đã cập nhật phòng họp");
-      setEditLinkId(null);
-      setEditMeetCode("");
-      setEditMeetLink("");
-      setEditNote("");
-      router.refresh();
     } finally {
       setLoading(false);
     }
@@ -378,14 +255,7 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
     }
   }
 
-  function openEditLink(r: ConnectionRow) {
-    setEditLinkId(r.id);
-    setEditMeetCode(r.meeting_code?.trim() ?? "");
-    setEditMeetLink(r.meeting_link?.trim() ?? "");
-    setEditNote(r.teacher_response?.trim() ?? "");
-  }
-
-  function openReject(r: ConnectionRow, fromAccepted: boolean) {
+   function openReject(r: ConnectionRow, fromAccepted: boolean) {
     setRejectNote("");
     setRejectCtx({
       connectionId: r.id,
@@ -483,7 +353,7 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                         </a>
                       </p>
                     ) : null}
-                    {r.teacher_response ? (
+                    {r.teacher_response && !isStoredJitsiRoomId(r.teacher_response) ? (
                       <p>
                         <span className="font-medium text-foreground">Ghi chú: </span>
                         <span className="whitespace-pre-wrap text-foreground">
@@ -497,8 +367,14 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                 <div className="flex flex-wrap gap-2 pt-1">
                   {r.status === "pending" && (
                     <>
-                      <Button size="sm" onClick={() => setRespondId(r.id)}>
-                        Chấp nhận
+                      <Button
+                        size="sm"
+                        className="gap-1"
+                        disabled={loading}
+                        onClick={() => void acceptAndCreateRoom(r.id, false)}
+                      >
+                        <Video className="h-3.5 w-3.5" />
+                        Tạo phòng họp
                       </Button>
                       <Button
                         size="sm"
@@ -513,10 +389,13 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
                     <>
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() => openEditLink(r)}
+                        variant="secondary"
+                        className="gap-1"
+                        disabled={loading}
+                        onClick={() => void acceptAndCreateRoom(r.id, true)}
                       >
-                        Sửa phòng họp
+                        <Video className="h-3.5 w-3.5" />
+                        Tạo phòng họp mới
                       </Button>
                       <Button
                         size="sm"
@@ -544,93 +423,6 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
           ))}
         </div>
       )}
-
-      <Dialog open={!!respondId} onOpenChange={(o) => !o && setRespondId(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Chấp nhận kết nối</DialogTitle>
-          </DialogHeader>
-          {responding ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{responding.goal}</p>
-              <div className="flex items-start gap-2 rounded-md border border-border p-3">
-                <Checkbox
-                  id="accept-auto"
-                  checked={acceptUseAuto}
-                  onCheckedChange={(v) => setAcceptUseAuto(v === true)}
-                  className="mt-0.5"
-                />
-                <div className="space-y-1">
-                  <Label htmlFor="accept-auto" className="cursor-pointer text-sm font-medium">
-                    Tạo phòng Jitsi tự động (khuyến nghị)
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Hệ thống sinh mã lớp và link tham gia; không cần dán link thủ công.
-                  </p>
-                </div>
-              </div>
-              {!acceptUseAuto ? (
-                <div className="space-y-3">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    className="gap-1.5"
-                    disabled={loading}
-                    onClick={() => void prefetchJitsiForAccept()}
-                  >
-                    <Video className="h-3.5 w-3.5" />
-                    Sinh phòng Jitsi
-                  </Button>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="acc-code">Mã lớp (tùy chọn)</Label>
-                    <Input
-                      id="acc-code"
-                      value={acceptMeetCode}
-                      onChange={(e) => setAcceptMeetCode(e.target.value)}
-                      placeholder="VD: ABC123"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="acc-link">Link phòng (tùy chọn)</Label>
-                    <Input
-                      id="acc-link"
-                      value={acceptMeetLink}
-                      onChange={(e) => setAcceptMeetLink(e.target.value)}
-                      placeholder="https://…"
-                    />
-                  </div>
-                </div>
-              ) : null}
-              <div className="space-y-1.5">
-                <Label htmlFor="acc-note">Ghi chú thêm (tùy chọn)</Label>
-                <Textarea
-                  id="acc-note"
-                  value={acceptNote}
-                  onChange={(e) => setAcceptNote(e.target.value)}
-                  placeholder="Lịch hẹn, kênh Zalo, …"
-                  className="min-h-[72px]"
-                />
-              </div>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" onClick={() => setRespondId(null)}>
-                  Huỷ
-                </Button>
-                <Button type="button" disabled={loading} onClick={() => void submitAccept()}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Đang gửi…
-                    </>
-                  ) : (
-                    "Xác nhận chấp nhận"
-                  )}
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={!!rejectCtx}
@@ -721,83 +513,6 @@ export function TeacherConnectionsManager({ initialRows }: Props) {
               Tiếp tục
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={!!editLinkId}
-        onOpenChange={(o) => {
-          if (!o) {
-            setEditLinkId(null);
-            setEditMeetCode("");
-            setEditMeetLink("");
-            setEditNote("");
-          }
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cập nhật phòng họp</DialogTitle>
-          </DialogHeader>
-          {editing ? (
-            <form onSubmit={(e) => void submitEditMeeting(e)} className="space-y-3">
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="gap-1.5"
-                disabled={loading}
-                onClick={() => void prefetchJitsiForEdit()}
-              >
-                <Video className="h-3.5 w-3.5" />
-                Tạo phòng Jitsi mới
-              </Button>
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-code">Mã lớp</Label>
-                <Input
-                  id="edit-code"
-                  value={editMeetCode}
-                  onChange={(e) => setEditMeetCode(e.target.value)}
-                  placeholder="Mã hiển thị cho HS"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-meet-link">Link phòng</Label>
-                <Input
-                  id="edit-meet-link"
-                  value={editMeetLink}
-                  onChange={(e) => setEditMeetLink(e.target.value)}
-                  placeholder="https://…"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-note">Ghi chú</Label>
-                <Textarea
-                  id="edit-note"
-                  value={editNote}
-                  onChange={(e) => setEditNote(e.target.value)}
-                  className="min-h-[64px]"
-                />
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setEditLinkId(null);
-                    setEditMeetCode("");
-                    setEditMeetLink("");
-                    setEditNote("");
-                  }}
-                >
-                  Huỷ
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  Lưu
-                </Button>
-              </DialogFooter>
-            </form>
-          ) : null}
         </DialogContent>
       </Dialog>
 

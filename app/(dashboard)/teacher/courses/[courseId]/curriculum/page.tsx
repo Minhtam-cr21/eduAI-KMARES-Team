@@ -1,4 +1,4 @@
-import { CurriculumEditor } from "@/components/teacher/curriculum-editor";
+import { CourseCurriculumTabs } from "@/components/teacher/course-curriculum-tabs";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
@@ -29,7 +29,7 @@ export default async function TeacherCourseCurriculumPage({
   }
 
   return (
-    <CurriculumEditor
+    <CourseCurriculumTabs
       courseId={course.id}
       courseTitle={course.title}
       courseIsPublished={course.is_published !== false}

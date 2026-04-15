@@ -12,11 +12,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TeacherDiscoveryCard } from "@/lib/types/teacher-discovery";
 import { cn } from "@/lib/utils";
-import type { ConnectionRequest } from "@/types/database";
-import { BookOpen, ExternalLink, Search, User, Users } from "lucide-react";
+import { BookOpen, Link2, Search, User, Users } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -30,15 +28,6 @@ const ConnectTeacherDialog = dynamic(
     })),
   { ssr: false }
 );
-
-const STATUS_STYLE: Record<string, string> = {
-  pending:
-    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400",
-  accepted:
-    "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400",
-  rejected:
-    "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400",
-};
 
 function TeacherAvatar({
   name,
@@ -102,7 +91,6 @@ function CourseThumb({
 }
 
 export function TeachersDiscoveryClient() {
-  const [tab, setTab] = useState("browse");
   const [teachers, setTeachers] = useState<TeacherDiscoveryCard[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
@@ -117,9 +105,6 @@ export function TeachersDiscoveryClient() {
     id: string;
     name: string | null;
   } | null>(null);
-
-  const [myRequests, setMyRequests] = useState<ConnectionRequest[]>([]);
-  const [reqLoading, setReqLoading] = useState(true);
 
   const loadTeachers = useCallback(async () => {
     setLoading(true);
@@ -153,36 +138,9 @@ export function TeachersDiscoveryClient() {
     }
   }, [page, limit, search, category]);
 
-  const loadRequests = useCallback(async () => {
-    setReqLoading(true);
-    try {
-      const res = await fetch("/api/connection-requests/student");
-      const data = (await res.json()) as ConnectionRequest[] | { error?: string };
-      if (!res.ok) {
-        toast.error(
-          typeof data === "object" && data && "error" in data
-            ? String(data.error)
-            : "Không tải yêu cầu"
-        );
-        setMyRequests([]);
-        return;
-      }
-      setMyRequests(Array.isArray(data) ? data : []);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Lỗi mạng");
-      setMyRequests([]);
-    } finally {
-      setReqLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     void loadTeachers();
   }, [loadTeachers]);
-
-  useEffect(() => {
-    if (tab === "requests") void loadRequests();
-  }, [tab, loadRequests]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -209,13 +167,20 @@ export function TeachersDiscoveryClient() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="browse">Khám phá giáo viên</TabsTrigger>
-          <TabsTrigger value="requests">Yêu cầu của tôi</TabsTrigger>
-        </TabsList>
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <Link
+          href="/student/connections"
+          className={cn(
+            buttonVariants({ variant: "secondary", size: "sm" }),
+            "gap-1.5"
+          )}
+        >
+          <Link2 className="h-3.5 w-3.5" />
+          Yêu cầu kết nối của tôi
+        </Link>
+      </div>
 
-        <TabsContent value="browse" className="space-y-6">
+      <div className="space-y-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="min-w-[200px] flex-1 space-y-2">
               <label className="text-sm font-medium">Tìm theo tên</label>
@@ -377,131 +342,7 @@ export function TeachersDiscoveryClient() {
               </div>
             </>
           )}
-        </TabsContent>
-
-        <TabsContent value="requests" className="space-y-4">
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => void loadRequests()}
-            >
-              Làm mới
-            </Button>
-          </div>
-          {reqLoading ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-40 rounded-xl" />
-              ))}
-            </div>
-          ) : myRequests.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center py-10 text-center">
-                <Users className="mb-3 h-10 w-10 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  Chưa có yêu cầu nào.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {myRequests.map((r) => (
-                <Card key={r.id}>
-                  <CardContent className="space-y-2 pt-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs font-semibold capitalize",
-                          STATUS_STYLE[r.status] ?? ""
-                        )}
-                      >
-                        {r.status}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {r.created_at
-                          ? new Date(r.created_at).toLocaleDateString("vi-VN")
-                          : ""}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-foreground">
-                      {r.goal}
-                    </p>
-                    {r.reason ? (
-                      <p className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">Lý do: </span>
-                        {r.reason}
-                      </p>
-                    ) : null}
-                    {r.desired_roadmap ? (
-                      <p className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">
-                          Lộ trình mong muốn:{" "}
-                        </span>
-                        {r.desired_roadmap}
-                      </p>
-                    ) : null}
-                    <p className="text-xs text-muted-foreground">
-                      GV:{" "}
-                      <Link
-                        href={`/student/teachers/${r.teacher_id}`}
-                        className="text-primary underline"
-                      >
-                        Xem profile
-                      </Link>
-                    </p>
-                    {r.status === "accepted" &&
-                    (r.meeting_code || r.meeting_link || r.teacher_response) ? (
-                      <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-2 text-xs text-muted-foreground">
-                        {r.meeting_code ? (
-                          <p>
-                            <span className="font-medium text-foreground">Mã lớp: </span>
-                            <span className="font-mono text-foreground">{r.meeting_code}</span>
-                          </p>
-                        ) : null}
-                        {r.meeting_link ? (
-                          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-                            <a
-                              href={r.meeting_link.trim()}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="break-all text-primary underline"
-                            >
-                              {r.meeting_link.trim()}
-                            </a>
-                            <a
-                              href={r.meeting_link.trim()}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={cn(
-                                buttonVariants({ size: "sm" }),
-                                "shrink-0 gap-1 no-underline"
-                              )}
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              Tham gia
-                            </a>
-                          </div>
-                        ) : null}
-                        {r.teacher_response ? (
-                          <p>
-                            <span className="font-medium text-foreground">Ghi chú GV: </span>
-                            <span className="whitespace-pre-wrap text-foreground">
-                              {r.teacher_response}
-                            </span>
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {connectTeacher ? (
         <ConnectTeacherDialog
@@ -509,7 +350,7 @@ export function TeachersDiscoveryClient() {
           onOpenChange={setConnectOpen}
           teacherId={connectTeacher.id}
           teacherName={connectTeacher.name}
-          onSent={() => void loadRequests()}
+          onSent={() => {}}
         />
       ) : null}
     </main>

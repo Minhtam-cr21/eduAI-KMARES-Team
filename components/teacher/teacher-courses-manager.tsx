@@ -44,15 +44,6 @@ type CatalogCategoryRow = { id: string; name: string; slug: string };
 
 type Props = { initialCourses: TeacherCourseRow[] };
 
-function formatVnd(n: number | null | undefined) {
-  if (n == null || Number.isNaN(Number(n))) return "—";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(n));
-}
-
 function linesFromFd(fd: FormData, key: string): string[] {
   return String(fd.get(key) ?? "")
     .split("\n")
@@ -153,7 +144,6 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
     const requirements = linesFromFd(fd, "requirements");
     const highlights = linesFromFd(fd, "highlights");
     const outcomesAfter = linesFromFd(fd, "outcomes_after");
-    const priceRaw = String(fd.get("price") ?? "").trim();
     const durRaw = String(fd.get("duration_hours") ?? "").trim();
     const faqRaw = String(fd.get("faq_json") ?? "").trim();
     let faq: unknown = null;
@@ -168,7 +158,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
     return {
       category: categoryName,
       category_id: categoryId || null,
-      price: priceRaw === "" ? 0 : Number(priceRaw),
+      price: 0,
       duration_hours: durRaw === "" ? null : parseInt(durRaw, 10),
       level: String(fd.get("level") ?? "beginner") as
         | "beginner"
@@ -376,7 +366,6 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Tên khóa</TableHead>
                 <TableHead>Danh mục</TableHead>
-                <TableHead className="text-right">Giá</TableHead>
                 <TableHead className="text-right">Giờ</TableHead>
                 <TableHead>Cấp độ</TableHead>
                 <TableHead>Catalog / AI</TableHead>
@@ -390,7 +379,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
               {filteredCourses.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={10}
+                    colSpan={9}
                     className="text-center text-muted-foreground"
                   >
                     Không có khóa học khớp bộ lọc.
@@ -411,9 +400,6 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                     <Badge variant="outline" className="text-xs">
                       {c.catalog_category?.name ?? c.category ?? "—"}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-right text-xs tabular-nums">
-                    {formatVnd(c.price)}
                   </TableCell>
                   <TableCell className="text-right text-xs tabular-nums">
                     {c.duration_hours ?? "—"}
@@ -547,28 +533,15 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
               </select>
               <input type="hidden" name="category_fallback" value="" readOnly />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="c-price">Giá (VND)</Label>
-                <Input
-                  id="c-price"
-                  name="price"
-                  type="number"
-                  min={0}
-                  step={1000}
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="c-dur">Duration (hours)</Label>
-                <Input
-                  id="c-dur"
-                  name="duration_hours"
-                  type="number"
-                  min={0}
-                  placeholder="—"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-dur">Duration (hours)</Label>
+              <Input
+                id="c-dur"
+                name="duration_hours"
+                type="number"
+                min={0}
+                placeholder="—"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="c-thumb">Thumbnail URL</Label>
@@ -719,28 +692,15 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                   ))}
                 </select>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="e-price">Giá (VND)</Label>
-                  <Input
-                    id="e-price"
-                    name="price"
-                    type="number"
-                    min={0}
-                    step={1000}
-                    defaultValue={editing.price ?? 0}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="e-dur">Duration (hours)</Label>
-                  <Input
-                    id="e-dur"
-                    name="duration_hours"
-                    type="number"
-                    min={0}
-                    defaultValue={editing.duration_hours ?? ""}
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="e-dur">Duration (hours)</Label>
+                <Input
+                  id="e-dur"
+                  name="duration_hours"
+                  type="number"
+                  min={0}
+                  defaultValue={editing.duration_hours ?? ""}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="e-thumb">Thumbnail URL</Label>

@@ -1,8 +1,5 @@
 import { sendConnectionUpdateEmail } from "@/lib/email/send";
-import {
-  createJitsiMeeting,
-  jitsiLinkFromClassCode,
-} from "@/lib/meeting/jitsi-room";
+import { createJitsiMeeting } from "@/lib/meeting/jitsi-room";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -14,84 +11,16 @@ export const dynamic = "force-dynamic";
 const respondSchema = z.object({
   status: z.enum(["accepted", "rejected"]),
   teacher_response: z.string().optional().nullable(),
-  meeting_code: z.string().max(80).optional().nullable(),
-  meeting_link: z.string().url().optional().nullable(),
-  generate_meeting: z.boolean().optional(),
 });
 
-type ResolvedMeeting = {
-  meeting_code: string | null;
-  meeting_link: string | null;
-  teacher_note: string | null;
-};
-
-function resolveAcceptedMeeting(
-  p: z.infer<typeof respondSchema>
-): ResolvedMeeting | { error: string } {
-  const note = p.teacher_response?.trim() || null;
-
-  if (p.generate_meeting) {
-    const g = createJitsiMeeting();
-    return {
-      meeting_code: g.meeting_code,
-      meeting_link: g.meeting_link,
-      teacher_note: note,
-    };
-  }
-
-  const rawLink = p.meeting_link?.trim() || null;
-  if (rawLink) {
-    const code = p.meeting_code?.trim().replace(/\s+/g, "") || null;
-    return {
-      meeting_code: code,
-      meeting_link: rawLink,
-      teacher_note: note,
-    };
-  }
-
-  const rawCode = p.meeting_code?.trim().replace(/\s+/g, "") || null;
-  if (rawCode) {
-    const link = jitsiLinkFromClassCode(rawCode);
-    if (!link) {
-      return {
-        error:
-          "M\u00e3 l\u1edbp kh\u00f4ng h\u1ee3p l\u1ec7 (ch\u1ec9 d\u00f9ng ch\u1eef v\u00e0 s\u1ed1).",
-      };
-    }
-    return {
-      meeting_code: rawCode,
-      meeting_link: link,
-      teacher_note: note,
-    };
-  }
-
-  if (note) {
-    if (/^https?:\/\//i.test(note)) {
-      return {
-        meeting_code: null,
-        meeting_link: note,
-        teacher_note: null,
-      };
-    }
-    return {
-      meeting_code: null,
-      meeting_link: null,
-      teacher_note: note,
-    };
-  }
-
+function buildAcceptedMeeting(now: string) {
+  const j = createJitsiMeeting();
   return {
-    error:
-      "Cần tạo phòng Jitsi, nhập link phòng, nhập mã lớp, hoặc ghi chú liên hệ.",
+    teacher_response: j.roomId,
+    meeting_link: j.meeting_link,
+    meeting_code: j.meeting_code,
+    responded_at: now,
   };
-}
-
-function hasStudentFacingContact(m: ResolvedMeeting): boolean {
-  return !!(
-    m.meeting_link ||
-    m.meeting_code ||
-    m.teacher_note
-  );
 }
 
 async function notifyStudent(
@@ -117,7 +46,7 @@ async function notifyStudent(
       .eq("id", connectionTeacherId)
       .maybeSingle();
     const teacherName =
-      (tp?.full_name as string | null)?.trim() || "Giáo viên";
+      (tp?.full_name as string | null)?.trim() || "Gi\u00E1o vi\u00EAn";
 
     await sendConnectionUpdateEmail(email, {
       teacherName,
@@ -131,7 +60,7 @@ async function notifyStudent(
   }
 }
 
-/** PUT: teacher/admin respond — pending or update meeting when accepted. */
+/** PUT: teacher/admin respond, or regenerate Jitsi room (accepted + accepted). */
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -223,26 +152,17 @@ export async function PUT(
       emailAction = "rejected";
       emailPayload.teacherResponse = responseTrim;
     } else if (status === "accepted") {
-      const resolved = resolveAcceptedMeeting(parsed.data);
-      if ("error" in resolved) {
-        return NextResponse.json({ error: resolved.error }, { status: 400 });
-      }
-      if (!hasStudentFacingContact(resolved)) {
-        return NextResponse.json(
-          { error: "Thiếu thông tin liên hệ hoặc phòng họp." },
-          { status: 400 }
-        );
-      }
       patch.status = "accepted";
-      patch.meeting_code = resolved.meeting_code;
-      patch.meeting_link = resolved.meeting_link;
-      patch.teacher_response = resolved.teacher_note;
-      patch.responded_at = now;
+      const acc = buildAcceptedMeeting(now);
+      patch.teacher_response = acc.teacher_response;
+      patch.meeting_link = acc.meeting_link;
+      patch.meeting_code = acc.meeting_code;
+      patch.responded_at = acc.responded_at;
       emailAction = "accepted";
       emailPayload = {
-        teacherResponse: resolved.teacher_note,
-        meetingLink: resolved.meeting_link,
-        meetingCode: resolved.meeting_code,
+        teacherResponse: null,
+        meetingLink: acc.meeting_link,
+        meetingCode: null,
       };
     }
   } else if (prevStatus === "accepted") {
@@ -255,24 +175,16 @@ export async function PUT(
       emailAction = "rejected";
       emailPayload.teacherResponse = responseTrim;
     } else if (status === "accepted") {
-      const resolved = resolveAcceptedMeeting(parsed.data);
-      if ("error" in resolved) {
-        return NextResponse.json({ error: resolved.error }, { status: 400 });
-      }
-      if (!hasStudentFacingContact(resolved)) {
-        return NextResponse.json(
-          { error: "Thiếu thông tin cập nhật (phòng họp hoặc ghi chú)." },
-          { status: 400 }
-        );
-      }
-      patch.meeting_code = resolved.meeting_code;
-      patch.meeting_link = resolved.meeting_link;
-      patch.teacher_response = resolved.teacher_note;
+      const acc = buildAcceptedMeeting(now);
+      patch.teacher_response = acc.teacher_response;
+      patch.meeting_link = acc.meeting_link;
+      patch.meeting_code = acc.meeting_code;
+      patch.responded_at = acc.responded_at;
       emailAction = "link_updated";
       emailPayload = {
-        teacherResponse: resolved.teacher_note,
-        meetingLink: resolved.meeting_link,
-        meetingCode: resolved.meeting_code,
+        teacherResponse: null,
+        meetingLink: acc.meeting_link,
+        meetingCode: null,
       };
     }
   } else {

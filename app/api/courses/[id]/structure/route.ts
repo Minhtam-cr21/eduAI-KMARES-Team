@@ -184,7 +184,25 @@ export async function GET(
     });
   }
 
-  return NextResponse.json({ chapters: out });
+  const { data: benefitRows, error: bErr } = await supabase
+    .from("course_benefits")
+    .select("id, icon, title, description, display_order")
+    .eq("course_id", courseId)
+    .order("display_order", { ascending: true });
+
+  if (bErr) {
+    return NextResponse.json({ error: bErr.message }, { status: 500 });
+  }
+
+  const benefits = (benefitRows ?? []).map((b) => ({
+    id: b.id as string,
+    icon: (b.icon as string | null) ?? null,
+    title: String(b.title ?? ""),
+    description: (b.description as string | null) ?? null,
+    display_order: (b.display_order as number | null) ?? 0,
+  }));
+
+  return NextResponse.json({ chapters: out, benefits });
 }
 
 /**

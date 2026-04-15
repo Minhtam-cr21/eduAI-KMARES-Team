@@ -31,16 +31,6 @@ export type StudentCatalogCourse = {
   category?: { name?: string | null } | null;
 };
 
-function formatVnd(n: number | null | undefined) {
-  if (n == null || Number.isNaN(Number(n))) return "Miễn phí";
-  if (Number(n) <= 0) return "Miễn phí";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(n));
-}
-
 function coverUrl(c: StudentCatalogCourse) {
   return c.image_url?.trim() || c.thumbnail_url?.trim() || null;
 }
@@ -58,15 +48,6 @@ export function StudentCourseCard({
 }) {
   const [enrolling, setEnrolling] = useState(false);
   const img = coverUrl(course);
-  const price = course.price != null ? Number(course.price) : 0;
-  const orig =
-    course.original_price != null ? Number(course.original_price) : null;
-  const showSale =
-    orig != null && !Number.isNaN(orig) && orig > price && price >= 0;
-  const pct =
-    showSale && orig
-      ? Math.max(1, Math.round((1 - price / orig) * 100))
-      : null;
 
   const descriptionSnippet =
     course.description?.trim() ||
@@ -155,11 +136,6 @@ export function StudentCourseCard({
                   <BookOpen className="h-12 w-12 text-muted-foreground/30" />
                 </div>
               )}
-              {pct != null ? (
-                <span className="absolute right-2 top-2 rounded-md bg-rose-600 px-2 py-0.5 text-xs font-bold text-white shadow">
-                  -{pct}%
-                </span>
-              ) : null}
             </div>
             <CardContent className="space-y-2 p-4">
               <h3 className="line-clamp-2 min-h-[2.5rem] text-base font-semibold leading-snug">
@@ -182,16 +158,6 @@ export function StudentCourseCard({
                     : "—"}
                 </span>
                 <span>{course.total_lessons ?? 0} bài</span>
-              </div>
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-primary text-lg font-bold">
-                  {formatVnd(price)}
-                </span>
-                {showSale ? (
-                  <span className="text-muted-foreground text-sm line-through">
-                    {formatVnd(orig)}
-                  </span>
-                ) : null}
               </div>
             </CardContent>
           </Link>

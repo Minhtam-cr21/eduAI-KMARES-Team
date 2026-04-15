@@ -88,16 +88,6 @@ function youtubeEmbedUrl(raw: string | null | undefined): string | null {
   return null;
 }
 
-function formatVnd(n: unknown) {
-  const num = Number(n);
-  if (Number.isNaN(num) || num <= 0) return "Miễn phí";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(num);
-}
-
 export default function StudentCourseDetailPage() {
   const params = useParams();
   const courseId = typeof params.courseId === "string" ? params.courseId : "";
@@ -306,16 +296,6 @@ export default function StudentCourseDetailPage() {
     (course.image_url as string | null) || (course.thumbnail_url as string | null);
   const promo = course.promo_video_url as string | null;
   const embed = youtubeEmbedUrl(promo);
-  const price = course.price;
-  const originalPrice = course.original_price as number | null | undefined;
-  const priceNum = price != null ? Number(price) : 0;
-  const origNum =
-    originalPrice != null && !Number.isNaN(Number(originalPrice))
-      ? Number(originalPrice)
-      : null;
-  const showSale = origNum != null && origNum > priceNum && priceNum >= 0;
-  const pct =
-    showSale && origNum ? Math.max(1, Math.round((1 - priceNum / origNum) * 100)) : null;
 
   const durationHours = course.duration_hours as number | null;
   const totalLessons = (course.total_lessons as number | null) ?? detail.lessons.length;
@@ -405,11 +385,6 @@ export default function StudentCourseDetailPage() {
                 <BookOpen className="h-16 w-16 text-muted-foreground/30" />
               </div>
             )}
-            {pct != null ? (
-              <span className="absolute right-3 top-3 rounded-md bg-rose-600 px-2 py-1 text-xs font-bold text-white shadow">
-                -{pct}%
-              </span>
-            ) : null}
           </div>
           <div className="flex flex-col justify-center p-6 lg:p-10">
             <div className="flex flex-wrap items-center gap-2">
@@ -452,12 +427,6 @@ export default function StudentCourseDetailPage() {
                 Giảng viên: {teacher.full_name}
               </p>
             ) : null}
-            <div className="mt-5 flex flex-wrap items-baseline gap-3">
-              <p className="text-2xl font-bold text-primary lg:text-3xl">{formatVnd(price)}</p>
-              {showSale ? (
-                <p className="text-muted-foreground text-lg line-through">{formatVnd(origNum)}</p>
-              ) : null}
-            </div>
             <div className="mt-6 flex flex-wrap gap-2 lg:hidden">{ctaHero}</div>
           </div>
         </div>
@@ -499,17 +468,6 @@ export default function StudentCourseDetailPage() {
               <CardTitle className="text-base">Tóm tắt khóa học</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <p className="text-muted-foreground text-xs">Học phí</p>
-                <div className="mt-1 flex flex-wrap items-baseline gap-2">
-                  <span className="text-primary text-xl font-bold">{formatVnd(price)}</span>
-                  {showSale ? (
-                    <span className="text-muted-foreground text-sm line-through">
-                      {formatVnd(origNum)}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
               {ctaPrimary}
               {enrolled ? (
                 <Badge variant="outline" className="w-full justify-center py-2">
@@ -519,14 +477,6 @@ export default function StudentCourseDetailPage() {
               <div className="border-t border-border pt-4">
                 <p className="text-muted-foreground mb-2 text-xs font-medium">Nội dung khóa</p>
                 <CourseDetailStatsList durationHours={durationHours} counts={lessonCounts} />
-              </div>
-              <div className="flex flex-col gap-2 border-t border-border pt-4">
-                <Button type="button" variant="outline" className="w-full" disabled>
-                  Kích hoạt mã
-                </Button>
-                <Button type="button" variant="outline" className="w-full" disabled>
-                  Mua mã / voucher
-                </Button>
               </div>
               <div className="border-t border-border pt-4">
                 <p className="text-muted-foreground text-xs font-medium">Giảng viên</p>
@@ -543,3 +493,4 @@ export default function StudentCourseDetailPage() {
     </main>
   );
 }
+

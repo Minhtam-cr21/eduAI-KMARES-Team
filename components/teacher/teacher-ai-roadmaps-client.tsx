@@ -109,12 +109,19 @@ export function TeacherAiRoadmapsClient() {
         }),
       });
       const j = (await res.json()) as {
-        error?: string;
+        error?: string | boolean;
+        message?: string;
         enrollWarnings?: string[];
         scheduleItems?: number;
       };
       if (!res.ok) {
-        toast.error(j.error ?? "Không duyệt được");
+        const msg =
+          typeof j.message === "string" && j.message
+            ? j.message
+            : typeof j.error === "string"
+              ? j.error
+              : "Không duyệt được";
+        toast.error(msg);
         return;
       }
       if (j.enrollWarnings?.length) {

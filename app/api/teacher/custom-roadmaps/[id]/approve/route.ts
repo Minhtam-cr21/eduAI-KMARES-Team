@@ -70,11 +70,17 @@ export async function POST(request: Request, context: Ctx) {
     return NextResponse.json({ error: fetchErr.message }, { status: 500 });
   }
   if (!roadmap) {
-    return NextResponse.json({ error: "Roadmap not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: true, message: "Không tìm thấy lộ trình." },
+      { status: 404 }
+    );
   }
   if (roadmap.status !== "pending") {
     return NextResponse.json(
-      { error: "Roadmap is not pending approval" },
+      {
+        error: true,
+        message: "Lộ trình này không ở trạng thái chờ duyệt.",
+      },
       { status: 400 }
     );
   }
@@ -96,14 +102,22 @@ export async function POST(request: Request, context: Ctx) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Không chuyển đổi được lộ trình";
     console.error("[custom-roadmaps/approve] convert", msg);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json(
+      {
+        error: true,
+        message:
+          "Không thể tạo lộ trình vì chưa có khóa học phù hợp hoặc không ánh xạ được nội dung. Vui lòng tạo khóa học trong danh mục tương ứng trước.",
+      },
+      { status: 502 }
+    );
   }
 
   if (course_sequence.length === 0) {
     return NextResponse.json(
       {
-        error:
-          "Không gợi ý được khóa học phù hợp. Thêm khóa published hoặc chỉnh module trong lộ trình.",
+        error: true,
+        message:
+          "Không thể tạo lộ trình vì chưa có khóa học phù hợp. Vui lòng tạo khóa học trong danh mục tương ứng trước.",
       },
       { status: 400 }
     );
@@ -126,7 +140,8 @@ export async function POST(request: Request, context: Ctx) {
     if (hasActive) {
       return NextResponse.json(
         {
-          error:
+          error: true,
+          message:
             "Học sinh đang có lộ trình active. Chờ góp ý hoặc tạm dừng trước khi duyệt lộ trình AI.",
         },
         { status: 409 }
