@@ -1,3 +1,4 @@
+import { ProfileStatsSection } from "@/components/student/profile-stats-section";
 import { BackButton } from "@/components/ui/back-button";
 import { ProfileForm } from "@/components/student/profile-form";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +25,7 @@ export default async function StudentProfilePage() {
     .maybeSingle();
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
+    <main className="mx-auto max-w-3xl px-4 py-8">
       <BackButton fallbackHref="/student" className="mb-6" />
 
       <div className="mb-8">
@@ -55,6 +56,8 @@ export default async function StudentProfilePage() {
           weaknesses: (profile?.weaknesses as string[] | null) ?? null,
         }}
       />
+
+      <ProfileStatsSection />
     </main>
   );
 }

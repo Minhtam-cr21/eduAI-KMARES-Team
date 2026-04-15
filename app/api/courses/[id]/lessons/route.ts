@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const LESSON_COLUMNS =
-  "id, course_id, title, content, video_url, code_template, order_index, status, created_at, updated_at";
+  "id, course_id, chapter_id, title, content, video_url, code_template, order_index, status, type, time_estimate, created_at, updated_at";
 
 /** GET — danh sách bài học đã published của một khóa học (tuỳ chọn ?page=&limit=). */
 export async function GET(

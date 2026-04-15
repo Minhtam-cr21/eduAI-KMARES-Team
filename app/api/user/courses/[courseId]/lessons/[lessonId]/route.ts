@@ -38,7 +38,7 @@ export async function GET(
   const { data: lesson, error } = await supabase
     .from("course_lessons")
     .select(
-      "id, course_id, title, content, video_url, code_template, order_index, status"
+      "id, course_id, title, content, video_url, code_template, order_index, status, type, time_estimate"
     )
     .eq("id", lessonId)
     .maybeSingle();

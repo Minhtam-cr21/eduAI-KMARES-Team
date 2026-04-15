@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { StudentStatsPayload } from "@/components/student/student-stats-charts";
-import { Award, BookOpen, Medal, ListChecks, TrendingUp } from "lucide-react";
+import { Award, BookOpen, ListChecks, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 type DashboardStats = StudentStatsPayload;
@@ -85,9 +85,9 @@ export function StudentStatsCards({
       bg: "bg-amber-500/10",
     },
     {
-      label: "Thứ hạng",
-      value: stats.rank ?? 0,
-      icon: Medal,
+      label: "Tiến độ lịch học",
+      value: `${stats.progress_percent ?? 0}%`,
+      icon: TrendingUp,
       tone: "text-violet-600 dark:text-violet-400",
       bg: "bg-violet-500/10",
     },
@@ -117,22 +117,6 @@ export function StudentStatsCards({
           </Card>
         ))}
       </div>
-      {stats.progress_percent != null ? (
-        <Card className="mt-3 border-border/80">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10">
-              <TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">Tiến độ lịch học</p>
-              <p className="text-muted-foreground text-xs">
-                {stats.total_lessons_completed}/{stats.total_lessons_assigned} bài đã hoàn thành
-                trong lộ trình — {stats.progress_percent}%
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
     </div>
   );
 }

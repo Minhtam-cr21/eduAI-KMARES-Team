@@ -44,7 +44,9 @@ export async function GET() {
   const courseIds = list.map((r) => r.course_id as string);
   const { data: coursesData, error: cErr } = await supabase
     .from("courses")
-    .select("id, title, description, thumbnail_url, course_type, category, teacher_id, status")
+    .select(
+      "id, title, description, thumbnail_url, image_url, course_type, category, category_id, teacher_id, status, price, original_price, duration_hours, total_lessons, rating, reviews_count, level"
+    )
     .in("id", courseIds);
 
   if (cErr) {

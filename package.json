@@ -14,6 +14,7 @@
     "ingest:roadmap": "npx tsx scripts/ingest-roadmap.ts",
     "ingest:roadmaps": "ts-node -P ./scripts/tsconfig.json --transpile-only ./scripts/ingest-roadmaps.ts",
     "seed:courses": "npx tsx scripts/seed-courses.ts",
+    "seed:advanced": "npx tsx scripts/seed-courses-advanced.ts",
     "seed:new-courses": "npx tsx scripts/seed-new-courses.ts",
     "seed:codelearn": "npx tsx scripts/seed-courses-codelearn.ts",
     "supabase:deploy:deadlines": "node scripts/deploy-edge-deadlines.mjs",

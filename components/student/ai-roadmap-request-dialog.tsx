@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 type RoadmapModule = {
@@ -28,7 +28,11 @@ type RoadmapPayload = {
   reasoning: string;
 };
 
-export function AiRoadmapRequestDialog() {
+export function AiRoadmapRequestDialog({
+  renderTrigger,
+}: {
+  renderTrigger?: (a: { open: () => void }) => ReactNode;
+} = {}) {
   const [open, setOpen] = useState(false);
   const [goal, setGoal] = useState("");
   const [timeframe, setTimeframe] = useState("");
@@ -109,21 +113,25 @@ export function AiRoadmapRequestDialog() {
 
   return (
     <>
-      <button
-        type="button"
-        className="flex w-full items-start gap-4 rounded-xl border border-border bg-card p-5 text-left transition hover:border-primary/30 hover:shadow-md"
-        onClick={() => setOpen(true)}
-      >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-600 dark:text-cyan-400">
-          <Sparkles className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="font-semibold text-foreground">Yêu cầu AI tạo lộ trình</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            RAG từ tài liệu roadmap Python; lưu bản nháp, có thể gửi giáo viên duyệt.
-          </p>
-        </div>
-      </button>
+      {renderTrigger ? (
+        renderTrigger({ open: () => setOpen(true) })
+      ) : (
+        <button
+          type="button"
+          className="flex w-full items-start gap-4 rounded-xl border border-border bg-card p-5 text-left transition hover:border-primary/30 hover:shadow-md"
+          onClick={() => setOpen(true)}
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-600 dark:text-cyan-400">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">Yêu cầu AI tạo lộ trình</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              RAG từ tài liệu roadmap Python; lưu bản nháp, có thể gửi giáo viên duyệt.
+            </p>
+          </div>
+        </button>
+      )}
 
       <Dialog
         open={open}

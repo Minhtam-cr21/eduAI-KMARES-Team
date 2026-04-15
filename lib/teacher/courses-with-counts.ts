@@ -28,6 +28,8 @@ export type TeacherCourseRow = {
   recommendations: string | null;
   what_you_will_learn: string[] | null;
   requirements: string[] | null;
+  highlights: string[] | null;
+  outcomes_after: string[] | null;
   faq: unknown | null;
   content: string | null;
   created_at: string;
@@ -87,6 +89,8 @@ export async function loadTeacherCoursesWithCounts(
       recommendations: (row.recommendations as string | null) ?? null,
       what_you_will_learn: (row.what_you_will_learn as string[] | null) ?? null,
       requirements: (row.requirements as string[] | null) ?? null,
+      highlights: (row.highlights as string[] | null) ?? null,
+      outcomes_after: (row.outcomes_after as string[] | null) ?? null,
       faq: row.faq ?? null,
       content: (row.content as string | null) ?? null,
       created_at: row.created_at as string,

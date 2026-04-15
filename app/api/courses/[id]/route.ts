@@ -35,6 +35,7 @@ export async function GET(
       thumbnail_url, image_url, promo_video_url, teacher_id,
       price, original_price, duration_hours, total_lessons, rating, level, enrolled_count, reviews_count,
       objectives, target_audience, recommendations, what_you_will_learn, requirements, faq,
+      highlights, outcomes_after,
       is_published, created_at, updated_at,
       course_categories ( id, name, slug, icon ),
       profiles!courses_teacher_id_fkey ( id, full_name, avatar_url )
@@ -59,13 +60,76 @@ export async function GET(
 
   const { data: lessons, error: lErr } = await supabase
     .from("course_lessons")
-    .select("id, title, order_index, video_url, status")
+    .select(
+      "id, title, order_index, video_url, status, chapter_id, type, time_estimate, content"
+    )
     .eq("course_id", params.id)
     .eq("status", "published")
     .order("order_index", { ascending: true });
 
   if (lErr) {
     return NextResponse.json({ error: lErr.message }, { status: 500 });
+  }
+
+  const { data: benefitRows, error: bErr } = await supabase
+    .from("course_benefits")
+    .select("id, icon, title, description, display_order")
+    .eq("course_id", params.id)
+    .order("display_order", { ascending: true });
+
+  if (bErr) {
+    return NextResponse.json({ error: bErr.message }, { status: 500 });
+  }
+
+  const { data: chapterRows, error: chErr } = await supabase
+    .from("course_chapters")
+    .select("id, title, description, order_index")
+    .eq("course_id", params.id)
+    .order("order_index", { ascending: true });
+
+  if (chErr) {
+    return NextResponse.json({ error: chErr.message }, { status: 500 });
+  }
+
+  const lessonList = lessons ?? [];
+  type CurriculumChapterRow = {
+    id: string | null;
+    title: unknown;
+    description: unknown;
+    order_index: unknown;
+    lessons: typeof lessonList;
+  };
+
+  const chapters: CurriculumChapterRow[] = (chapterRows ?? []).map((ch) => {
+    const o = ch as Record<string, unknown>;
+    const chId = o.id as string;
+    return {
+      id: chId,
+      title: o.title,
+      description: o.description,
+      order_index: o.order_index,
+      lessons: lessonList.filter((l) => (l as { chapter_id?: string }).chapter_id === chId),
+    };
+  });
+
+  const orphanLessons = lessonList.filter(
+    (l) => !(l as { chapter_id?: string | null }).chapter_id
+  );
+  const orphanChapter: CurriculumChapterRow = {
+    id: null,
+    title: "Nội dung khóa học",
+    description: null,
+    order_index: 9999,
+    lessons: orphanLessons,
+  };
+  let curriculum_chapters: CurriculumChapterRow[] =
+    chapters.length === 0 && orphanLessons.length > 0
+      ? [orphanChapter]
+      : chapters.length > 0
+        ? [...chapters]
+        : [];
+  if (chapters.length > 0 && orphanLessons.length > 0) {
+    curriculum_chapters = [...curriculum_chapters, orphanChapter];
   }
 
   const { data: reviewRows, error: rErr } = await supabase
@@ -111,7 +175,9 @@ export async function GET(
 
   return NextResponse.json({
     course: { ...row, teacher, category },
-    lessons: lessons ?? [],
+    lessons: lessonList,
+    chapters: curriculum_chapters,
+    benefits: benefitRows ?? [],
     reviews,
     review_stats: stats,
     my_review,

@@ -201,7 +201,7 @@ export default function StudentCourseDetailPage() {
     }));
     const next = withPr.find((x) => x.pr?.progress_status !== "completed");
     const pick = next?.l ?? lessons[0];
-    return `/student/courses/${courseId}/lessons/${pick.id}`;
+    return `/learn/${pick.id}`;
   }, [detail, lessonProgress, courseId]);
 
   async function enroll() {

@@ -86,6 +86,8 @@ export async function POST(request: Request) {
     what_you_will_learn: d.what_you_will_learn ?? null,
     requirements: d.requirements ?? null,
     faq: d.faq ?? null,
+    highlights: d.highlights ?? null,
+    outcomes_after: d.outcomes_after ?? null,
   };
 
   const { data, error } = await supabase
@@ -100,9 +102,12 @@ export async function POST(request: Request) {
   return NextResponse.json(data, { status: 201 });
 }
 
-/** GET — danh sách khóa published (phân trang + lọc category + search). */
+/** GET — danh sách khóa published (phân trang + lọc category + search + sort + enrollment). */
 export async function GET(request: Request) {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10", 10)));
@@ -113,6 +118,8 @@ export async function GET(request: Request) {
   const course_type = searchParams.get("course_type");
   const search =
     searchParams.get("search") ?? searchParams.get("q") ?? undefined;
+  const sort = searchParams.get("sort") ?? undefined;
+  const enrollment = searchParams.get("enrollment") ?? "all";
 
   let categoryId: string | null = null;
   if (categorySlug && categorySlug !== "all") {
@@ -145,12 +152,42 @@ export async function GET(request: Request) {
     query = query.or(`title.ilike.${pattern},description.ilike.${pattern}`);
   }
 
+  let enrolledIds: string[] = [];
+  if (user && (enrollment === "enrolled" || enrollment === "not_enrolled")) {
+    const { data: ucRows } = await supabase
+      .from("user_courses")
+      .select("course_id")
+      .eq("user_id", user.id)
+      .neq("status", "dropped");
+    enrolledIds = (ucRows ?? []).map((r) => r.course_id as string);
+  }
+
+  if (enrollment === "enrolled") {
+    if (enrolledIds.length === 0) {
+      return NextResponse.json({
+        data: [],
+        count: 0,
+        page,
+        limit,
+      });
+    }
+    query = query.in("id", enrolledIds);
+  } else if (enrollment === "not_enrolled" && enrolledIds.length > 0) {
+    query = query.not("id", "in", `(${enrolledIds.join(",")})`);
+  }
+
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
-  const { data, error, count } = await query
-    .range(from, to)
-    .order("created_at", { ascending: false });
+  if (sort === "popular") {
+    query = query
+      .order("enrolled_count", { ascending: false })
+      .order("rating", { ascending: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
+
+  const { data, error, count } = await query.range(from, to);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

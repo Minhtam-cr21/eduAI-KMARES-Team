@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { AICourseDraft } from "@/lib/ai/ai-course-draft";
+import { normalizeCourseCategory } from "@/lib/constants/course-categories";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -199,7 +200,7 @@ export function AICourseGeneratorDialog({ open, onOpenChange, onSaved }: Props) 
             description: draft.description.trim() || null,
             content: contentForDb,
             course_type: draft.course_type,
-            category: draft.category.trim(),
+            category: normalizeCourseCategory(draft.category.trim()),
             thumbnail_url: draft.thumbnail_url?.trim() || null,
           },
           lessonsData: draft.lessons.map((l) => ({

@@ -23,6 +23,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { AICourseDraft } from "@/lib/ai/ai-course-draft";
+import {
+  COURSE_CATEGORY_OPTIONS,
+  normalizeCourseCategory,
+} from "@/lib/constants/course-categories";
 import { cn } from "@/lib/utils";
 import { GripVertical } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -218,34 +222,27 @@ export function CoursePreviewEditor({
                 }
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="pv-cat">Danh mục</Label>
-                <Input
-                  id="pv-cat"
-                  value={value.category}
-                  disabled={disabled}
-                  onChange={(e) => onChange({ ...value, category: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="pv-type">Loại</Label>
-                <select
-                  id="pv-type"
-                  disabled={disabled}
-                  value={value.course_type}
-                  onChange={(e) =>
-                    onChange({
-                      ...value,
-                      course_type: e.target.value as AICourseDraft["course_type"],
-                    })
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="skill">Kỹ năng</option>
-                  <option value="role">Vai trò</option>
-                </select>
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pv-cat">Danh mục</Label>
+              <select
+                id="pv-cat"
+                disabled={disabled}
+                value={normalizeCourseCategory(value.category)}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    category: e.target.value,
+                    course_type: "skill",
+                  })
+                }
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {COURSE_CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pv-thumb">Thumbnail URL</Label>

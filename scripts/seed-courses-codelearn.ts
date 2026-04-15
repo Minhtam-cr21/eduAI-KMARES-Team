@@ -1,11 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
-import "dotenv/config";
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Next.js uses .env.local; default dotenv only reads .env — load both (local first).
+config({ path: resolve(process.cwd(), ".env.local") });
+config({ path: resolve(process.cwd(), ".env") });
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!url || !key) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  console.error(
+    "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.\n" +
+      "  Put them in .env.local or .env at the project root.\n" +
+      `  URL: ${url ? "ok" : "missing"} · Service role: ${key ? "ok" : "missing"}`
+  );
   process.exit(1);
 }
 

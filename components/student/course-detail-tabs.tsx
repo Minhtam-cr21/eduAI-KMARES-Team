@@ -207,7 +207,7 @@ export function CourseDetailTabs({
                         <div className="flex flex-wrap gap-2 pb-2">
                           {enrolled ? (
                             <Link
-                              href={`/student/courses/${courseId}/lessons/${lesson.id}`}
+                              href={`/learn/${lesson.id}`}
                               className={cn(
                                 buttonVariants({ size: "sm" }),
                                 "inline-flex items-center justify-center"

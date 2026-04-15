@@ -1,3 +1,4 @@
+import { LessonCompleteActions } from "@/components/student/lesson-complete-actions";
 import {
   LessonActivityPing,
   LessonScheduleCompleteSection,
@@ -30,7 +31,9 @@ export default async function LearnCourseLessonPage({
 
   const { data: lesson, error: lErr } = await supabase
     .from("course_lessons")
-    .select("id, title, content, video_url, code_template, course_id, status")
+    .select(
+      "id, title, content, video_url, code_template, course_id, status, type, time_estimate"
+    )
     .eq("id", lessonId)
     .maybeSingle();
 
@@ -75,6 +78,15 @@ export default async function LearnCourseLessonPage({
       </>
     );
   }
+
+  const { data: progRow } = await supabase
+    .from("user_course_progress")
+    .select("status")
+    .eq("user_id", user.id)
+    .eq("course_id", lesson.course_id as string)
+    .eq("lesson_id", lessonId)
+    .maybeSingle();
+  const lessonCompleted = progRow?.status === "completed";
 
   const videoSrc = normalizeVideoEmbedUrl(lesson.video_url as string | null);
   const content = (lesson.content as string | null)?.trim() ?? "";
@@ -122,6 +134,13 @@ export default async function LearnCourseLessonPage({
         </div>
 
         <div className="mt-10 flex flex-col gap-4 border-t border-border pt-6 sm:flex-row sm:flex-wrap sm:items-center">
+          <LessonCompleteActions
+            courseId={String(lesson.course_id)}
+            lessonId={lessonId}
+            lessonType={(lesson.type as string | null) ?? "text"}
+            hasVideo={!!videoSrc}
+            initialCompleted={lessonCompleted === true}
+          />
           <LessonScheduleCompleteSection lessonId={lessonId} />
 
           <Link

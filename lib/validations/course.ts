@@ -38,6 +38,8 @@ export const courseSchema = z.object({
   what_you_will_learn: stringArray,
   requirements: stringArray,
   faq: z.unknown().optional().nullable(),
+  highlights: stringArray,
+  outcomes_after: stringArray,
 });
 
 export type CourseBody = z.infer<typeof courseSchema>;

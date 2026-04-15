@@ -151,6 +151,8 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
     const objectives = linesFromFd(fd, "objectives");
     const whatYouLearn = linesFromFd(fd, "what_you_will_learn");
     const requirements = linesFromFd(fd, "requirements");
+    const highlights = linesFromFd(fd, "highlights");
+    const outcomesAfter = linesFromFd(fd, "outcomes_after");
     const priceRaw = String(fd.get("price") ?? "").trim();
     const durRaw = String(fd.get("duration_hours") ?? "").trim();
     const faqRaw = String(fd.get("faq_json") ?? "").trim();
@@ -180,6 +182,8 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
         String(fd.get("recommendations") ?? "").trim() || null,
       what_you_will_learn: whatYouLearn.length ? whatYouLearn : null,
       requirements: requirements.length ? requirements : null,
+      highlights: highlights.length ? highlights : null,
+      outcomes_after: outcomesAfter.length ? outcomesAfter : null,
       image_url: String(fd.get("image_url") ?? "").trim() || null,
       promo_video_url:
         String(fd.get("promo_video_url") ?? "").trim() || null,
@@ -595,6 +599,14 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
               <Textarea id="c-req" name="requirements" rows={2} />
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="c-high">Highlights (mỗi dòng)</Label>
+              <Textarea id="c-high" name="highlights" rows={2} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-out">Kết quả sau học (mỗi dòng)</Label>
+              <Textarea id="c-out" name="outcomes_after" rows={2} />
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="c-content">Nội dung chi tiết (tùy chọn)</Label>
               <Textarea id="c-content" name="content" rows={4} />
             </div>
@@ -796,6 +808,24 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                   name="requirements"
                   rows={2}
                   defaultValue={(editing.requirements ?? []).join("\n")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="e-high">Highlights</Label>
+                <Textarea
+                  id="e-high"
+                  name="highlights"
+                  rows={2}
+                  defaultValue={(editing.highlights ?? []).join("\n")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="e-out">Kết quả sau học</Label>
+                <Textarea
+                  id="e-out"
+                  name="outcomes_after"
+                  rows={2}
+                  defaultValue={(editing.outcomes_after ?? []).join("\n")}
                 />
               </div>
               <div className="space-y-1.5">
