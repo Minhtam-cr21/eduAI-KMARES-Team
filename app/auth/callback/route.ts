@@ -18,10 +18,12 @@ function copyCookies(from: NextResponse, to: NextResponse) {
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
+  const tokenHash = url.searchParams.get("token_hash");
+  const type = url.searchParams.get("type");
   const next = url.searchParams.get("next");
   const origin = getRequestOrigin(request);
 
-  if (!code) {
+  if (!code && !tokenHash) {
     return NextResponse.redirect(
       new URL("/login?error=oauth_missing_code", origin)
     );
@@ -72,11 +74,29 @@ export async function GET(request: NextRequest) {
     }
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  let authError: { message: string } | null = null;
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    authError = error;
+  } else if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: type as
+        | "signup"
+        | "invite"
+        | "magiclink"
+        | "recovery"
+        | "email_change"
+        | "email",
+    });
+    authError = error;
+  } else {
+    authError = { message: "Auth callback thiếu type/token hợp lệ." };
+  }
 
-  if (error) {
-    console.error("[auth/callback] exchangeCodeForSession:", error.message);
-    return errorRedirect(error.message);
+  if (authError) {
+    console.error("[auth/callback] auth exchange:", authError.message);
+    return errorRedirect(authError.message);
   }
 
   const {

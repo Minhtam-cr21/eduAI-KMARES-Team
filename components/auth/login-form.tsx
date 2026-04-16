@@ -1,9 +1,11 @@
 "use client";
 
-import { loginAction } from "@/lib/actions/auth";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { studentPostAuthPath } from "@/lib/auth/student-post-auth";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +16,7 @@ type Props = {
 };
 
 export function LoginForm({ oauthError }: Props) {
+  const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(
     oauthError ?? null
   );
@@ -30,10 +33,79 @@ export function LoginForm({ oauthError }: Props) {
   function onSubmit(data: LoginInput) {
     setServerError(null);
     startTransition(async () => {
-      const result = await loginAction({ ...data, selectedRole });
-      if (result?.error) {
-        setServerError(result.error);
+      const supabase = createSupabaseBrowserClient();
+      const { error, data: authData } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (error) {
+        setServerError(error.message);
+        return;
       }
+
+      const userId = authData.user?.id;
+      if (!userId) {
+        setServerError("Không tạo được phiên đăng nhập. Vui lòng thử lại.");
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role, assessment_completed, onboarding_completed")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (profileError) {
+        setServerError(profileError.message);
+        return;
+      }
+
+      if (!profile) {
+        const { error: insertError } = await supabase.from("profiles").insert({
+          id: userId,
+          full_name: authData.user?.user_metadata?.full_name ?? null,
+          role: "student",
+        });
+        if (insertError) {
+          setServerError(insertError.message);
+          return;
+        }
+        router.replace("/student");
+        router.refresh();
+        return;
+      }
+
+      if (profile.role !== "admin") {
+        if (selectedRole === "teacher" && profile.role !== "teacher") {
+          await supabase.auth.signOut();
+          setServerError(
+            "Tài khoản này không phải là giáo viên. Vui lòng chọn đúng cổng đăng nhập hoặc liên hệ admin."
+          );
+          return;
+        }
+        if (selectedRole === "student" && profile.role === "teacher") {
+          await supabase.auth.signOut();
+          setServerError(
+            "Tài khoản này là giáo viên. Vui lòng chọn cổng \"Giáo viên\" để đăng nhập."
+          );
+          return;
+        }
+      }
+
+      if (profile.role === "admin") {
+        router.replace("/admin");
+      } else if (profile.role === "teacher") {
+        router.replace("/teacher");
+      } else {
+        router.replace(
+          studentPostAuthPath({
+            assessment_completed: profile.assessment_completed,
+            onboarding_completed: profile.onboarding_completed,
+          })
+        );
+      }
+      router.refresh();
     });
   }
 

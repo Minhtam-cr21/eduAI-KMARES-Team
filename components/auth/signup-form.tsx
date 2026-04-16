@@ -1,10 +1,11 @@
 "use client";
 
-import { finalizePasswordSignupAction } from "@/lib/actions/auth";
+import { getBrowserSiteOrigin } from "@/lib/site-origin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { signupSchema, type SignupInput } from "@/lib/validations/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { GoogleSignInButton } from "./google-sign-in-button";
@@ -27,6 +28,7 @@ function translateSignupError(raw: string): string {
 }
 
 export function SignupForm() {
+  const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -41,9 +43,7 @@ export function SignupForm() {
     setInfo(null);
     startTransition(async () => {
       const supabase = createSupabaseBrowserClient();
-      const origin =
-        process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ||
-        (typeof window !== "undefined" ? window.location.origin : "");
+      const origin = getBrowserSiteOrigin();
 
       const { data: signData, error } = await supabase.auth.signUp({
         email: data.email,
@@ -69,7 +69,24 @@ export function SignupForm() {
       }
 
       if (signData.session?.user) {
-        await finalizePasswordSignupAction(data.full_name?.trim() || null);
+        const fullName = data.full_name?.trim() || null;
+        const { error: profileError } = await supabase.from("profiles").upsert(
+          {
+            id: signData.session.user.id,
+            full_name: fullName,
+            role: "student",
+          },
+          {
+            onConflict: "id",
+            ignoreDuplicates: false,
+          }
+        );
+        if (profileError) {
+          setServerError(translateSignupError(profileError.message));
+          return;
+        }
+        router.replace("/student");
+        router.refresh();
         return;
       }
 

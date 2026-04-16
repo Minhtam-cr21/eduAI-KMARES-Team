@@ -1,5 +1,6 @@
 "use client";
 
+import { getBrowserSiteOrigin } from "@/lib/site-origin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type Props = {
@@ -9,9 +10,7 @@ type Props = {
 export function GoogleSignInButton({ label = "Đăng nhập bằng Google" }: Props) {
   async function handleClick() {
     const supabase = createSupabaseBrowserClient();
-    const origin =
-      process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ||
-      window.location.origin;
+    const origin = getBrowserSiteOrigin();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

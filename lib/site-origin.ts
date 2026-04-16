@@ -12,6 +12,17 @@ export function getSiteOrigin(): string {
 }
 
 /**
+ * Trên browser, auth redirect/callback nên ưu tiên đúng origin hiện tại
+ * (preview/custom domain trên Vercel) thay vì cố ép canonical env URL.
+ */
+export function getBrowserSiteOrigin(): string {
+  if (typeof window !== "undefined" && window.location.origin) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  return getSiteOrigin();
+}
+
+/**
  * Origin của **request hiện tại** — dùng cho redirect sau `/auth/callback`.
  * Tránh redirect sang host khác `NEXT_PUBLIC_APP_URL` (custom domain, preview Vercel)
  * khiến cookie session không khớp domain → không giữ đăng nhập.
