@@ -48,11 +48,12 @@ const features = [
   },
 ];
 
+// Landing: KMARES Team roster (edit here when membership changes).
 const teachers = [
-  { name: "Nguyễn Văn A", subject: "Python & Data Science", avatar: "NV" },
-  { name: "Trần Thị B", subject: "Frontend & React", avatar: "TT" },
-  { name: "Lê Hoàng C", subject: "C++ & Thuật toán", avatar: "LH" },
-  { name: "Phạm Minh D", subject: "Backend & SQL", avatar: "PM" },
+  { name: "Nguyễn Minh Tâm", subject: "Python & Data Science", avatar: "MT" },
+  { name: "Trần Quốc Huy", subject: "Frontend & React", avatar: "TH" },
+  { name: "Lê Ngọc Ánh", subject: "C++ & Thuật toán", avatar: "NA" },
+  { name: "Phạm Đình Khôi", subject: "Backend & SQL", avatar: "PK" },
 ];
 
 export default function HomePage() {
