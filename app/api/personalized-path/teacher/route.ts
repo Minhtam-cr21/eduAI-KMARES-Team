@@ -1,4 +1,8 @@
 import { getTeacherOrAdminSupabase } from "@/lib/auth/assert-teacher-api";
+import { teacherPathReviewCreateSchema } from "@/lib/teacher/review-contracts";
+import { insertTeacherReviewEvent, listTeacherReviewEvents } from "@/lib/teacher/review-store";
+import { schemaSyncErrorResponse } from "@/lib/supabase/schema-sync";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -22,6 +26,13 @@ const postBodySchema = z.object({
     })
   ),
   status: z.enum(["draft", "pending_student_approval"]),
+  reviewStatus: teacherPathReviewCreateSchema.shape.reviewStatus.optional(),
+  reviewNote: teacherPathReviewCreateSchema.shape.reviewNote.optional(),
+  adjustmentNote: teacherPathReviewCreateSchema.shape.adjustmentNote.optional(),
+  suggestionSource: teacherPathReviewCreateSchema.shape.suggestionSource.optional(),
+  reasoning: teacherPathReviewCreateSchema.shape.reasoning.optional(),
+  learnerSignalsUsed: teacherPathReviewCreateSchema.shape.learnerSignalsUsed.optional(),
+  pathStatus: teacherPathReviewCreateSchema.shape.pathStatus.optional(),
 });
 
 function normalizeSequence(
@@ -93,7 +104,46 @@ export async function GET() {
     student_name: r.student_id ? nameById.get(r.student_id) ?? null : null,
   }));
 
-  return NextResponse.json({ paths: rows });
+  const pathIds = rows.map((row) => row.id as string);
+  const reviewResult =
+    pathIds.length > 0
+      ? await listTeacherReviewEvents(supabase, {
+          reviewKind: "personalized_path",
+          teacherId: me?.role === "admin" ? undefined : userId,
+          limit: 200,
+        })
+      : { data: [], error: null, schemaError: null };
+
+  if (reviewResult.schemaError) {
+    return schemaSyncErrorResponse(reviewResult.schemaError);
+  }
+
+  if (reviewResult.error) {
+    return NextResponse.json({ error: reviewResult.error }, { status: 500 });
+  }
+
+  const latestReviewByPathId = new Map<
+    string,
+    { review_status: string; created_at: string; source: string | null }
+  >();
+  for (const review of reviewResult.data) {
+    if (!review.path_id || !pathIds.includes(review.path_id)) continue;
+    if (latestReviewByPathId.has(review.path_id)) continue;
+    latestReviewByPathId.set(review.path_id, {
+      review_status: review.review_status,
+      created_at: review.created_at,
+      source: review.source,
+    });
+  }
+
+  return NextResponse.json({
+    paths: rows.map((row) => ({
+      ...row,
+      latest_review_status: latestReviewByPathId.get(row.id)?.review_status ?? null,
+      latest_reviewed_at: latestReviewByPathId.get(row.id)?.created_at ?? null,
+      latest_review_source: latestReviewByPathId.get(row.id)?.source ?? null,
+    })),
+  });
 }
 
 /** POST — tạo mới hoặc cập nhật lộ trình cho học sinh. */
@@ -160,7 +210,33 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, pathId: data?.id ?? editable.id });
+
+    const pathId = data?.id ?? editable.id;
+    const reviewInsert = await maybeInsertPathReview({
+      supabase,
+      teacherId: userId,
+      studentId,
+      pathId,
+      reviewStatus:
+        parsed.data.reviewStatus ??
+        (status === "pending_student_approval" ? "sent_to_student" : "reviewed"),
+      reviewNote: parsed.data.reviewNote,
+      adjustmentNote: parsed.data.adjustmentNote,
+      suggestionSource: parsed.data.suggestionSource,
+      reasoning: parsed.data.reasoning,
+      learnerSignalsUsed: parsed.data.learnerSignalsUsed,
+      pathStatus: status,
+      sequenceLength: course_sequence.length,
+    });
+
+    if (reviewInsert.error) {
+      if (reviewInsert.schemaError) {
+        return schemaSyncErrorResponse(reviewInsert.schemaError);
+      }
+      return NextResponse.json({ error: reviewInsert.error }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, pathId });
   }
 
   const { data: inserted, error: insErr } = await supabase
@@ -178,5 +254,95 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, pathId: inserted?.id });
+  const pathId = inserted?.id;
+  if (!pathId) {
+    return NextResponse.json({ error: "Không tạo được pathId." }, { status: 500 });
+  }
+
+  const reviewInsert = await maybeInsertPathReview({
+    supabase,
+    teacherId: userId,
+    studentId,
+    pathId,
+    reviewStatus:
+      parsed.data.reviewStatus ??
+      (status === "pending_student_approval" ? "sent_to_student" : "reviewed"),
+    reviewNote: parsed.data.reviewNote,
+    adjustmentNote: parsed.data.adjustmentNote,
+    suggestionSource: parsed.data.suggestionSource,
+    reasoning: parsed.data.reasoning,
+    learnerSignalsUsed: parsed.data.learnerSignalsUsed,
+    pathStatus: status,
+    sequenceLength: course_sequence.length,
+  });
+
+  if (reviewInsert.error) {
+    if (reviewInsert.schemaError) {
+      return schemaSyncErrorResponse(reviewInsert.schemaError);
+    }
+    return NextResponse.json({ error: reviewInsert.error }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, pathId });
+}
+
+async function maybeInsertPathReview(args: {
+  supabase: SupabaseClient;
+  teacherId: string;
+  studentId: string;
+  pathId: string;
+  reviewStatus: z.infer<typeof teacherPathReviewCreateSchema.shape.reviewStatus>;
+  reviewNote?: string;
+  adjustmentNote?: string;
+  suggestionSource?: z.infer<typeof teacherPathReviewCreateSchema.shape.suggestionSource>;
+  reasoning?: string;
+  learnerSignalsUsed?: z.infer<
+    typeof teacherPathReviewCreateSchema.shape.learnerSignalsUsed
+  >;
+  pathStatus?: string | null;
+  sequenceLength: number;
+}) {
+  if (!args.reasoning && !args.reviewNote && !args.adjustmentNote) {
+    return { error: null, schemaError: null };
+  }
+
+  const reviewParsed = teacherPathReviewCreateSchema.safeParse({
+    pathId: args.pathId,
+    studentId: args.studentId,
+    reviewStatus: args.reviewStatus,
+    reviewNote: args.reviewNote ?? "",
+    adjustmentNote: args.adjustmentNote ?? "",
+    suggestionSource: args.suggestionSource ?? null,
+    reasoning: args.reasoning ?? "Teacher-reviewed personalized path.",
+    learnerSignalsUsed: args.learnerSignalsUsed ?? [],
+    pathStatus: args.pathStatus ?? null,
+    sequenceLength: args.sequenceLength,
+  });
+
+  if (!reviewParsed.success) {
+    return {
+      error: reviewParsed.error.issues[0]?.message ?? "Invalid path review.",
+      schemaError: null,
+    };
+  }
+
+  const inserted = await insertTeacherReviewEvent(args.supabase, {
+    teacher_id: args.teacherId,
+    student_id: args.studentId,
+    path_id: args.pathId,
+    review_kind: "personalized_path",
+    review_status: reviewParsed.data.reviewStatus,
+    source: reviewParsed.data.suggestionSource ?? null,
+    review_note: reviewParsed.data.reviewNote || null,
+    adjustment_note: reviewParsed.data.adjustmentNote || null,
+    snapshot: {
+      reasoning: reviewParsed.data.reasoning,
+      suggestion_source: reviewParsed.data.suggestionSource ?? null,
+      learner_signals_used: reviewParsed.data.learnerSignalsUsed,
+      path_status: reviewParsed.data.pathStatus ?? null,
+      sequence_length: reviewParsed.data.sequenceLength,
+    },
+  });
+
+  return { error: inserted.error, schemaError: inserted.schemaError };
 }

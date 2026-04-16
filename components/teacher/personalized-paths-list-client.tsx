@@ -19,6 +19,8 @@ type PathListRow = {
   status: string;
   updated_at: string | null;
   student_name: string | null;
+  latest_review_status?: string | null;
+  latest_reviewed_at?: string | null;
 };
 
 const LABEL: Record<string, string> = {
@@ -28,6 +30,13 @@ const LABEL: Record<string, string> = {
   revision_requested: "Học sinh góp ý",
   active: "Đang học",
   paused: "Tạm dừng",
+};
+
+const REVIEW_LABEL: Record<string, string> = {
+  reviewed: "Đã review",
+  adjusted: "Đã chỉnh",
+  sent_to_student: "Đã gửi HS",
+  monitoring: "Theo dõi",
 };
 
 export function PersonalizedPathsListClient() {
@@ -72,6 +81,7 @@ export function PersonalizedPathsListClient() {
           <TableRow>
             <TableHead>Học sinh</TableHead>
             <TableHead>Trạng thái</TableHead>
+            <TableHead>Review</TableHead>
             <TableHead>Cập nhật</TableHead>
             <TableHead className="text-right">Thao tác</TableHead>
           </TableRow>
@@ -79,7 +89,7 @@ export function PersonalizedPathsListClient() {
         <TableBody>
           {paths.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-muted-foreground">
+              <TableCell colSpan={5} className="text-muted-foreground">
                 Chưa có lộ trình nào.
               </TableCell>
             </TableRow>
@@ -91,6 +101,15 @@ export function PersonalizedPathsListClient() {
                 </TableCell>
                 <TableCell>
                   {LABEL[p.status] ?? p.status}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {p.latest_review_status
+                    ? `${REVIEW_LABEL[p.latest_review_status] ?? p.latest_review_status}${
+                        p.latest_reviewed_at
+                          ? ` · ${new Date(p.latest_reviewed_at).toLocaleString("vi-VN")}`
+                          : ""
+                      }`
+                    : "—"}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {p.updated_at

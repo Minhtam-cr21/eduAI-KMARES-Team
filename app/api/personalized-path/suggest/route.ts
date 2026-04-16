@@ -1,5 +1,9 @@
 import { generatePathFromAssessment } from "@/lib/assessment/path-generator";
 import { getTeacherOrAdminSupabase } from "@/lib/auth/assert-teacher-api";
+import {
+  SchemaSyncError,
+  schemaSyncErrorResponse,
+} from "@/lib/supabase/schema-sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -16,7 +20,7 @@ async function suggestForStudent(studentId: string, supabase: SupabaseClient) {
   return generatePathFromAssessment(studentId, supabase);
 }
 
-/** GET ?studentId=uuid — cùng payload với POST (courseSequence + reasoning). */
+/** GET ?studentId=uuid — giữ payload cũ và thêm metadata additive cho Phase 4. */
 export async function GET(request: Request) {
   const gate = await getTeacherOrAdminSupabase();
   if (!gate.ok) return gate.response;
@@ -31,12 +35,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { courseSequence, reasoning } = await suggestForStudent(
-      parsed.data,
-      gate.supabase
-    );
-    return NextResponse.json({ courseSequence, reasoning });
+    const suggestion = await suggestForStudent(parsed.data, gate.supabase);
+    return NextResponse.json(suggestion);
   } catch (e) {
+    if (e instanceof SchemaSyncError) {
+      return schemaSyncErrorResponse(e);
+    }
     const msg = e instanceof Error ? e.message : "Lỗi gợi ý lộ trình";
     console.error("[personalized-path/suggest GET]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -63,12 +67,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { courseSequence, reasoning } = await suggestForStudent(
-      parsed.data.studentId,
-      gate.supabase
-    );
-    return NextResponse.json({ courseSequence, reasoning });
+    const suggestion = await suggestForStudent(parsed.data.studentId, gate.supabase);
+    return NextResponse.json(suggestion);
   } catch (e) {
+    if (e instanceof SchemaSyncError) {
+      return schemaSyncErrorResponse(e);
+    }
     const msg = e instanceof Error ? e.message : "Lỗi gợi ý lộ trình";
     console.error("[personalized-path/suggest]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });

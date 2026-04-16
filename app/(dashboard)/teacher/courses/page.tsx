@@ -20,7 +20,8 @@ export default async function TeacherCoursesPage() {
           Khóa học của tôi
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Tạo, sửa, xóa khóa học và mở trang bài học.
+          Bảng này quản lý khóa học catalog hiện tại; luồng Edu V2 được tạo và
+          chỉnh sửa ở trình builder riêng.
         </p>
       </div>
       <TeacherCoursesManager initialCourses={courses} />

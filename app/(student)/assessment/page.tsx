@@ -7,8 +7,9 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AssessmentQuestion } from "@/lib/assessment/questions";
 import {
-  ASSESSMENT_QUESTIONS,
   ASSESSMENT_QUESTIONS_BY_GROUP,
+  ASSESSMENT_QUESTION_COUNTS,
+  groupAssessmentQuestions,
 } from "@/lib/assessment/questions";
 import {
   countAnsweredQuestions,
@@ -20,7 +21,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const LS_KEY = "assessment_answers_temp";
-const TOTAL = ASSESSMENT_QUESTIONS.length;
 
 type TabKey = keyof typeof ASSESSMENT_QUESTIONS_BY_GROUP;
 
@@ -270,24 +270,31 @@ export default function AssessmentPage() {
     return out;
   }, [radioAnswers, checkboxAnswers]);
 
+  const groupedQuestions = useMemo(
+    () => (questions?.length ? groupAssessmentQuestions(questions) : ASSESSMENT_QUESTIONS_BY_GROUP),
+    [questions]
+  );
+
+  const totalQuestions = questions?.length ?? ASSESSMENT_QUESTION_COUNTS.total;
+
   const answeredCount = useMemo(
     () => countAnsweredQuestions(mergedAnswers),
     [mergedAnswers]
   );
-  const progressPct = Math.round((answeredCount / TOTAL) * 100);
-  const canSubmit = answeredCount >= TOTAL && !submitting;
+  const progressPct = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+  const canSubmit = answeredCount >= totalQuestions && !submitting;
 
   const tabLabels = useMemo(() => {
     const map = new Map<TabKey, { answered: number; total: number }>();
     for (const key of TAB_ORDER) {
-      const list = ASSESSMENT_QUESTIONS_BY_GROUP[key];
+      const list = groupedQuestions[key];
       const answered = list.filter((q) =>
         isQuestionAnswered(q, mergedAnswers)
       ).length;
       map.set(key, { answered, total: list.length });
     }
     return map;
-  }, [mergedAnswers]);
+  }, [groupedQuestions, mergedAnswers]);
 
   async function handleSubmit() {
     if (!questions?.length || !canSubmit) return;
@@ -350,15 +357,17 @@ export default function AssessmentPage() {
             Trắc nghiệm định hướng
           </h1>
           <p className="text-muted-foreground text-sm">
-            50 câu (20 MBTI + 30 mở rộng). Tiến độ được lưu tạm trên trình duyệt
-            của bạn.
+            {ASSESSMENT_QUESTION_COUNTS.total} câu (
+            {ASSESSMENT_QUESTION_COUNTS.mbti} MBTI +{" "}
+            {ASSESSMENT_QUESTION_COUNTS.extended} mở rộng). Tiến độ được lưu tạm
+            trên trình duyệt của bạn.
           </p>
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Tiến độ</span>
             <span className="font-medium tabular-nums text-foreground">
-              {answeredCount}/{TOTAL} ({progressPct}%)
+              {answeredCount}/{totalQuestions} ({progressPct}%)
             </span>
           </div>
           <Progress value={progressPct} className="h-2" />
@@ -383,7 +392,7 @@ export default function AssessmentPage() {
 
         {TAB_ORDER.map((key) => (
           <TabsContent key={key} value={key} className="space-y-4">
-            {ASSESSMENT_QUESTIONS_BY_GROUP[key].map((q) => (
+            {groupedQuestions[key].map((q) => (
               <QuestionBlock
                 key={q.code}
                 q={q}

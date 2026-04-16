@@ -69,7 +69,7 @@ export function TeacherStudentsTable({ students }: Props) {
                     href={`/teacher/students/${s.id}`}
                     className="text-sm font-medium text-primary underline-offset-4 hover:underline"
                   >
-                    Xem
+                    Mở workspace
                   </Link>
                 </TableCell>
               </TableRow>

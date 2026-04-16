@@ -1,285 +1,104 @@
-﻿# Dự án: EduAI MVP
-# Techstack: Next.js 14 (App Router), TypeScript, Tailwind, shadcn/ui, Supabase
+﻿# EduAI Rework Rules
 
-## Cấu trúc thư mục (sơ đồ cây)
-eduai-mvp/
-├── app/
-│   ├── (auth)/login/page.tsx, signup/page.tsx — form (RHF + zod); logic auth trong server actions `lib/actions/auth.ts`
-│   ├── auth/callback/route.ts — OAuth PKCE (Google), exchange code → session
-│   ├── (student)/dashboard/page.tsx, learn/[lessonId]/page.tsx, debug/page.tsx
-│   ├── admin/topics/page.tsx — CRUD topics (shadcn Dialog); server actions `lib/actions/topics.ts`; `requireAdmin()` trong `lib/auth/require-admin.ts`
-│   ├── teacher/students/page.tsx
-│   ├── api/run-code/route.ts, ai-suggest/route.ts
-│   ├── layout.tsx
-│   └── page.tsx
-├── components/ui/ (shadcn)
-├── lib/supabase/client.ts, server.ts, browser.ts (OAuth / client-only)
-├── lib/actions/auth.ts, lib/actions/topics.ts (server actions; kiểm tra quyền trên server)
-├── lib/auth/require-admin.ts
-├── lib/validations/auth.ts, lib/validations/topic.ts (zod)
-├── components/admin/ (UI quản trị)
-├── supabase/migrations/*.sql (schema; áp dụng qua SQL Editor hoặc Supabase CLI)
-├── types/database.ts
-├── middleware.ts
-└── .env.local
+## 1. Mục tiêu dự án
+- Dự án đang ở giai đoạn `REWORK TOÀN BỘ`, không phát triển tính năng rời rạc.
+- Mục tiêu sản phẩm hiện tại:
+  - Giữ nguyên `login/signup`.
+  - Student app tập trung vào 4 trục: `Khóa học`, `Lộ trình cá nhân hóa`, `Lịch học thông minh`, `Profile`.
+  - Teacher app tập trung vào: `tạo khóa học`, `theo dõi học sinh`, `AI phân tích dữ liệu học tập/lịch học`, `đề xuất cải thiện lộ trình và lịch trình`.
+- Mọi thay đổi phải bám đúng tài liệu ở root repo và prompt phase hiện tại, không tự ý mở rộng sản phẩm.
 
-## Database (Supabase PostgreSQL)
-Các bảng chính:
-- **profiles**: mở rộng `auth.users` (role, full_name, goal, …); trigger `on_auth_user_created` tạo dòng khi đăng ký.
-- **topics**, **lessons**: nội dung khóa học; SELECT công khai khi `is_published = true`; admin có policy riêng trên `topics` (migration `002_topics_admin_rls`) để đọc/ghi toàn bộ.
-- **learning_paths**: gán bài cho học sinh (`student_id`, `lesson_id`, `status`, …).
-- **code_submissions**: lịch sử code / debug theo `user_id`.
+## 2. Vai trò làm việc
+- `Mentor (ChatGPT/Codex trong thread này)`:
+  - đọc toàn bộ thư mục,
+  - tạo prompt cho Cursor,
+  - kiểm tra kết quả sau mỗi phase,
+  - đánh giá chênh lệch giữa mục tiêu và code thực tế,
+  - cập nhật tài liệu định hướng.
+- `Cursor`:
+  - là coding executor,
+  - chỉ code khi có prompt rõ ràng,
+  - không tự quyết định kiến trúc ngoài phạm vi prompt,
+  - phải báo cáo lại bằng file markdown sau mỗi phase nếu prompt yêu cầu.
 
-RLS:
-- Luôn bật RLS trên mọi bảng mới; mọi truy cập phải có policy rõ ràng (không dựa vào “mặc định mở”).
-- Không bật quyền truy cập rộng (ví dụ `USING true` cho role authenticated) trừ khi có lý do và đã ghi chú.
-- Policy teacher cho `lessons` / `learning_paths`: thêm khi triển khai CMS (kiểm tra `profiles.role`).
+## 3. Nguồn sự thật phải đọc trước khi làm
+- Trước khi code hoặc refactor, luôn đọc:
+  - `PROJECT_AUDIT.md`
+  - `TARGET_ARCHITECTURE.md`
+  - `FEATURE_MATRIX.md`
+  - `DATA_TARGET_SCHEMA.md`
+  - `API_CONTRACTS.md`
+  - `MIGRATION_MAP.md`
+  - `MIGRATION_STRATEGY.md`
+  - `FINAL_REWORK_AUDIT.md`
+  - `MENTOR_WORKFLOW.md`
+  - `CURSOR_PHASE_PROTOCOL.md`
+- Nếu tài liệu và code mâu thuẫn nhau, ưu tiên:
+  1. trạng thái code thực tế,
+  2. sau đó cập nhật tài liệu,
+  3. không giả định tùy ý.
 
-## Auth flow
-- **Email/password:** `lib/actions/auth.ts` — `createClient()` từ `@/lib/supabase/server` (SSR cookies). Sau đăng nhập thành công: `redirect('/dashboard')`. Đăng ký: nếu project bật xác nhận email và không có session ngay, trả message thay vì redirect; nếu có session (confirm tắt), redirect dashboard và log dòng `profiles`.
-- **Google:** chỉ UI client (`GoogleSignInButton`, `lib/supabase/browser.ts` — `createBrowserClient` từ `@supabase/ssr`). `redirectTo`: `{origin}/auth/callback?next=/dashboard`. Route `GET /auth/callback` gọi `exchangeCodeForSession` rồi redirect.
-- **Profile:** trigger `on_auth_user_created` tạo `profiles` với `role` mặc định `student`. Kiểm tra nhanh: terminal log từ server actions / callback; UI trên `/dashboard`.
-- **Middleware** chặn `/dashboard`, `/learn`, `/debug`, `/profile` (và /admin, /teacher) khi chưa có session; `/login`, `/signup`, `/auth/callback` mở.
+## 4. Quy trình bắt buộc cho mọi phase
+- Mỗi phase phải đi theo đúng thứ tự:
+  1. đọc thư mục liên quan,
+  2. xác định phạm vi sửa,
+  3. liệt kê file sẽ đụng vào,
+  4. chỉ code trong phạm vi đó,
+  5. chạy kiểm tra phù hợp (`build`, `lint`, hoặc kiểm tra cục bộ phù hợp),
+  6. tạo/cập nhật file báo cáo phase,
+  7. dừng để mentor review.
+- Không được bỏ qua bước đọc codebase trước khi sửa.
+- Không được sửa nhiều domain cùng lúc nếu prompt chỉ yêu cầu một domain.
 
-## Admin routes & bảo mật DB
-- **Admin routes:** chỉ gọi database với **service role key** (chỉ trên server, không lộ client) **hoặc** — như hiện tại — dùng **anon key + RLS policy chặt** (ví dụ `profiles.role = 'admin'` trong `USING` / `WITH CHECK`). Không tin middleware/UI: luôn kiểm tra role trong server action / Route Handler.
-- **Server actions / API:** đặt kiểm tra quyền và validation phía server; không phụ thuộc client để ẩn logic nhạy cảm.
+## 5. Quy tắc code khi Cursor thực thi
+- Không đổi stack công nghệ nếu chưa có prompt riêng cho việc đó.
+- Ưu tiên giữ `Next.js + TypeScript + Supabase`.
+- Không tự động xóa legacy code chỉ vì “trông có vẻ cũ”.
+- Không tự động drop bảng, xóa migration, hoặc đổi schema phá dữ liệu.
+- Mọi migration phải additive trước: `ADD`, `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`.
+- Không hardcode secrets.
+- Không gọi OpenAI trực tiếp từ client.
+- Mọi xử lý AI phải đi qua server route/server action.
+- RLS là bắt buộc cho bảng mới hoặc luồng dữ liệu mới.
 
-## Quy tắc code
-- Dùng server components mặc định; client component chỉ cho form (react-hook-form), nút OAuth, bảng/dialog tương tác, hoặc Monaco.
-- Xác thực: Supabase Auth (email + Google). Middleware bảo vệ /dashboard, /admin, /teacher.
-- Database: PostgreSQL trên Supabase. RLS bắt buộc.
-- **Mọi truy cập database đều phải qua Supabase client, không dùng fetch trực tiếp tới REST/PostgREST ngoài client chính thức.**
-- **RLS phải được bật cho mọi bảng** (và có policy phù hợp; không để bảng public không kiểm soát).
-- UI: shadcn/ui + Tailwind. Tuyệt đối không dùng CSS thuần.
-- Giới hạn AI gợi ý debugger: **3 lần/người/ngày** (bảng `user_quotas`; reset theo ngày).
+## 6. Rule riêng cho AI features
+- Không dùng từ “train OpenAI bằng dữ liệu học sinh” như một mặc định triển khai.
+- Mặc định dùng:
+  - chuẩn hóa dữ liệu học sinh trong hệ thống,
+  - gửi dữ liệu đã rút gọn sang OpenAI để phân tích,
+  - nhận JSON có cấu trúc,
+  - giáo viên duyệt/chỉnh sửa trước khi áp dụng.
+- Fine-tuning chỉ được đề xuất khi có prompt riêng và có lý do rõ ràng.
 
-### Debugger & API bảo mật (bắt buộc)
-- **Không** gọi API bên thứ ba (Judge0, OpenAI, …) từ component client hoặc `fetch` trình duyệt trực tiếp tới provider.
-- **Mọi** gọi chạy code / LLM chỉ trong **Route Handlers** (`app/api/...`) hoặc server actions: biến môi trường `x_rapidapi_key` (RapidAPI → Judge0 CE) cho `/api/run-code`, đọc qua `process.env['x_rapidapi_key']`; `OPENAI_API_KEY` cho `/api/ai-suggest`; **không** `NEXT_PUBLIC_*` cho secret.
-- Client chỉ `fetch('/api/run-code', …)` và `fetch('/api/ai-suggest', …)` với `{ code, language, stdin?, error? }` — **không** gửi API key.
-- Debugger UI: Monaco (`@monaco-editor/react`) + output; chạy code qua **Judge0 CE** (`judge0-ce.p.rapidapi.com`, `wait=true`); gợi ý lỗi qua **OpenAI Chat Completions** (`gpt-3.5-turbo-0125`) trên server qua `fetch` (không đưa code hoàn chỉnh trong prompt — đã nêu trong prompt hệ thống).
+## 7. Rule riêng cho Student
+- Student navigation chính chỉ được xoay quanh:
+  - `Khóa học`
+  - `Lộ trình cá nhân hóa`
+  - `Lịch học thông minh`
+  - `Profile`
+- Route cũ có thể tồn tại tạm thời để tương thích, nhưng không được tự ý đẩy lại vào primary nav nếu chưa có xác nhận.
 
-## Các lệnh thường dùng
-- Dev: npm run dev
-- Build: npm run build
-- Seed data: (sẽ tạo script sau)
+## 8. Rule riêng cho Teacher
+- Teacher area phải tập trung vào:
+  - quản lý khóa học,
+  - quản lý học sinh,
+  - review personalized paths,
+  - xem schedule insights,
+  - AI hỗ trợ chứ không tự động quyết định thay giáo viên.
+- Bất kỳ logic AI nào ảnh hưởng lộ trình/lịch trình phải có bước review của giáo viên.
 
-## Lưu ý đặc biệt
-- Không hardcode Supabase URL/key. Dùng biến môi trường.
-- Khi thêm bảng mới, luôn tạo RLS policy.
-- Commit sau mỗi chức năng hoàn chỉnh.
+## 9. Kiểm tra và báo cáo
+- Nếu build/lint/test không chạy được, phải ghi rõ lý do thật.
+- Không được ghi “build thành công” nếu chưa kiểm tra thật.
+- Mọi phase phải có file markdown báo cáo:
+  - những gì đã làm,
+  - file nào đã sửa,
+  - kiểm tra nào đã chạy,
+  - rủi ro còn lại,
+  - điểm cần mentor xác nhận.
 
-## Quy tắc bổ sung cho Course Enrollment & định hướng (Bước 7b / Bước 8)
-
-- **Bảng:** `onboarding_answers` (legacy, không còn UI), `user_courses`, `user_course_progress`. Học sinh mới dùng **Trắc nghiệm 50 câu** (`assessment_completed`); có thể giữ `onboarding_completed` trên DB cho dữ liệu cũ.
-- **API cũ không được động đến:** `/api/user/learning-paths` (vẫn dùng cho dữ liệu cũ). Hệ thống mới dùng `user_courses` và `user_course_progress` hoàn toàn độc lập.
-- **Middleware:** Không redirect bắt buộc tới `/onboarding` (đã loại bỏ). Các module dùng `assessment_completed` như đã thiết kế (dashboard, lộ trình cá nhân hóa).
-- **Edge Function:** `supabase/functions/handle-missed-deadlines` (lịch học). Không bắt buộc `analyze-onboarding`.
-- **Gọi API nội bộ:** Khi gọi `/api/admin/sync-course` từ Edge Function hoặc từ server action, dùng `fetch` với `Authorization: Bearer <service_role_key>` hoặc dùng `createClient` với service role để tránh vòng lặp RLS.
-- **Seed dữ liệu:** Script seed chỉ chạy trong môi trường development, không ảnh hưởng production. Dữ liệu mẫu cho các khóa học C++, Java, SQL, Prompt, Frontend, Backend, Fullstack phải có `status = 'published'` để hiển thị.
-- **Không xóa bất kỳ API, component, hoặc trang nào hiện có.** Chỉ thêm mới hoặc mở rộng an toàn.
-
-## Quy tắc nâng cấp UI/UX cho My Courses và Course Detail
-
-- **Được phép tạo API mới**: `GET /api/courses/[id]` (lấy chi tiết một khóa học) vì API này chưa tồn tại và cần thiết cho trang chi tiết khóa học. Không ảnh hưởng đến API cũ.
-- **Không sửa các API đã có**: `/api/courses`, `/api/courses/teacher`, `/api/courses/[id]/lessons`, `/api/user/courses/enrolled`, `/api/user/courses/[courseId]/progress`.
-- **Khi thêm component mới** (accordion, progress bar), sử dụng shadcn/ui có sẵn (Collapsible, Accordion, Progress). Không cài đặt thêm thư viện nếu chưa có.
-- **Giữ nguyên cấu trúc responsive**: trên mobile, các cột xếp chồng, sidebar ẩn/hiện nếu cần.
-- **Tất cả dữ liệu hiển thị phải đến từ API thật, không mock** (trừ Schedule tạm thời). Đối với số bài học, gọi API `/api/courses/[courseId]/lessons` chỉ lấy count (có thể dùng `head: true`).
-
-## Quy tắc mới cho Phase 2: Cá nhân hóa nâng cao (Personalized Learning)
-
-### 1. Các module mới trên dashboard học sinh (thay thế cấu trúc cũ)
-- **Xóa hoàn toàn module Debugger cũ** (`/debug`). Mọi link đến `/debug` phải chuyển sang `/practice` (phòng luyện code).
-- **Dashboard học sinh mới** gồm 6 module chính:
-  1. **Lộ trình cơ bản** (Basic Roadmap) – hiển thị các khóa học có sẵn (C++, Java, Python, SQL, Frontend, Backend, Fullstack).
-  2. **Lộ trình cá nhân hóa** (Personalized Roadmap) – **chỉ mở khi người dùng đã hoàn thành bài test**. Nếu chưa, hiển thị popup yêu cầu làm test.
-  3. **Trắc nghiệm định hướng** (Assessment) – tên giao diện: "Trắc nghiệm định hướng". Gồm 50 câu (20 MBTI + 30 mở rộng).
-  4. **Kết nối giáo viên** (Connect Mentor) – giữ nguyên chức năng hiện tại.
-  5. **Phòng luyện code** (Code Practice) – gồm 2 chế độ: Random & Bài tập theo khóa.
-  6. **Profile** (Hồ sơ) – giữ nguyên.
-
-### 2. Bộ câu hỏi mới (50 câu) và xử lý
-- **Lưu câu hỏi** trong file `lib/assessment/questions.ts` (TypeScript) để dễ quản lý, không cần bảng database.
-- **API**:
-  - `GET /api/assessment/questions` – trả về mảng 50 câu hỏi (bao gồm MBTI và mở rộng).
-  - `POST /api/assessment/submit` – nhận mảng câu trả lời, lưu vào bảng `assessment_responses`, gọi AI agent phân tích, lưu kết quả vào `career_orientations` và cập nhật `profiles`.
-- **Các bảng mới được phép tạo**:
-  - `assessment_responses` (lưu câu trả lời)
-  - `career_orientations` (lưu kết quả phân tích, định hướng nghề)
-  - `personalized_paths` (lộ trình cá nhân hóa do giáo viên tạo/duyệt)
-  - `study_schedule` (lịch trình chi tiết theo ngày, hỗ trợ deadline trượt/đóng băng)
-- **Không sửa** các bảng cũ (`onboarding_answers`, `profiles`, `user_courses`, ...). Chỉ thêm cột mới vào `profiles` nếu cần (nullable).
-
-### 3. Lộ trình cá nhân hóa (Personalized Roadmap)
-- **Cơ chế**:
-  - Sau khi có kết quả test, AI (Agent 2) đề xuất `course_sequence` (mảng {course_id, order_index, due_date}) dựa trên profile + career_orientations.
-  - Giáo viên được phân công (hoặc admin) xem đề xuất, có thể chỉnh sửa (thêm/bớt khóa học, sắp xếp lại) trong trang `teacher/personalized-paths`.
-  - Sau khi giáo viên duyệt (status = 'approved'), hệ thống tạo `study_schedule` (các lesson của từng khóa học theo thứ tự và due_date).
-  - Học sinh nhận lộ trình, có thể gửi feedback (yêu cầu chỉnh sửa) qua API `PUT /api/personalized-path/student/feedback`.
-- **API cần tạo mới**:
-  - `POST /api/personalized-path/generate` – gọi AI đề xuất (chỉ dùng nội bộ, hoặc gọi từ admin/teacher).
-  - `GET /api/personalized-path/teacher` – danh sách path cần duyệt (teacher).
-  - `PUT /api/personalized-path/teacher/:id` – duyệt/từ chối/chỉnh sửa.
-  - `GET /api/personalized-path/student` – học sinh xem path của mình.
-  - `PUT /api/personalized-path/student/feedback` – gửi phản hồi.
-
-### 4. Calendar lịch trình và cơ chế deadline trượt/đóng băng
-- **Trang lịch trình** riêng: `app/(student)/student/calendar/page.tsx` (chỉ hiển thị khi có personalized path approved). Dạng lịch tự xây (grid, tuần/tháng), không dùng Google Calendar API.
-- **Hiển thị các bài học** từ `study_schedule` theo ngày, với trạng thái (pending/completed/missed/frozen).
-- **Cơ chế tự động**:
-  - Nếu đến due_date mà chưa đánh dấu completed → tự động chuyển status = 'missed' và dời deadline +1 ngày (cập nhật due_date).
-  - Nếu học sinh không tương tác (không có submission hoặc không đánh dấu) trong 3 ngày liên tiếp → chuyển status = 'frozen', tạm dừng lộ trình, gửi email thông báo cho giáo viên.
-  - Giáo viên có thể "đóng băng" thủ công hoặc "kích hoạt lại" qua API.
-- **API**:
-  - `GET /api/study-schedule` – lấy lịch trình của user.
-  - `PUT /api/study-schedule/:id/complete` – đánh dấu bài hoàn thành.
-  - (Có thể có cron job hoặc Edge Function chạy định kỳ để xử lý missed/frozen, nhưng trong MVP có thể xử lý khi user login hoặc gọi API).
-
-### 5. Phòng luyện code thông minh (Code Practice)
-- **Thay thế hoàn toàn debugger cũ**: xóa file `app/debug/page.tsx` và các route liên quan.
-- **2 chế độ**:
-  - **Random**: Chọn ngôn ngữ (Java/Python/C++), độ khó (easy/medium/hard). Gọi API `POST /api/practice/random` để lấy bài tập (có thể sinh mới bằng AI hoặc lấy từ seed có sẵn). Lưu bài tập vào bảng `practice_exercises` nếu chưa có.
-  - **Bài tập theo khóa**: Hiển thị danh sách bài tập từ các `course_lessons` có `code_template` không null, thuộc các khóa học mà học sinh đã đăng ký (`user_courses`).
-- **AI gợi ý bài tiếp theo**: Gọi `GET /api/practice/next-suggestion` trả về exercise_id dựa trên lịch sử submissions (ưu tiên bài chưa làm, bài sai nhiều).
-- **Giữ nguyên** API `/api/practice/run` (chạy code) và `/api/practice/submissions` (lịch sử).
-
-### 6. Định hướng nghề nghiệp (Career Orientation)
-- **Trang riêng**: `app/(student)/student/career/page.tsx`. Chỉ hiển thị nếu đã hoàn thành bài test (kiểm tra `career_orientations` có bản ghi không). Nếu chưa, hiển thị popup yêu cầu làm test.
-- **Nội dung** (lấy từ `career_orientations`):
-  - MBTI type và giải thích.
-  - Điểm mạnh, điểm yếu.
-  - Gợi ý nghề nghiệp (suggested_careers) kèm giải thích ngắn.
-  - Đề xuất khóa học bổ trợ (suggested_courses) – link đến các khóa học trong lộ trình cơ bản.
-  - Lưu ý: "Đây chỉ là gợi ý, không ép buộc. Hãy phát huy điểm mạnh hiện tại."
-
-### 7. Agent AI (3 agent dùng chung API key)
-- **Agent 1 (Assessment Analyzer)**: Phân tích 50 câu trả lời, tính MBTI, điểm các trụ cột (động lực, phong cách học, kỹ năng nền, ...), sinh `career_orientations`.
-- **Agent 2 (Path Generator)**: Đề xuất `course_sequence` dựa trên profile và career_orientation.
-- **Agent 3 (Practice Suggester)**: Gợi ý bài tập tiếp theo dựa trên lịch sử submissions.
-- **Cách tích hợp**: Tạo các hàm trong `lib/ai/agents.ts`, mỗi agent gọi OpenAI API với prompt riêng. Fallback rule-based khi hết quota (dùng mapping đơn giản).
-
-### 8. Mail notification (Resend hoặc Supabase Edge Functions)
-- **Gửi mail** khi:
-  - Giáo viên duyệt/từ chối personalized path.
-  - Học sinh gửi feedback yêu cầu chỉnh sửa path.
-  - Hệ thống tự động đóng băng lộ trình (thông báo cho giáo viên và học sinh).
-  - Deadline trượt (nhắc nhở).
-- **Cấu hình**: Dùng Resend (dễ dùng) hoặc Supabase Edge Functions với SMTP. Thêm biến môi trường `RESEND_API_KEY`.
-
-### 9. Xóa bỏ hoàn toàn Debugger cũ
-- **Xóa thư mục** `app/debug` (nếu tồn tại).
-- **Xóa route** `/debug` khỏi middleware nếu có.
-- **Tìm và thay thế** tất cả link `href="/debug"` trong codebase (navigation, buttons) chuyển thành `/practice` (hoặc `/student/practice`).
-- **Xóa các API liên quan** nếu không còn dùng (`/api/run-code`, `/api/ai-suggest`? Thực tế phòng luyện code vẫn cần chạy code, nên giữ lại `/api/practice/run` và có thể dùng lại logic cũ). **Không xóa** nếu chưa chắc.
-
-### 10. Tách biệt lộ trình cơ bản và lộ trình cá nhân hóa
-- **Lộ trình cơ bản**: Hiển thị danh sách khóa học từ bảng `courses` với `course_type` bất kỳ (skill/role), do giáo viên tạo và admin duyệt. Học sinh có thể tự đăng ký (enroll) bất kỳ lúc nào. Không liên quan đến kết quả test.
-- **Lộ trình cá nhân hóa**: Chỉ xuất hiện sau test, do giáo viên tạo riêng cho từng học sinh dựa trên đề xuất AI. Lộ trình này có thể bao gồm các khóa học từ lộ trình cơ bản nhưng được sắp xếp theo thứ tự và thời gian biểu riêng.
-
-### 11. Các bước ưu tiên thực hiện (theo yêu cầu "hoàn thành hôm nay")
-1. **Tạo database migrations** cho các bảng mới (`assessment_responses`, `career_orientations`, `personalized_paths`, `study_schedule`).
-2. **Xóa module debugger cũ** và cập nhật routing/link.
-3. **Xây dựng bộ câu hỏi 50 câu** + API submit + agent 1 (phân tích).
-4. **Giao diện bài test** (2 bước: 50 câu).
-5. **Trang định hướng nghề nghiệp**.
-6. **Module lộ trình cá nhân hóa** (AI đề xuất, GV duyệt, HS nhận).
-7. **Calendar lịch trình** + cơ chế deadline trượt/đóng băng.
-8. **Phòng luyện code thông minh** (random + bài tập theo khóa + gợi ý AI).
-9. **Tích hợp mail notification**.
-
-### 12. Lưu ý bổ sung cho Cursor
-- Khi tạo API mới, luôn kiểm tra xem API đó đã tồn tại chưa (tìm kiếm trong codebase). Nếu đã có, tái sử dụng hoặc mở rộng an toàn.
-- **Không xóa** các API cũ liên quan đến practice (như `/api/practice/run`, `/api/practice/exercises`) vì chúng vẫn được dùng.
-- **Thêm các trường mới vào `profiles`** (nếu cần) bằng migration, với giá trị default null.
-- **Kiểm tra build** sau mỗi lần thay đổi lớn: `npm run build`.
-- **Commit thường xuyên** với message rõ ràng.
-
-## Quy tắc an toàn bổ sung
-- **Tuyệt đối không hardcode secret** (API key, service role key) trong client component. Chỉ dùng trên server (API routes, server actions, edge functions).
-- **Không gọi trực tiếp OpenAI từ client**. Luôn qua API route hoặc server action.
-- **Kiểm tra RLS** cho các bảng mới: đảm bảo học sinh chỉ xem/ghi dữ liệu của mình, giáo viên và admin có quyền cao hơn.
-
-#Cấu trúc của roadmap train AI module
-eduai-mvp/
-├── app/
-├── components/
-├── lib/
-├── public/
-├── roadmaps/          <--- tạo thư mục này
-│   ├── python.pdf
-│   ├── java.pdf
-│   ├── sql.pdf
-│   └── ...
-├── scripts/
-├── package.json
-└── ...
-
-## QUY TẮC MỚI (áp dụng từ giai đoạn tái cấu trúc)
-
-### 1. Xóa hoàn toàn module Practice (phòng luyện code)
-- Không được giữ lại bất kỳ file, component, API, route nào liên quan đến practice, random, exercise, code runner (trừ khi đã được chuyển đổi sang quiz).
-- Các thư mục cần xóa: `app/(student)/practice/`, `app/api/practice/`, `components/student/practice-*`, `lib/ai/error-analyzer.ts` (nếu chỉ dùng cho practice).
-- Các bảng cũ: `practice_exercises`, `practice_submissions` sẽ bị xóa trong migration.
-- Thay thế bằng `quizzes`, `quiz_attempts`.
-
-### 2. Module mới: Bài tập trắc nghiệm (Quiz)
-- Mỗi bài học có thể có một quiz (15 câu trắc nghiệm).
-- Quiz được lưu trong bảng `quizzes` (JSON câu hỏi, đáp án, giải thích).
-- Học sinh làm quiz → lưu vào `quiz_attempts` (điểm, câu trả lời).
-- Giáo viên tạo quiz trong trang quản lý bài học (modal hoặc trang riêng).
-- AI có thể hỗ trợ tạo quiz từ nội dung lesson (gọi OpenAI).
-
-### 3. Theo dõi hành vi người dùng (Behavior Tracking)
-- Bảng `user_behavior` ghi nhận các sự kiện: `view_lesson`, `complete_quiz`, `watch_video`, `login`, `view_course`, ...
-- API `POST /api/behavior/track` (authenticated) để ghi lại sự kiện từ client.
-- Dữ liệu này dùng để phân tích tính kỷ luật, đề xuất lộ trình cá nhân hóa.
-- Chỉ admin/teacher có quyền xem thống kê hành vi (qua API hoặc trang riêng).
-
-### 4. Lịch trình thông minh (Study Schedule)
-- Học sinh có thể thêm `student_note` và đánh dấu `is_busy` vào `study_schedule` (khung giờ bận).
-- Giáo viên xem lịch của học sinh (chỉ thấy khoảng bận, không thấy nội dung note).
-- Deadline trượt tự động dời +1 ngày (đã có). Bổ sung: nếu học sinh đánh dấu bận, hệ thống ưu tiên dời lịch tránh khung đó.
-
-### 5. Tạo khóa học mới (không cần admin duyệt)
-- Giáo viên tạo khóa học trực tiếp, `status='published'` ngay lập tức.
-- Admin vẫn có thể xóa khóa học (nếu vi phạm) nhưng không cần duyệt.
-- Bổ sung trường `content` cho khóa học (mô tả chi tiết, trọng tâm kiến thức).
-- Giáo viên có thể import/đính kèm ảnh roadmap (lưu trong `thumbnail_url` hoặc `roadmap_image`).
-
-### 6. AI tạo khóa học (Course Generation)
-- Tạo API `POST /api/ai/generate-course` (teacher only).
-- Input: `topic`, `description`, `files?` (PDF/text).
-- Output: course structure (title, description, lessons content, quizzes).
-- Lưu vào bảng `courses` và `course_lessons` với status='draft', giáo viên chỉnh sửa rồi publish.
-- Không thay đổi các course hiện có.
-
-### 7. Xóa/điều chỉnh các route cũ
-- Xóa `/practice/*` khỏi middleware.
-- Cập nhật `student-nav.tsx`: chỉ còn Dashboard, Quizzes, Trắc nghiệm (gộp), Profile, Kết nối GV, Lộ trình.
-- Dashboard student: hiển thị thống kê học tập (số bài hoàn thành, biểu đồ, streak).
-
-### 8. Ưu tiên phát triển: Lộ trình và lịch trình
-- Tập trung vào cơ chế lộ trình cá nhân hóa, lịch học thông minh, deadline trượt.
-- Bỏ qua các tính năng luyện code (đã chuyển thành quiz).
-
-### 9. Code style & kiểm tra
-- Chạy `npm run build` sau mỗi thay đổi lớn.
-- Commit message rõ ràng: "refactor: ...", "feat: ...", "fix: ..."
-
-## Kiến trúc dữ liệu mới (Edu-AI System)
-
-- **Course (edu_courses)**: title, description, level, category, instructor_id, duration_hours, total_lessons, is_published, is_archived, thumbnail_url, language
-- **Module (edu_modules)**: chương (course_id, title, description, order, is_locked, duration_hours)
-- **Lesson (edu_lessons)**: bài trong module (module_id, title, description, order, lesson_type lecture|interactive|code-along|quiz|project, duration_minutes, is_locked)
-- **LessonContent (edu_lesson_contents)**: lesson_id, content_type video|text|code_editor|quiz|resource, order, content_data JSONB
-- **Resource (edu_resources)**: lesson_id, title, file_url, file_type, file_size, order
-- **Enrollment (edu_enrollments)**: student_id, course_id
-- **StudentProgress (edu_student_progress)**: student_id, lesson_id, course_id, status, completion_percentage, time_spent_minutes, last_accessed, completed_at
-- **Submission (edu_submissions)**: student_id, lesson_id, submission_type quiz|code|assignment, submitted_code, answers JSONB, score, feedback, is_correct, submitted_at, graded_at
-
-### Quy tắc chuyển đổi
-
-- Bảng cũ giữ nguyên (deprecated). Schema mới: edu_*. API mới: pp/api/v2/.
-- Middleware không chặn /api/v2; kiểm tra quyền trong handler.
+## 10. Cấm suy diễn
+- Không được tự sáng tạo yêu cầu sản phẩm mới.
+- Nếu có điểm chưa chắc, phải ghi rõ:
+  - `CẦN XÁC NHẬN`
+- Không được biến tài liệu planning thành khẳng định runtime nếu chưa kiểm tra trong code hoặc build thực tế.

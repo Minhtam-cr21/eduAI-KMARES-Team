@@ -39,7 +39,7 @@ export default function TeacherNewEduV2CoursePage() {
         return;
       }
       if (!j.id) {
-        toast.error("Thieu id phan hoi");
+        toast.error("Thiếu id phản hồi");
         return;
       }
       toast.success("Đã tạo khóa học (Edu V2)");
@@ -58,7 +58,7 @@ export default function TeacherNewEduV2CoursePage() {
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Cấu trúc: Course → Module → Lesson → LessonContent. Sau khi tạo, bạn
-          se chinh sua chuong va noi dung.
+          sẽ chỉnh sửa chương và nội dung.
         </p>
       </div>
       <Card>
@@ -97,7 +97,7 @@ export default function TeacherNewEduV2CoursePage() {
               <Input id="language" name="language" defaultValue="vi" className="mt-1" />
             </div>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Dang tao…" : "Tao va mo trinh chinh sua"}
+              {submitting ? "Đang tạo…" : "Tạo và mở trình chỉnh sửa"}
             </Button>
           </form>
         </CardContent>

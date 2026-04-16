@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = segmentMetadata({
   title: "Giáo viên",
   description:
-    "Không gian quản lý khóa học, học sinh, lộ trình cá nhân hóa và lộ trình AI cho giáo viên EduAI.",
+    "Workspace giáo viên EduAI: tổng quan, khóa học, học sinh, duyệt lộ trình, lịch học can thiệp và thông báo.",
   noIndex: true,
 });
 

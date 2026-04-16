@@ -665,3 +665,57 @@ export const ASSESSMENT_QUESTIONS_BY_GROUP = {
   C: GROUP_C,
   D: GROUP_D,
 } as const;
+
+export const MBTI_ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
+  ...ASSESSMENT_QUESTIONS_BY_GROUP.MBTI,
+];
+
+export const EXTENDED_ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
+  ...GROUP_A,
+  ...GROUP_B,
+  ...GROUP_C,
+  ...GROUP_D,
+];
+
+export const ASSESSMENT_QUESTION_COUNTS = {
+  total: ASSESSMENT_QUESTIONS.length,
+  mbti: MBTI_ASSESSMENT_QUESTIONS.length,
+  extended: EXTENDED_ASSESSMENT_QUESTIONS.length,
+} as const;
+
+export const ASSESSMENT_QUESTION_MAP = new Map(
+  ASSESSMENT_QUESTIONS.map((question) => [question.code, question])
+);
+
+export function getAssessmentQuestion(code: string): AssessmentQuestion | undefined {
+  return ASSESSMENT_QUESTION_MAP.get(code);
+}
+
+export function getAssessmentOptionLabel(
+  code: string,
+  value: string
+): string | null {
+  const question = getAssessmentQuestion(code);
+  if (!question?.options?.length) return null;
+  const option = question.options.find((item) => item.value === value.trim());
+  return option?.label ?? null;
+}
+
+export function splitAssessmentAnswer(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+export function groupAssessmentQuestions(
+  questions: AssessmentQuestion[]
+): typeof ASSESSMENT_QUESTIONS_BY_GROUP {
+  return {
+    MBTI: questions.filter((question) => question.group === "MBTI"),
+    A: questions.filter((question) => question.group === "A"),
+    B: questions.filter((question) => question.group === "B"),
+    C: questions.filter((question) => question.group === "C"),
+    D: questions.filter((question) => question.group === "D"),
+  };
+}

@@ -9,16 +9,16 @@ import {
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
+  Bell,
   BookOpen,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   GitBranch,
   LayoutDashboard,
-  Bell,
   Link2,
   ListVideo,
   MapPinned,
-  Sparkles,
   Users,
 } from "lucide-react";
 import Image from "next/image";
@@ -28,39 +28,48 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   TeacherNavLinks,
+  isTeacherNavItemActive,
   type TeacherNavItem,
 } from "@/components/teacher/teacher-nav-links";
 
 const STORAGE_KEY = "teacher-sidebar-collapsed";
 
-export function useTeacherNavItems(badges: {
-  notifications?: number;
-  aiRoadmaps?: number;
+export function useTeacherPrimaryNavItems(badges: {
+  pathReview?: number;
 }): TeacherNavItem[] {
   return [
     { href: "/teacher", label: "Tổng quan", icon: LayoutDashboard },
-    { href: "/teacher/courses", label: "Khóa học của tôi", icon: BookOpen },
-    { href: "/teacher/roadmaps", label: "Roadmap công khai", icon: MapPinned },
-    { href: "/teacher/lessons", label: "Bài học", icon: ListVideo },
-    { href: "/teacher/connections", label: "Yêu cầu kết nối", icon: Link2 },
+    { href: "/teacher/courses", label: "Khóa học", icon: BookOpen },
     { href: "/teacher/students", label: "Học sinh", icon: Users },
     {
-      href: "/teacher/personalized-paths",
-      label: "Lộ trình cá nhân",
+      href: "/teacher/path-review",
+      label: "Duyệt lộ trình",
       icon: GitBranch,
+      badge: badges.pathReview,
+      activePrefixes: [
+        "/teacher/path-review",
+        "/teacher/personalized-paths",
+        "/teacher/ai-roadmaps",
+      ],
     },
     {
-      href: "/teacher/ai-roadmaps",
-      label: "Lộ trình AI",
-      icon: Sparkles,
-      badge: badges.aiRoadmaps,
+      href: "/teacher/schedule-insights",
+      label: "Lịch học & can thiệp",
+      icon: CalendarDays,
     },
     {
       href: "/teacher/notifications",
       label: "Thông báo",
       icon: Bell,
-      badge: badges.notifications,
     },
+  ];
+}
+
+export function useTeacherSecondaryNavItems(): TeacherNavItem[] {
+  return [
+    { href: "/teacher/roadmaps", label: "Roadmap công khai", icon: MapPinned },
+    { href: "/teacher/lessons", label: "Bài học", icon: ListVideo },
+    { href: "/teacher/connections", label: "Kết nối", icon: Link2 },
   ];
 }
 
@@ -69,9 +78,7 @@ function CollapsedNavLinks({ items }: { items: TeacherNavItem[] }) {
   return (
     <div className="flex flex-col gap-0.5">
       {items.map((item) => {
-        const active =
-          pathname === item.href ||
-          (item.href !== "/teacher" && pathname.startsWith(item.href));
+        const active = isTeacherNavItemActive(pathname, item);
         const Icon = item.icon;
         return (
           <Tooltip key={item.href}>
@@ -100,10 +107,12 @@ export function TeacherSidebarDesktop({
   collapsed,
   onToggleCollapse,
   navItems,
+  secondaryItems,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
   navItems: TeacherNavItem[];
+  secondaryItems?: TeacherNavItem[];
 }) {
   return (
     <motion.aside
@@ -140,9 +149,21 @@ export function TeacherSidebarDesktop({
 
       <div className="flex-1 overflow-y-auto p-2">
         {collapsed ? (
-          <CollapsedNavLinks items={navItems} />
+          <CollapsedNavLinks
+            items={[...navItems, ...(secondaryItems ?? [])]}
+          />
         ) : (
-          <TeacherNavLinks items={navItems} />
+          <>
+            <TeacherNavLinks items={navItems} />
+            {secondaryItems?.length ? (
+              <>
+                <p className="text-muted-foreground px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide">
+                  Thêm
+                </p>
+                <TeacherNavLinks items={secondaryItems} className="mt-0.5" />
+              </>
+            ) : null}
+          </>
         )}
       </div>
 

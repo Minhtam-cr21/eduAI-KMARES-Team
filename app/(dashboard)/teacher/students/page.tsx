@@ -1,22 +1,31 @@
 import { TeacherStudentsTable } from "@/components/teacher/teacher-students-table";
-import type { TeacherStudentRow } from "@/lib/types/teacher";
-import { fetchInternalApi } from "@/lib/server/internal-fetch";
+import { requireTeacherOrAdmin } from "@/lib/auth/require-teacher-or-admin";
+import { isRuntimeEnvError } from "@/lib/runtime/env";
+import { loadTeacherStudentsList } from "@/lib/teacher/students";
 
 export default async function TeacherStudentsPage() {
-  const res = await fetchInternalApi("/api/teacher/students");
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { error?: string };
+  let gate: Awaited<ReturnType<typeof requireTeacherOrAdmin>>;
+  try {
+    gate = await requireTeacherOrAdmin("/teacher/students");
+  } catch (error) {
+    if (isRuntimeEnvError(error)) {
+      return (
+        <div>
+          <p className="text-destructive text-sm">{error.message}</p>
+        </div>
+      );
+    }
+    throw error;
+  }
+
+  const { data: students, error } = await loadTeacherStudentsList(gate.supabase);
+  if (error) {
     return (
       <div>
-        <p className="text-destructive text-sm">
-          {err.error ?? `Lỗi ${res.status}`}
-        </p>
+        <p className="text-destructive text-sm">{error}</p>
       </div>
     );
   }
-
-  const body = (await res.json()) as { students?: TeacherStudentRow[] };
-  const students = body.students ?? [];
 
   return (
     <div className="space-y-6">
@@ -25,7 +34,8 @@ export default async function TeacherStudentsPage() {
           Học sinh
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Danh sách học sinh và tiến độ lộ trình (bài học được giao).
+          Chọn một học sinh để mở intervention workspace: assessment, path, schedule,
+          recommendations, review history và action panel.
         </p>
       </div>
       <TeacherStudentsTable students={students} />

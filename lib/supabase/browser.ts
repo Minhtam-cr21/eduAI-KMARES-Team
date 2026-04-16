@@ -1,9 +1,11 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { getSupabasePublicEnv } from "@/lib/runtime/env";
 
 /** Client Supabase cho trình duyệt (OAuth, tương tác cần `window`). */
 export function createSupabaseBrowserClient() {
+  const { url, anonKey } = getSupabasePublicEnv();
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    url,
+    anonKey
   );
 }

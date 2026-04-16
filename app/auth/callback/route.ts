@@ -1,4 +1,5 @@
 import { studentPostAuthPath } from "@/lib/auth/student-post-auth";
+import { RuntimeEnvError, getSupabasePublicEnv } from "@/lib/runtime/env";
 import { getRequestOrigin } from "@/lib/site-origin";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
@@ -31,13 +32,26 @@ export async function GET(request: NextRequest) {
       new URL(`/login?error=${encodeURIComponent(msg)}`, origin)
     );
 
+  let urlEnv: string;
+  let anonKey: string;
+  try {
+    const env = getSupabasePublicEnv();
+    urlEnv = env.url;
+    anonKey = env.anonKey;
+  } catch (error) {
+    if (error instanceof RuntimeEnvError) {
+      return errorRedirect(error.code);
+    }
+    throw error;
+  }
+
   let redirectTarget = new URL(next?.startsWith("/") ? next : "/student", origin);
 
   let response = NextResponse.redirect(redirectTarget);
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    urlEnv,
+    anonKey,
     {
       cookies: {
         getAll() {

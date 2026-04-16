@@ -7,9 +7,16 @@ import { useMemo, useState } from "react";
 
 export type StudyCalendarItem = {
   id: string;
-  due_date: string;
+  due_date: string | null;
   status: string;
-  miss_count?: number;
+  miss_count?: number | null;
+  priority?: "critical" | "high" | "normal" | "light";
+  soft_deadline_level?: "level_1" | "level_2" | "level_3" | "level_4" | null;
+  adjustment_proposal?: {
+    proposal_reason: string;
+    suggested_action: string;
+    proposed_due_date: string | null;
+  } | null;
   lesson: {
     id: string;
     title: string;
@@ -173,7 +180,14 @@ export function StudyCalendar({ items }: { items: StudyCalendarItem[] }) {
                   <div className="text-xs opacity-80">
                     {it.lesson?.course?.title ?? "Khóa học"} · {st}
                     {it.miss_count ? ` · trượt ${it.miss_count}` : ""}
+                    {it.priority ? ` · ${it.priority}` : ""}
+                    {it.soft_deadline_level ? ` · ${it.soft_deadline_level}` : ""}
                   </div>
+                  {it.adjustment_proposal ? (
+                    <div className="mt-1 text-xs opacity-80">
+                      {it.adjustment_proposal.proposal_reason}
+                    </div>
+                  ) : null}
                   {href ? (
                     <Link
                       href={href}

@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { RuntimeEnvError, getSupabasePublicEnv } from "@/lib/runtime/env";
 import { NextResponse, type NextRequest } from "next/server";
 
 /** Cần đăng nhập (mọi role): dashboard học sinh, học bài, khu vực student. */
@@ -63,9 +64,34 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  let url: string;
+  let anonKey: string;
+  try {
+    ({ url, anonKey } = getSupabasePublicEnv());
+  } catch (error) {
+    if (error instanceof RuntimeEnvError) {
+      if (request.nextUrl.pathname.startsWith("/api")) {
+        return NextResponse.json(
+          {
+            error: error.message,
+            code: error.code,
+            missingEnv: error.missingEnv,
+          },
+          { status: 503 }
+        );
+      }
+
+      return new NextResponse(error.message, {
+        status: 503,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+    throw error;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {

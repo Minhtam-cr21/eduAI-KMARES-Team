@@ -1,28 +1,50 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { getOpenAI, hasOpenAIApiKey } from "@/lib/ai/openai-client";
-import { computeMBTI, computeTraits, type TraitScores } from "./analyzer";
+import type {
+  PathSuggestionAnalysisSource,
+  PersonalizedPathSignal,
+  PersonalizedPathSuggestion,
+  PersonalizedPathSequenceItem,
+} from "@/lib/personalized-path/contracts";
+import { personalizedPathSuggestionSchema } from "@/lib/personalized-path/contracts";
+import {
+  createSchemaSyncError,
+  type SchemaDependency,
+} from "@/lib/supabase/schema-sync";
+import { buildFallbackLearnerAnalysis, buildLearnerProfile } from "./learner-profile";
+import {
+  learnerAnalysisSchema,
+  learnerProfileSchema,
+  type LearnerAnalysis,
+  type LearnerProfile,
+} from "./contracts";
+import { computeMBTI } from "./analyzer";
 
-export type CourseSequenceItem = {
-  course_id: string;
-  title: string;
-  order_index: number;
-  recommended_due_date_offset_days: number;
-};
-
-const openAiResponseSchema = z.object({
-  course_ids: z.array(z.string().uuid()),
-  reasoning: z.string(),
-});
+export type CourseSequenceItem = PersonalizedPathSequenceItem;
 
 type PublishedCourse = { id: string; category: string; title?: string };
+type GoalKey = "web" | "data" | "game" | "mobile" | "automation" | "other";
+type ProfileRow = { goal?: string | null; mbti_type?: string | null } | null;
+type OrientationRow = {
+  suggested_courses?: unknown;
+  mbti_type?: string | null;
+  learner_profile?: unknown;
+  ai_analysis?: unknown;
+  analysis_source?: string | null;
+} | null;
+type PathGenerationContext = {
+  learnerProfile: LearnerProfile;
+  learnerAnalysis: LearnerAnalysis;
+  analysisSource: PathSuggestionAnalysisSource;
+  structuredAnalysisSource: string | null;
+  signals: PersonalizedPathSignal[];
+  goalDisplay: string;
+  goalKey: GoalKey;
+  mbti: string;
+};
 
-function normalizeGoalFromA1(answers: Record<string, string>): string {
-  return (answers.A1 ?? "").trim().toLowerCase() || "other";
-}
-
-const RULE_ORDER: Record<string, string[]> = {
+const RULE_ORDER: Record<GoalKey, string[]> = {
   web: ["Frontend", "Backend", "Fullstack", "SQL"],
   data: ["SQL", "Backend", "Python", "Prompt engineering"],
   game: ["C++", "Frontend", "Backend"],
@@ -31,17 +53,167 @@ const RULE_ORDER: Record<string, string[]> = {
   other: ["Frontend", "SQL", "Backend"],
 };
 
-function uniq(ids: string[]): string[] {
-  return Array.from(new Set(ids));
+const CATEGORY_KEYWORDS: Array<{ category: string; keywords: string[] }> = [
+  {
+    category: "Frontend",
+    keywords: ["frontend", "front-end", "giao diện", "ui", "ux", "web", "website"],
+  },
+  {
+    category: "Backend",
+    keywords: ["backend", "back-end", "api", "server", "dịch vụ", "automation"],
+  },
+  {
+    category: "Fullstack",
+    keywords: ["fullstack", "full-stack", "sản phẩm", "end-to-end"],
+  },
+  {
+    category: "SQL",
+    keywords: ["sql", "database", "data", "dữ liệu", "analytics"],
+  },
+  {
+    category: "Python",
+    keywords: ["python", "phân tích", "analysis", "ml", "automation"],
+  },
+  {
+    category: "Prompt engineering",
+    keywords: ["prompt", "llm", "ai", "openai"],
+  },
+  { category: "C++", keywords: ["game", "gaming", "c++"] },
+  { category: "Java", keywords: ["java", "enterprise", "oop"] },
+  { category: "Vibe Coding", keywords: ["prototype", "vibe", "thử nhanh", "demo"] },
+];
+
+const PHASE3_PATH_INPUT_DEPENDENCY: SchemaDependency = {
+  phase: "Phase 3",
+  migrationFile: "supabase/migrations/20260416000000_phase3_assessment_analysis_columns.sql",
+  feature: "personalized path suggestion",
+  relation: "career_orientations",
+  columns: [
+    "learner_profile",
+    "ai_analysis",
+    "analysis_source",
+    "assessment_version",
+  ],
+};
+
+function normalizeGoalFromA1(answers: Record<string, string>): GoalKey {
+  const raw = (answers.A1 ?? "").trim().toLowerCase();
+  if (raw === "web") return "web";
+  if (raw === "data") return "data";
+  if (raw === "game") return "game";
+  if (raw === "mobile") return "mobile";
+  if (raw === "automation") return "automation";
+  return "other";
+}
+
+function uniq(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function addSignal(
+  signals: PersonalizedPathSignal[],
+  key: string,
+  label: string,
+  value: string | null | undefined
+) {
+  const normalized = value?.trim();
+  if (!normalized || signals.some((signal) => signal.key === key)) return;
+  signals.push({ key, label, value: normalized });
+}
+
+function inferGoalKeyFromTexts(values: string[]): GoalKey {
+  const haystack = values.join(" ").toLowerCase();
+  if (
+    haystack.includes("data") ||
+    haystack.includes("dữ liệu") ||
+    haystack.includes("sql") ||
+    haystack.includes("analytics")
+  ) {
+    return "data";
+  }
+  if (
+    haystack.includes("game") ||
+    haystack.includes("gaming") ||
+    haystack.includes("c++")
+  ) {
+    return "game";
+  }
+  if (
+    haystack.includes("mobile") ||
+    haystack.includes("android") ||
+    haystack.includes("ios")
+  ) {
+    return "mobile";
+  }
+  if (
+    haystack.includes("automation") ||
+    haystack.includes("tự động") ||
+    haystack.includes("backend") ||
+    haystack.includes("api")
+  ) {
+    return "automation";
+  }
+  if (
+    haystack.includes("web") ||
+    haystack.includes("frontend") ||
+    haystack.includes("website") ||
+    haystack.includes("fullstack")
+  ) {
+    return "web";
+  }
+  return "other";
+}
+
+function inferPreferredCategories(args: {
+  goalKey: GoalKey;
+  profile: LearnerProfile;
+  analysis: LearnerAnalysis;
+}): string[] {
+  const scoreByCategory = new Map<string, number>();
+
+  for (const category of RULE_ORDER[args.goalKey] ?? RULE_ORDER.other) {
+    scoreByCategory.set(category, (scoreByCategory.get(category) ?? 0) + 3);
+  }
+
+  const haystacks = [
+    args.profile.goal_summary,
+    ...args.profile.interests,
+    ...args.profile.learning_style_signals,
+    ...args.profile.motivation_signals,
+    ...args.profile.risk_flags,
+    args.analysis.learner_summary,
+    ...args.analysis.path_focus,
+    ...args.analysis.support_strategies,
+  ].map((value) => value.toLowerCase());
+
+  for (const hint of CATEGORY_KEYWORDS) {
+    let points = 0;
+    for (const source of haystacks) {
+      if (hint.keywords.some((keyword) => source.includes(keyword))) {
+        points += 2;
+      }
+    }
+    if (points > 0) {
+      scoreByCategory.set(
+        hint.category,
+        (scoreByCategory.get(hint.category) ?? 0) + points
+      );
+    }
+  }
+
+  return Array.from(scoreByCategory.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([category]) => category);
 }
 
 /**
- * Gợi ý thứ tự khóa theo mục tiêu (A1) và category đã publish.
+ * Gợi ý thứ tự khóa theo learner signals đã chuẩn hóa và category đã publish.
  */
 function ruleBasedCourseOrder(
   courses: PublishedCourse[],
-  goalKey: string,
-  suggestedFromOrientation: string[]
+  goalKey: GoalKey,
+  suggestedFromOrientation: string[],
+  preferredCategories: string[]
 ): string[] {
   const byCat = new Map<string, PublishedCourse[]>();
   for (const c of courses) {
@@ -56,22 +228,25 @@ function ruleBasedCourseOrder(
     const key = label.trim().toLowerCase();
     const list = byCat.get(key);
     if (!list?.length) return [];
-    return list.map((x) => x.id);
+    return list.map((course) => course.id);
   };
 
-  const orderLabels = RULE_ORDER[goalKey] ?? RULE_ORDER.other;
+  const orderLabels = uniq([
+    ...preferredCategories,
+    ...(RULE_ORDER[goalKey] ?? RULE_ORDER.other),
+  ]);
   const out: string[] = [];
 
   for (const id of suggestedFromOrientation) {
-    if (courses.some((c) => c.id === id)) out.push(id);
+    if (courses.some((course) => course.id === id)) out.push(id);
   }
 
   for (const label of orderLabels) {
     out.push(...pickFromCategory(label));
   }
 
-  for (const c of courses) {
-    if (!out.includes(c.id)) out.push(c.id);
+  for (const course of courses) {
+    if (!out.includes(course.id)) out.push(course.id);
   }
 
   return uniq(out);
@@ -83,12 +258,12 @@ function buildSequenceFromIds(
   daysPerCourse = 7
 ): CourseSequenceItem[] {
   let cumulative = 0;
-  return orderedIds.map((course_id, i) => {
+  return orderedIds.map((course_id, index) => {
     cumulative += daysPerCourse;
     return {
       course_id,
       title: titleById.get(course_id) ?? "",
-      order_index: i,
+      order_index: index,
       recommended_due_date_offset_days: cumulative,
     };
   });
@@ -106,83 +281,125 @@ async function loadAssessmentAnswers(
   if (error) throw new Error(error.message);
   const map: Record<string, string> = {};
   for (const row of data ?? []) {
-    const code = row.question_code as string;
-    map[code] = String(row.answer ?? "");
+    map[String(row.question_code)] = String(row.answer ?? "");
   }
   return map;
 }
 
-async function callOpenAiPathSuggestion(args: {
-  mbti: string;
-  goal: string;
-  traits: TraitScores;
-  courseCatalog: { id: string; category: string; title: string }[];
-}): Promise<{ course_ids: string[]; reasoning: string } | null> {
-  if (!hasOpenAIApiKey()) return null;
+async function resolvePathGenerationContext(
+  supabase: SupabaseClient,
+  userId: string,
+  orientation: OrientationRow,
+  profile: ProfileRow
+): Promise<PathGenerationContext> {
+  const structuredProfile = learnerProfileSchema.safeParse(
+    orientation?.learner_profile
+  );
+  const structuredAnalysis = learnerAnalysisSchema.safeParse(
+    orientation?.ai_analysis
+  );
 
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-3.5-turbo";
-  const allowed = new Set(args.courseCatalog.map((c) => c.id));
+  let answers: Record<string, string> | null = null;
+  let learnerProfile: LearnerProfile;
+  let learnerAnalysis: LearnerAnalysis;
+  let analysisSource: PathSuggestionAnalysisSource;
 
-  const userPrompt = [
-    `Dựa trên MBTI = ${args.mbti}, mục tiêu (A1) = ${args.goal}, điểm các trụ cột = ${JSON.stringify(args.traits)}, hãy đề xuất danh sách khóa học (từ các category: C++, Java, SQL, Frontend, Backend, Fullstack, Prompt engineering, Python, Vibe Coding) theo thứ tự nên học.`,
-    "Chỉ được chọn course_id từ catalog sau (id + category + title):",
-    JSON.stringify(args.courseCatalog),
-    'Trả về DUY NHẤT JSON: {"course_ids":["uuid",...],"reasoning":"lý do ngắn tiếng Việt"} — mọi id phải nằm trong catalog.',
-  ].join("\n");
-
-  let content: string | undefined;
-  try {
-    const completion = await getOpenAI().chat.completions.create({
-      model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "Bạn là cố vấn lộ trình học lập trình. Chỉ trả về JSON hợp lệ, không markdown.",
-        },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.35,
-      max_tokens: 600,
-      response_format: { type: "json_object" },
-    });
-    content = completion.choices?.[0]?.message?.content?.trim();
-  } catch (e) {
-    console.error(
-      "[path-generator] OpenAI error:",
-      e instanceof Error ? e.message : e
-    );
-    return null;
+  if (structuredProfile.success) {
+    learnerProfile = structuredProfile.data;
+    learnerAnalysis = structuredAnalysis.success
+      ? structuredAnalysis.data
+      : buildFallbackLearnerAnalysis(learnerProfile);
+    analysisSource = structuredAnalysis.success
+      ? "structured_profile_with_ai"
+      : "structured_profile";
+  } else {
+    answers = await loadAssessmentAnswers(supabase, userId);
+    learnerProfile = buildLearnerProfile(answers);
+    learnerAnalysis = buildFallbackLearnerAnalysis(learnerProfile);
+    analysisSource = "raw_answers_fallback";
   }
 
-  if (!content) return null;
+  const goalDisplay =
+    profile?.goal?.trim() ||
+    learnerProfile.goal_summary ||
+    "Mục tiêu chưa xác định rõ";
+  const goalKey =
+    analysisSource === "raw_answers_fallback" && answers
+      ? normalizeGoalFromA1(answers)
+      : inferGoalKeyFromTexts([
+          goalDisplay,
+          ...learnerProfile.interests,
+          ...learnerAnalysis.path_focus,
+        ]);
 
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content);
-  } catch {
-    return null;
-  }
+  const mbti =
+    (orientation?.mbti_type as string | null)?.trim() ||
+    (profile?.mbti_type as string | null)?.trim() ||
+    learnerProfile.mbti_type ||
+    (answers ? computeMBTI(answers) : "INTJ");
 
-  const parsed = openAiResponseSchema.safeParse(raw);
-  if (!parsed.success) return null;
-
-  const filtered = parsed.data.course_ids.filter((id) => allowed.has(id));
-  if (filtered.length === 0) return null;
+  const signals: PersonalizedPathSignal[] = [];
+  addSignal(signals, "mbti_type", "MBTI", mbti);
+  addSignal(
+    signals,
+    "goal_summary",
+    "Mục tiêu học",
+    learnerProfile.goal_summary || goalDisplay
+  );
+  addSignal(
+    signals,
+    "constraint_summary",
+    "Ràng buộc hiện tại",
+    learnerProfile.constraint_summary
+  );
+  addSignal(
+    signals,
+    "recommended_pacing",
+    "Nhịp độ đề xuất",
+    learnerAnalysis.recommended_pacing
+  );
+  addSignal(
+    signals,
+    "path_focus",
+    "Trọng tâm lộ trình",
+    learnerAnalysis.path_focus.slice(0, 3).join(", ")
+  );
+  addSignal(
+    signals,
+    "interests",
+    "Sở thích nổi bật",
+    learnerProfile.interests.slice(0, 3).join(", ")
+  );
+  addSignal(
+    signals,
+    "risk_flags",
+    "Rủi ro cần lưu ý",
+    learnerProfile.risk_flags.slice(0, 3).join(", ")
+  );
 
   return {
-    course_ids: uniq(filtered),
-    reasoning: parsed.data.reasoning,
+    learnerProfile,
+    learnerAnalysis,
+    analysisSource,
+    structuredAnalysisSource:
+      typeof orientation?.analysis_source === "string"
+        ? orientation.analysis_source
+        : null,
+    signals,
+    goalDisplay,
+    goalKey,
+    mbti,
   };
 }
 
 /**
- * Sinh course_sequence (thứ tự + offset ngày tích luỹ) từ kết quả test + career_orientations.
+ * Sinh course_sequence (thứ tự + offset ngày tích luỹ) từ learner_profile / ai_analysis,
+ * chỉ fallback về assessment_responses khi structured profile chưa sẵn sàng.
  */
 export async function generatePathFromAssessment(
   userId: string,
   supabase: SupabaseClient
-): Promise<{ courseSequence: CourseSequenceItem[]; reasoning: string }> {
+): Promise<PersonalizedPathSuggestion> {
   const [{ data: profile, error: pErr }, { data: orientation, error: oErr }] =
     await Promise.all([
       supabase
@@ -192,7 +409,9 @@ export async function generatePathFromAssessment(
         .maybeSingle(),
       supabase
         .from("career_orientations")
-        .select("suggested_courses, mbti_type")
+        .select(
+          "suggested_courses, mbti_type, learner_profile, ai_analysis, analysis_source"
+        )
         .eq("user_id", userId)
         .order("updated_at", { ascending: false })
         .limit(1)
@@ -200,66 +419,89 @@ export async function generatePathFromAssessment(
     ]);
 
   if (pErr) throw new Error(pErr.message);
-  if (oErr) throw new Error(oErr.message);
+  if (oErr) {
+    const schemaError = createSchemaSyncError(oErr, PHASE3_PATH_INPUT_DEPENDENCY);
+    if (schemaError) throw schemaError;
+    throw new Error(oErr.message);
+  }
 
-  const answers = await loadAssessmentAnswers(supabase, userId);
-  const mbti =
-    (orientation?.mbti_type as string | null)?.trim() ||
-    (profile?.mbti_type as string | null)?.trim() ||
-    computeMBTI(answers);
-  const traits = computeTraits(answers);
-  const goalKey = normalizeGoalFromA1(answers);
-  const goalDisplay = profile?.goal?.trim() || answers.A1 || goalKey;
+  const context = await resolvePathGenerationContext(
+    supabase,
+    userId,
+    orientation,
+    profile
+  );
 
   const suggestedRaw = orientation?.suggested_courses;
   const suggestedFromOrientation: string[] = [];
   if (Array.isArray(suggestedRaw)) {
-    for (const x of suggestedRaw) {
-      if (typeof x === "string" && z.string().uuid().safeParse(x).success) {
-        suggestedFromOrientation.push(x);
+    for (const value of suggestedRaw) {
+      if (typeof value === "string" && z.string().uuid().safeParse(value).success) {
+        suggestedFromOrientation.push(value);
       }
     }
   }
 
-  const { data: published, error: cErr } = await supabase
+  const { data: published, error: catalogErr } = await supabase
     .from("courses")
     .select("id, category, title")
     .eq("status", "published");
 
-  if (cErr) throw new Error(cErr.message);
+  if (catalogErr) throw new Error(catalogErr.message);
   const courses = (published ?? []) as PublishedCourse[];
-
-  const catalog = courses.map((c) => ({
-    id: c.id,
-    category: c.category,
-    title: (c as { title?: string }).title ?? "",
+  const catalog = courses.map((course) => ({
+    id: course.id,
+    category: course.category,
+    title: course.title ?? "",
   }));
 
-  let orderedIds: string[] = [];
-  let reasoning = "";
+  const preferredCategories = inferPreferredCategories({
+    goalKey: context.goalKey,
+    profile: context.learnerProfile,
+    analysis: context.learnerAnalysis,
+  }).filter((category) =>
+    catalog.some(
+      (course) => course.category.trim().toLowerCase() === category.toLowerCase()
+    )
+  );
 
-  const ai = await callOpenAiPathSuggestion({
-    mbti,
-    goal: String(goalDisplay),
-    traits,
-    courseCatalog: catalog,
-  });
+  const orderedIds = ruleBasedCourseOrder(
+    courses,
+    context.goalKey,
+    suggestedFromOrientation,
+    preferredCategories
+  );
 
-  if (ai) {
-    orderedIds = ai.course_ids;
-    reasoning = ai.reasoning;
-  } else {
-    orderedIds = ruleBasedCourseOrder(courses, goalKey, suggestedFromOrientation);
-    reasoning =
-      `Gợi ý theo luật (không gọi AI hoặc AI lỗi): mục tiêu "${goalKey}", MBTI ${mbti}, ưu tiên khóa đã gợi ý trong career_orientations và thứ tự category phù hợp.`;
-  }
-
-  const validIds = orderedIds.filter((id) => courses.some((c) => c.id === id));
+  const validIds = orderedIds.filter((id) => courses.some((course) => course.id === id));
   const titleById = new Map<string, string>();
-  for (const c of courses) {
-    titleById.set(c.id, (c as { title?: string }).title?.trim() || c.category || c.id);
+  for (const course of courses) {
+    titleById.set(course.id, course.title?.trim() || course.category || course.id);
   }
-  const courseSequence = buildSequenceFromIds(validIds, titleById);
 
-  return { courseSequence, reasoning };
+  const courseSequence = buildSequenceFromIds(validIds, titleById);
+  const reasoning = [
+    `Ưu tiên learner_profile làm input chính với MBTI ${context.mbti}.`,
+    `Mục tiêu hiện tại: ${context.goalDisplay}.`,
+    preferredCategories.length > 0
+      ? `Category được ưu tiên từ learner_profile/ai_analysis: ${preferredCategories.join(", ")}.`
+      : null,
+    suggestedFromOrientation.length > 0
+      ? "Giữ ưu tiên các khóa đã xuất hiện trong career_orientations.suggested_courses nếu còn publish."
+      : null,
+    context.structuredAnalysisSource
+      ? `Structured assessment source: ${context.structuredAnalysisSource}.`
+      : null,
+    context.analysisSource === "raw_answers_fallback"
+      ? "Structured learner_profile chưa sẵn sàng hoặc không hợp lệ nên route fallback về assessment_responses."
+      : "assessment_responses chỉ còn là fallback, không phải input chính.",
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ");
+
+  return personalizedPathSuggestionSchema.parse({
+    courseSequence,
+    reasoning,
+    learnerSignalsUsed: context.signals,
+    analysisSource: context.analysisSource,
+  });
 }

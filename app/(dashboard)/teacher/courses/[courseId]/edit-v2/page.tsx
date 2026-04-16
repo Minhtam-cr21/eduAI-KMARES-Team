@@ -22,7 +22,7 @@ export default function TeacherEditEduV2CoursePage({
       </div>
       <div>
         <h1 className="font-heading text-2xl font-bold tracking-tight">
-          Chinh sua khoa hoc (Edu V2)
+          Chỉnh sửa khóa học (Edu V2)
         </h1>
         <p className="text-muted-foreground mt-1 text-sm font-mono">{courseId}</p>
       </div>

@@ -4,7 +4,10 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 /**
- * POST — xóa kết quả trắc nghiệm để học sinh làm lại (responses + career_orientations, reset cờ profile).
+ * POST — xóa kết quả trắc nghiệm để học sinh làm lại.
+ * Xóa toàn bộ row `career_orientations`, nên các cột additive Phase 3 như
+ * `learner_profile`, `ai_analysis`, `analysis_source`, `assessment_version`
+ * cũng được dọn cùng lúc và vẫn giữ compatibility với flow cũ.
  */
 export async function POST() {
   const supabase = createClient();

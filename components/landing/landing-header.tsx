@@ -47,8 +47,8 @@ export function LandingHeader() {
   const navItems = [
     { label: "Lộ trình", action: () => scrollTo("roadmap") },
     ...(user?.loggedIn
-      ? [{ label: "Quiz", action: () => (window.location.href = "/quizzes") }]
-      : [{ label: "Quiz", action: () => (window.location.href = "/login") }]),
+      ? [{ label: "Khóa học", action: () => (window.location.href = "/student/courses") }]
+      : [{ label: "Khóa học", action: () => (window.location.href = "/login?next=/student/courses") }]),
     { label: "Giáo viên", action: () => scrollTo("teachers") },
     { label: "Liên hệ tư vấn", action: () => scrollTo("contact") },
   ];

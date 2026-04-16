@@ -2,10 +2,12 @@ import {
   createClient as createSupabaseClient,
   type SupabaseClient,
 } from "@supabase/supabase-js";
+import { getSupabasePublicEnv } from "@/lib/runtime/env";
 
 export function createClient(): SupabaseClient {
+  const { url, anonKey } = getSupabasePublicEnv();
   return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    url,
+    anonKey
   );
 }

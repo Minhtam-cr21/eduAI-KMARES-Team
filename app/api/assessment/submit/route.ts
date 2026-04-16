@@ -1,14 +1,35 @@
 import { analyzeAssessment } from "@/lib/assessment/analyzer";
+import { buildStructuredAssessmentAnalysis } from "@/lib/assessment/ai-analysis";
 import {
   ASSESSMENT_QUESTION_CODES,
   ASSESSMENT_QUESTIONS,
 } from "@/lib/assessment/questions";
+import { buildLearnerProfile } from "@/lib/assessment/learner-profile";
 import { notifyAssessmentCompletedForStudent } from "@/lib/notifications/assessment-complete";
+import { isRuntimeEnvError } from "@/lib/runtime/env";
+import {
+  createSchemaSyncError,
+  schemaSyncErrorResponse,
+  type SchemaDependency,
+} from "@/lib/supabase/schema-sync";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
+
+const PHASE3_SUBMIT_DEPENDENCY: SchemaDependency = {
+  phase: "Phase 3",
+  migrationFile: "supabase/migrations/20260416000000_phase3_assessment_analysis_columns.sql",
+  feature: "assessment submit route",
+  relation: "career_orientations",
+  columns: [
+    "learner_profile",
+    "ai_analysis",
+    "analysis_source",
+    "assessment_version",
+  ],
+};
 
 /** Personal orientation (`/assessment`). Not lesson quizzes — scope note at top of `lib/assessment/questions.ts`. */
 
@@ -48,7 +69,22 @@ function validateAnswerValues(map: Record<string, string>): string | null {
 }
 
 export async function POST(request: Request) {
-  const supabase = createClient();
+  let supabase: ReturnType<typeof createClient>;
+  try {
+    supabase = createClient();
+  } catch (error) {
+    if (isRuntimeEnvError(error)) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          missingEnv: error.missingEnv,
+        },
+        { status: 503 }
+      );
+    }
+    throw error;
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -117,6 +153,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
+  const learnerProfile = buildLearnerProfile(map);
+  const structuredAnalysis =
+    await buildStructuredAssessmentAnalysis(learnerProfile);
+
   const { error: delRespErr } = await supabase
     .from("assessment_responses")
     .delete()
@@ -157,9 +197,17 @@ export async function POST(request: Request) {
       analysis.suggested_course_ids.length > 0
         ? analysis.suggested_course_ids
         : [],
+    learner_profile: structuredAnalysis.learner_profile,
+    ai_analysis: structuredAnalysis.ai_analysis,
+    analysis_source: structuredAnalysis.analysis_source,
+    assessment_version: structuredAnalysis.assessment_version,
   });
   if (insCarErr) {
     await supabase.from("assessment_responses").delete().eq("user_id", user.id);
+    const schemaError = createSchemaSyncError(insCarErr, PHASE3_SUBMIT_DEPENDENCY);
+    if (schemaError) {
+      return schemaSyncErrorResponse(schemaError);
+    }
     return NextResponse.json({ error: insCarErr.message }, { status: 500 });
   }
 
@@ -196,5 +244,11 @@ export async function POST(request: Request) {
     studentDisplayName,
   });
 
-  return NextResponse.json(analysis);
+  return NextResponse.json({
+    ...analysis,
+    learner_profile: structuredAnalysis.learner_profile,
+    ai_analysis: structuredAnalysis.ai_analysis,
+    analysis_source: structuredAnalysis.analysis_source,
+    assessment_version: structuredAnalysis.assessment_version,
+  });
 }

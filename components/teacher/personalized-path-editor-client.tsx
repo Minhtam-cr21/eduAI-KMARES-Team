@@ -32,6 +32,43 @@ type SeqRow = {
   due_date_offset_days: number;
 };
 
+type LearnerSignal = {
+  key: string;
+  label: string;
+  value: string;
+};
+
+type PathReviewRecord = {
+  id: string;
+  review_status: string;
+  review_note: string | null;
+  adjustment_note: string | null;
+  source: string | null;
+  created_at: string;
+};
+
+type InitialEditorData = {
+  path?: {
+    id: string;
+    course_sequence: unknown;
+    status: string;
+    student_feedback: string | null;
+  } | null;
+  suggested?: {
+    courseSequence: Array<{
+      course_id: string;
+      order_index: number;
+      recommended_due_date_offset_days: number;
+    }>;
+    reasoning: string;
+    analysisSource?: string;
+    learnerSignalsUsed?: LearnerSignal[];
+  } | null;
+  pathReview?: PathReviewRecord | null;
+  pathReviewHistory?: PathReviewRecord[];
+  courses?: CourseOpt[];
+};
+
 function SortableRow({
   row,
   title,
@@ -106,14 +143,22 @@ function SortableRow({
 
 export function PersonalizedPathEditorClient({
   studentId,
+  initialData,
 }: {
   studentId: string;
+  initialData?: InitialEditorData | null;
 }) {
   const [courses, setCourses] = useState<CourseOpt[]>([]);
   const [pathId, setPathId] = useState<string | null>(null);
   const [pathStatus, setPathStatus] = useState<string | null>(null);
   const [rows, setRows] = useState<SeqRow[]>([]);
   const [reasoning, setReasoning] = useState<string | null>(null);
+  const [analysisSource, setAnalysisSource] = useState<string | null>(null);
+  const [learnerSignals, setLearnerSignals] = useState<LearnerSignal[]>([]);
+  const [reviewStatus, setReviewStatus] = useState("reviewed");
+  const [reviewNote, setReviewNote] = useState("");
+  const [adjustmentNote, setAdjustmentNote] = useState("");
+  const [pathReviewHistory, setPathReviewHistory] = useState<PathReviewRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [addCourseId, setAddCourseId] = useState("");
@@ -146,7 +191,11 @@ export function PersonalizedPathEditorClient({
             recommended_due_date_offset_days: number;
           }>;
           reasoning: string;
+          analysisSource?: string;
+          learnerSignalsUsed?: LearnerSignal[];
         } | null;
+        pathReview?: PathReviewRecord | null;
+        pathReviewHistory?: PathReviewRecord[];
         courses?: CourseOpt[];
         error?: string;
       };
@@ -157,7 +206,7 @@ export function PersonalizedPathEditorClient({
       setCourses(j.courses ?? []);
 
       let suggested = j.suggested;
-      if (!j.path) {
+      if (!j.path && !suggested) {
         const sugRes = await fetch(
           `/api/personalized-path/suggest?studentId=${encodeURIComponent(studentId)}`
         );
@@ -168,6 +217,8 @@ export function PersonalizedPathEditorClient({
             recommended_due_date_offset_days: number;
           }>;
           reasoning?: string;
+          analysisSource?: string;
+          learnerSignalsUsed?: LearnerSignal[];
           error?: string;
         };
         if (!sugRes.ok) {
@@ -177,11 +228,19 @@ export function PersonalizedPathEditorClient({
           suggested = {
             courseSequence: sugJson.courseSequence ?? [],
             reasoning: sugJson.reasoning ?? "",
+            analysisSource: sugJson.analysisSource,
+            learnerSignalsUsed: sugJson.learnerSignalsUsed ?? [],
           };
         }
       }
 
       setReasoning(suggested?.reasoning ?? null);
+      setAnalysisSource(suggested?.analysisSource ?? null);
+      setLearnerSignals(suggested?.learnerSignalsUsed ?? []);
+      setPathReviewHistory(j.pathReviewHistory ?? []);
+      setReviewStatus(j.pathReview?.review_status ?? "reviewed");
+      setReviewNote(j.pathReview?.review_note ?? "");
+      setAdjustmentNote(j.pathReview?.adjustment_note ?? "");
 
       if (j.path) {
         setPathId(j.path.id);
@@ -222,6 +281,12 @@ export function PersonalizedPathEditorClient({
         setPathId(null);
         setPathStatus(null);
         setStudentFeedback(null);
+        setAnalysisSource(null);
+        setLearnerSignals([]);
+        setReviewStatus("reviewed");
+        setReviewNote("");
+        setAdjustmentNote("");
+        setPathReviewHistory([]);
       }
     } finally {
       setLoading(false);
@@ -229,8 +294,62 @@ export function PersonalizedPathEditorClient({
   }, [studentId]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!initialData) {
+      void load();
+      return;
+    }
+
+    const j = initialData;
+    setCourses(j.courses ?? []);
+    setReasoning(j.suggested?.reasoning ?? null);
+    setAnalysisSource(j.suggested?.analysisSource ?? null);
+    setLearnerSignals(j.suggested?.learnerSignalsUsed ?? []);
+    setPathReviewHistory(j.pathReviewHistory ?? []);
+    setReviewStatus(j.pathReview?.review_status ?? "reviewed");
+    setReviewNote(j.pathReview?.review_note ?? "");
+    setAdjustmentNote(j.pathReview?.adjustment_note ?? "");
+
+    if (j.path) {
+      setPathId(j.path.id);
+      setPathStatus(j.path.status);
+      setStudentFeedback(j.path.student_feedback ?? null);
+      const raw = j.path.course_sequence;
+      if (Array.isArray(raw)) {
+        const parsed = (raw as Record<string, unknown>[])
+          .map((r, i) => ({
+            course_id: String(r.course_id ?? ""),
+            order_index: Number(r.order_index ?? i),
+            due_date_offset_days: Number(
+              r.due_date_offset_days ??
+                r.recommended_due_date_offset_days ??
+                7 * (i + 1)
+            ),
+          }))
+          .filter((r) => r.course_id);
+        parsed.sort((a, b) => a.order_index - b.order_index);
+        setRows(parsed.map((r, i) => ({ ...r, order_index: i })));
+      } else {
+        setRows([]);
+      }
+    } else if (j.suggested?.courseSequence?.length) {
+      setPathId(null);
+      setPathStatus(null);
+      setStudentFeedback(null);
+      setRows(
+        j.suggested.courseSequence.map((r, i) => ({
+          course_id: r.course_id,
+          order_index: i,
+          due_date_offset_days: r.recommended_due_date_offset_days ?? 7 * (i + 1),
+        }))
+      );
+    } else {
+      setRows([]);
+      setPathId(null);
+      setPathStatus(null);
+      setStudentFeedback(null);
+    }
+    setLoading(false);
+  }, [initialData, load]);
 
   function titleFor(id: string) {
     const c = courses.find((x) => x.id === id);
@@ -267,6 +386,14 @@ export function PersonalizedPathEditorClient({
         body: JSON.stringify({
           studentId,
           status,
+          reviewStatus:
+            status === "pending_student_approval" ? "sent_to_student" : reviewStatus,
+          reviewNote,
+          adjustmentNote,
+          suggestionSource: analysisSource,
+          reasoning: reasoning ?? "Teacher reviewed the personalized path suggestion.",
+          learnerSignalsUsed: learnerSignals,
+          pathStatus: pathStatus ?? status,
           courseSequence: rows.map((r, i) => ({
             course_id: r.course_id,
             order_index: i,
@@ -342,8 +469,79 @@ export function PersonalizedPathEditorClient({
         <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">Gợi ý AI / luật: </span>
           {reasoning}
+          {analysisSource ? (
+            <p className="mt-2 text-xs">
+              Nguồn phân tích: <span className="font-medium">{analysisSource}</span>
+            </p>
+          ) : null}
+          {learnerSignals.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-xs">
+              {learnerSignals.slice(0, 5).map((signal) => (
+                <li key={signal.key}>
+                  <span className="font-medium text-foreground">{signal.label}:</span>{" "}
+                  {signal.value}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
+      <div className="rounded-lg border border-border bg-background p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium">Teacher review</p>
+            <p className="text-xs text-muted-foreground">
+              Lưu ghi chú review cùng lịch sử cơ bản cho personalized path này.
+            </p>
+          </div>
+          <select
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            value={reviewStatus}
+            onChange={(e) => setReviewStatus(e.target.value)}
+          >
+            <option value="reviewed">Đã review</option>
+            <option value="adjusted">Đã chỉnh</option>
+            <option value="sent_to_student">Đã gửi học sinh</option>
+            <option value="monitoring">Theo dõi</option>
+          </select>
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-muted-foreground">Review note</span>
+            <textarea
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={reviewNote}
+              onChange={(e) => setReviewNote(e.target.value)}
+              placeholder="Ví dụ: giữ thứ tự hiện tại vì phù hợp goal_summary và pacing."
+            />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-muted-foreground">Adjustment note</span>
+            <textarea
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={adjustmentNote}
+              onChange={(e) => setAdjustmentNote(e.target.value)}
+              placeholder="Ví dụ: đẩy SQL lên sớm hơn, giảm offset khóa 3."
+            />
+          </label>
+        </div>
+        {pathReviewHistory.length > 0 ? (
+          <div className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+            <p className="mb-2 font-medium text-foreground">Lịch sử review gần nhất</p>
+            <ul className="space-y-2">
+              {pathReviewHistory.slice(0, 3).map((review) => (
+                <li key={review.id} className="rounded-md border border-dashed border-border px-3 py-2">
+                  <div>
+                    {review.review_status} · {new Date(review.created_at).toLocaleString("vi-VN")}
+                  </div>
+                  {review.review_note ? <div>Note: {review.review_note}</div> : null}
+                  {review.adjustment_note ? <div>Adjustment: {review.adjustment_note}</div> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
 
       <DndContext
         sensors={sensors}

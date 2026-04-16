@@ -286,7 +286,8 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Quản lý tất cả khóa học của bạn.
+          Bảng dưới là luồng catalog hiện tại. Edu V2 dùng trình builder riêng
+          và chưa xuất hiện trong danh sách này.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -296,7 +297,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
             className="gap-1.5"
           >
             <Sparkles className="h-4 w-4" />
-            Tạo khóa học b��ng AI
+            Tạo khóa học bằng AI
           </Button>
           <Button
             type="button"
@@ -314,7 +315,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
             )}
           >
             <Plus className="h-4 w-4" />
-            Tao khoa (Edu V2)
+            Tạo khóa học Edu V2
           </Link>
         </div>
       </div>
@@ -455,7 +456,7 @@ export function TeacherCoursesManager({ initialCourses }: Props) {
                           buttonVariants({ variant: "outline", size: "sm" })
                         )}
                       >
-                        Bài học
+                        Giáo trình
                       </Link>
                       <Button
                         variant="secondary"

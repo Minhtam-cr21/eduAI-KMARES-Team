@@ -1,61 +1,19 @@
-"use client";
-
 import { BackButton } from "@/components/ui/back-button";
 import { buttonVariants } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { createClient } from "@/lib/supabase/server";
+import { loadStudentEnrolledCourses } from "@/lib/user-courses/enrolled";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
-type EnrolledPayload = {
-  courses: Array<{
-    enrollment: {
-      id: string;
-      status: string;
-      enrolled_at: string;
-      completed_at: string | null;
-    };
-    course: {
-      id: string;
-      title?: string;
-      description?: string | null;
-      thumbnail_url?: string | null;
-      category?: string;
-      course_type?: string;
-    };
-    teacher: { full_name: string | null; avatar_url: string | null } | null;
-    completed_lessons: number;
-    total_lessons: number;
-  }>;
-};
-
-export default function MyCoursesPage() {
-  const [data, setData] = useState<EnrolledPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/user/courses/enrolled");
-        const j = (await res.json()) as EnrolledPayload & { error?: string };
-        if (!res.ok) {
-          toast.error(j.error ?? "Không tải được danh sách");
-          return;
-        }
-        if (!cancelled) setData(j);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Lỗi mạng");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+export default async function MyCoursesPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const loaded = user
+    ? await loadStudentEnrolledCourses(supabase, user.id)
+    : { data: { courses: [] }, error: null, status: 200 };
+  const data = loaded.data;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
@@ -72,12 +30,14 @@ export default function MyCoursesPage() {
         <div className="flex flex-wrap gap-2">
           <Link
             href="/student/courses/explore"
+            prefetch
             className={cn(buttonVariants({ size: "sm" }))}
           >
             Khám phá khóa học
           </Link>
           <Link
             href="/student"
+            prefetch
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             ← Hub
@@ -85,15 +45,14 @@ export default function MyCoursesPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-28 w-full" />
-        </div>
-      ) : !data?.courses?.length ? (
+      {!data?.courses?.length ? (
         <p className="text-muted-foreground text-sm">
           Bạn chưa đăng ký khóa nào.{" "}
-          <Link href="/student/courses/explore" className="text-primary underline">
+          <Link
+            href="/student/courses/explore"
+            prefetch
+            className="text-primary underline"
+          >
             Khám phá khóa học
           </Link>
         </p>

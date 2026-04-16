@@ -13,19 +13,25 @@ import { usePathname } from "next/navigation";
 import { TeacherNavLinks, type TeacherNavItem } from "./teacher-nav-links";
 
 const TITLE_MAP: { prefix: string; title: string }[] = [
-  { prefix: "/teacher/courses/", title: "Bài học khóa" },
+  { prefix: "/teacher/courses/new-v2", title: "Tạo khóa học Edu V2" },
+  { prefix: "/teacher/courses/", title: "Chi tiết khóa học" },
   { prefix: "/teacher/courses", title: "Khóa học" },
   { prefix: "/teacher/roadmaps", title: "Roadmap công khai" },
   { prefix: "/teacher/lessons", title: "Bài học" },
   { prefix: "/teacher/connections", title: "Kết nối" },
   { prefix: "/teacher/students", title: "Học sinh" },
+  { prefix: "/teacher/path-review", title: "Duyệt lộ trình" },
   { prefix: "/teacher/personalized-paths", title: "Lộ trình cá nhân" },
   { prefix: "/teacher/ai-roadmaps", title: "Lộ trình AI" },
+  { prefix: "/teacher/schedule-insights", title: "Lịch học & can thiệp" },
   { prefix: "/teacher/notifications", title: "Thông báo" },
 ];
 
 function headerTitle(pathname: string): string {
   if (pathname === "/teacher") return "Tổng quan";
+  if (pathname.endsWith("/edit-v2")) return "Chỉnh sửa khóa học Edu V2";
+  if (pathname.endsWith("/curriculum")) return "Chương trình khóa học";
+  if (pathname.endsWith("/lessons")) return "Bài học khóa học";
   for (const { prefix, title } of TITLE_MAP) {
     if (pathname.startsWith(prefix)) return title;
   }

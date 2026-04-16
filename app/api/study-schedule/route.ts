@@ -1,4 +1,6 @@
+import { isRuntimeEnvError } from "@/lib/runtime/env";
 import { createClient } from "@/lib/supabase/server";
+import { buildEnrichedScheduleSnapshot } from "@/lib/study-schedule/snapshot";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -8,7 +10,22 @@ export const runtime = "nodejs";
  * Query: year, month (1–12) optional — lọc theo tháng; không có thì trả về tất cả.
  */
 export async function GET(request: Request) {
-  const supabase = createClient();
+  let supabase: ReturnType<typeof createClient>;
+  try {
+    supabase = createClient();
+  } catch (error) {
+    if (isRuntimeEnvError(error)) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          missingEnv: error.missingEnv,
+        },
+        { status: 503 }
+      );
+    }
+    throw error;
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -47,92 +64,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const listRaw = rows ?? [];
-  const pathIds = Array.from(
-    new Set(
-      listRaw
-        .map((r) => r.path_id as string | null)
-        .filter((id): id is string => Boolean(id))
-    )
-  );
-
-  let allowedPathIds = new Set<string>();
-  if (pathIds.length > 0) {
-    const { data: paths, error: pErr } = await supabase
-      .from("personalized_paths")
-      .select("id, status")
-      .in("id", pathIds);
-
-    if (pErr) {
-      return NextResponse.json({ error: pErr.message }, { status: 500 });
-    }
-    for (const p of paths ?? []) {
-      const st = (p.status as string) ?? "";
-      if (st === "active" || st === "paused") {
-        allowedPathIds.add(p.id as string);
-      }
-    }
+  const snapshot = await buildEnrichedScheduleSnapshot(supabase, rows ?? [], {
+    studentId: user.id,
+  });
+  if (snapshot.error) {
+    return NextResponse.json({ error: snapshot.error }, { status: 500 });
   }
 
-  const list = listRaw.filter((r) => {
-    const pid = r.path_id as string | null;
-    if (!pid) return true;
-    return allowedPathIds.has(pid);
-  });
-  const lessonIds = Array.from(
-    new Set(list.map((r) => r.lesson_id).filter(Boolean))
-  ) as string[];
-
-  const lessonById = new Map<
-    string,
-    { id: string; title: string; course_id: string }
-  >();
-  const courseById = new Map<string, { id: string; title: string }>();
-
-  if (lessonIds.length > 0) {
-    const { data: lessons } = await supabase
-      .from("course_lessons")
-      .select("id, title, course_id")
-      .in("id", lessonIds);
-
-    const courseIds = new Set<string>();
-    for (const L of lessons ?? []) {
-      const id = L.id as string;
-      lessonById.set(id, {
-        id,
-        title: (L.title as string) ?? "",
-        course_id: L.course_id as string,
-      });
-      if (L.course_id) courseIds.add(L.course_id as string);
-    }
-
-    if (courseIds.size > 0) {
-      const { data: courses } = await supabase
-        .from("courses")
-        .select("id, title")
-        .in("id", Array.from(courseIds));
-
-      for (const c of courses ?? []) {
-        courseById.set(c.id as string, {
-          id: c.id as string,
-          title: (c.title as string) ?? "",
-        });
-      }
-    }
-  }
-
-  const items = list.map((r) => {
-    const lesson = r.lesson_id ? lessonById.get(r.lesson_id) : undefined;
-    const course = lesson?.course_id
-      ? courseById.get(lesson.course_id)
-      : undefined;
-    return {
-      ...r,
-      lesson: lesson
-        ? { ...lesson, course: course ?? null }
-        : null,
-    };
-  });
-
-  return NextResponse.json({ items });
+  return NextResponse.json(snapshot.data);
 }

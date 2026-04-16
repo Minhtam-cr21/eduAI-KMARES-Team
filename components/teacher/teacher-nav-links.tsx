@@ -10,7 +10,21 @@ export type TeacherNavItem = {
   label: string;
   icon: LucideIcon;
   badge?: number;
+  /** If set, item is active when pathname matches any of these prefixes (plus subpaths). */
+  activePrefixes?: string[];
 };
+
+export function isTeacherNavItemActive(pathname: string, item: TeacherNavItem): boolean {
+  if (item.activePrefixes?.length) {
+    return item.activePrefixes.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    );
+  }
+  return (
+    pathname === item.href ||
+    (item.href !== "/teacher" && pathname.startsWith(item.href))
+  );
+}
 
 export function TeacherNavLinks({
   items,
@@ -28,9 +42,7 @@ export function TeacherNavLinks({
   return (
     <nav className={cn("flex flex-col gap-0.5", className)}>
       {items.map((item) => {
-        const active =
-          pathname === item.href ||
-          (item.href !== "/teacher" && pathname.startsWith(item.href));
+        const active = isTeacherNavItemActive(pathname, item);
         const Icon = item.icon;
         return (
           <Link

@@ -1,3 +1,4 @@
+import { isRuntimeEnvError } from "@/lib/runtime/env";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -9,7 +10,25 @@ export async function getTeacherOrAdminSupabase(): Promise<
   | { ok: true; supabase: SupabaseClient; userId: string }
   | { ok: false; response: NextResponse }
 > {
-  const supabase = createClient();
+  let supabase: SupabaseClient;
+  try {
+    supabase = createClient();
+  } catch (error) {
+    if (isRuntimeEnvError(error)) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          {
+            error: error.message,
+            code: error.code,
+            missingEnv: error.missingEnv,
+          },
+          { status: 503 }
+        ),
+      };
+    }
+    throw error;
+  }
   const {
     data: { user },
     error: authErr,

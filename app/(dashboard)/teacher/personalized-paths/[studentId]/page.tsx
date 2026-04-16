@@ -1,5 +1,3 @@
-"use client";
-
 import { PersonalizedPathEditorClient } from "@/components/teacher/personalized-path-editor-client";
 import {
   Card,
@@ -8,12 +6,31 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { loadTeacherPersonalizedPathEditorData } from "@/lib/teacher/personalized-path-editor";
 
-export default function TeacherPersonalizedPathStudentPage() {
-  const params = useParams();
-  const studentId =
-    typeof params.studentId === "string" ? params.studentId : "";
+export default async function TeacherPersonalizedPathStudentPage({
+  params,
+}: {
+  params: { studentId: string };
+}) {
+  const studentId = params.studentId;
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: me } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const initialData =
+    user && studentId
+      ? await loadTeacherPersonalizedPathEditorData({
+          supabase,
+          userId: user.id,
+          studentId,
+          isAdmin: me?.role === "admin",
+        })
+      : null;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -28,7 +45,10 @@ export default function TeacherPersonalizedPathStudentPage() {
         </CardHeader>
         <CardContent>
           {studentId ? (
-            <PersonalizedPathEditorClient studentId={studentId} />
+            <PersonalizedPathEditorClient
+              studentId={studentId}
+              initialData={initialData?.data ?? null}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">Thiếu mã học sinh.</p>
           )}

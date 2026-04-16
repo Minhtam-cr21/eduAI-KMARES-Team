@@ -1,6 +1,31 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  createSchemaSyncError,
+  type SchemaDependency,
+} from "@/lib/supabase/schema-sync";
 
 import { computeTraits } from "./analyzer";
+import {
+  ASSESSMENT_VERSION,
+  analysisSourceSchema,
+  learnerAnalysisSchema,
+  learnerProfileSchema,
+  type AnalysisSource,
+  type LearnerAnalysis,
+  type LearnerProfile,
+} from "./contracts";
+import {
+  buildFallbackLearnerAnalysis,
+  buildLearnerProfile,
+} from "./learner-profile";
+import {
+  buildAssessmentRubric,
+  buildStudentAssessmentView,
+  buildTeacherAssessmentView,
+  type AssessmentRubric,
+  type StudentAssessmentView,
+  type TeacherAssessmentView,
+} from "./rubric";
 export type AssessmentTraits = {
   motivation: number;
   learningStyle: number;
@@ -25,6 +50,13 @@ export type AssessmentResultPayload = {
     created_at: string;
   };
   traits: AssessmentTraits;
+  learner_profile: LearnerProfile;
+  ai_analysis: LearnerAnalysis;
+  analysis_source: AnalysisSource;
+  assessment_version: string;
+  rubric: AssessmentRubric;
+  student_view: StudentAssessmentView;
+  teacher_view: TeacherAssessmentView;
   courses: Array<{
     id: string;
     title: string;
@@ -34,12 +66,26 @@ export type AssessmentResultPayload = {
   }>;
 };
 
+const PHASE3_CAREER_ANALYSIS_DEPENDENCY: SchemaDependency = {
+  phase: "Phase 3",
+  migrationFile: "supabase/migrations/20260416000000_phase3_assessment_analysis_columns.sql",
+  feature: "assessment result loading",
+  relation: "career_orientations",
+  columns: [
+    "learner_profile",
+    "ai_analysis",
+    "analysis_source",
+    "assessment_version",
+  ],
+};
+
 export async function loadAssessmentResult(
   supabase: SupabaseClient,
   userId: string
 ): Promise<
   | { ok: true; data: AssessmentResultPayload }
   | { ok: false; reason: "not_completed" | "no_career_row" }
+  | { ok: false; reason: "schema_not_synced"; message: string }
 > {
   const { data: profile, error: pErr } = await supabase
     .from("profiles")
@@ -60,12 +106,22 @@ export async function loadAssessmentResult(
   const { data: career, error: cErr } = await supabase
     .from("career_orientations")
     .select(
-      "id, strengths, weaknesses, suggested_careers, suggested_courses, created_at"
+      "id, strengths, weaknesses, suggested_careers, suggested_courses, created_at, learner_profile, ai_analysis, analysis_source, assessment_version"
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  if (cErr) {
+    const schemaError = createSchemaSyncError(
+      cErr,
+      PHASE3_CAREER_ANALYSIS_DEPENDENCY
+    );
+    if (schemaError) {
+      return { ok: false, reason: "schema_not_synced", message: schemaError.message };
+    }
+  }
 
   if (cErr || !career) {
     return { ok: false, reason: "no_career_row" };
@@ -86,6 +142,43 @@ export async function loadAssessmentResult(
   }
 
   const traits = computeTraits(answerMap);
+  const learnerProfileParse = learnerProfileSchema.safeParse(
+    career.learner_profile
+  );
+  const learner_profile = learnerProfileParse.success
+    ? learnerProfileParse.data
+    : buildLearnerProfile(answerMap);
+
+  const aiAnalysisParse = learnerAnalysisSchema.safeParse(career.ai_analysis);
+  const ai_analysis = aiAnalysisParse.success
+    ? aiAnalysisParse.data
+    : buildFallbackLearnerAnalysis(learner_profile);
+
+  const analysis_source = analysisSourceSchema.safeParse(career.analysis_source)
+    .success
+    ? (career.analysis_source as AnalysisSource)
+    : "rule_based";
+
+  const assessment_version =
+    typeof career.assessment_version === "string" &&
+    career.assessment_version.trim()
+      ? career.assessment_version
+      : ASSESSMENT_VERSION;
+  const rubric = buildAssessmentRubric(learner_profile);
+  const strengths = (career.strengths as string[]) ?? [];
+  const weaknesses = (career.weaknesses as string[]) ?? [];
+  const student_view = buildStudentAssessmentView({
+    rubric,
+    profile: learner_profile,
+    analysis: ai_analysis,
+    strengths,
+    weaknesses,
+  });
+  const teacher_view = buildTeacherAssessmentView({
+    rubric,
+    profile: learner_profile,
+    analysis: ai_analysis,
+  });
 
   const rawCourseIds: unknown[] = Array.isArray(career.suggested_courses)
     ? (career.suggested_courses as unknown[])
@@ -131,13 +224,20 @@ export async function loadAssessmentResult(
       },
       career: {
         id: career.id as string,
-        strengths: (career.strengths as string[]) ?? [],
-        weaknesses: (career.weaknesses as string[]) ?? [],
+        strengths,
+        weaknesses,
         suggested_careers: (career.suggested_careers as string[]) ?? [],
         suggested_courses: courseIds,
         created_at: career.created_at as string,
       },
       traits,
+      learner_profile,
+      ai_analysis,
+      analysis_source,
+      assessment_version,
+      rubric,
+      student_view,
+      teacher_view,
       courses,
     },
   };

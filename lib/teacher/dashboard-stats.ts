@@ -56,6 +56,9 @@ export async function loadTeacherDashboardStats(
       .select("*", { count: "exact", head: true })
       .eq("teacher_id", userId)
       .eq("is_published", false),
+    // NOTE(master-plan-v2 phase 2): total_students intentionally mirrors the
+    // current global roster RPC scope. Do not narrow this independently from
+    // /api/teacher/students until the product rule is confirmed.
     supabase.rpc("teacher_list_students_with_stats"),
     supabase
       .from("connection_requests")

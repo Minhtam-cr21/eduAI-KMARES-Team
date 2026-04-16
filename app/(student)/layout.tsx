@@ -8,7 +8,7 @@ import Link from "next/link";
 export const metadata: Metadata = segmentMetadata({
   title: "Học tập",
   description:
-    "Dashboard học sinh EduAI: khóa học, quiz, trắc nghiệm định hướng và lộ trình cá nhân hóa.",
+    "Trung tâm học sinh EduAI — khóa học, lộ trình cá nhân hóa, lịch học thông minh, hồ sơ.",
   noIndex: true,
 });
 
@@ -22,7 +22,7 @@ export default function StudentLayout({
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-3">
           <Link
-            href="/"
+            href="/student"
             className="flex items-center gap-2 text-sm font-semibold text-foreground hover:opacity-80"
           >
             <Image src="/images/logo.png" alt="EduAI" width={28} height={28} className="h-7 w-7" />

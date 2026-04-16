@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { TeacherNotificationRow } from "@/lib/teacher/dashboard-home";
 import { TeacherDashboardStatsPremium } from "@/components/teacher/teacher-dashboard-stats-premium";
 import type { TeacherDashboardStats } from "@/lib/teacher/dashboard-stats";
 import type { CompletedAssessmentPendingStudent } from "@/lib/types/teacher";
@@ -25,27 +26,22 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-type NotificationRow = {
-  id: string;
-  type: string;
-  title: string | null;
-  content: string | null;
-  link: string | null;
-  is_read: boolean;
-  created_at: string;
-};
-
 export function TeacherDashboardHomeTabs({
   stats,
+  initialPendingStudents,
+  initialNotifications,
 }: {
   stats: TeacherDashboardStats;
+  initialPendingStudents: CompletedAssessmentPendingStudent[];
+  initialNotifications: TeacherNotificationRow[];
 }) {
   const [pendingStudents, setPendingStudents] = useState<
     CompletedAssessmentPendingStudent[]
-  >([]);
-  const [pendingLoading, setPendingLoading] = useState(true);
-  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const [notifLoading, setNotifLoading] = useState(true);
+  >(initialPendingStudents);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [notifications, setNotifications] =
+    useState<TeacherNotificationRow[]>(initialNotifications);
+  const [notifLoading, setNotifLoading] = useState(false);
 
   const loadPending = useCallback(async () => {
     setPendingLoading(true);
@@ -74,7 +70,7 @@ export function TeacherDashboardHomeTabs({
     try {
       const res = await fetch("/api/notifications/teacher");
       const data = (await res.json()) as {
-        notifications?: NotificationRow[];
+        notifications?: TeacherNotificationRow[];
         error?: string;
       };
       if (!res.ok) {
@@ -90,11 +86,6 @@ export function TeacherDashboardHomeTabs({
       setNotifLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    void loadPending();
-    void loadNotifications();
-  }, [loadPending, loadNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -123,7 +114,8 @@ export function TeacherDashboardHomeTabs({
           Bảng điều khiển
         </h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
-          Tổng quan, học sinh chờ lộ trình cá nhân hóa, kết nối và thông báo.
+          Tổng quan teacher workspace. Luồng chính nên bắt đầu từ Học sinh để đi vào
+          assessment, path, schedule và review history theo từng học sinh.
         </p>
       </div>
 

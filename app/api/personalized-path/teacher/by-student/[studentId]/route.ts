@@ -1,4 +1,5 @@
 import { getTeacherOrAdminSupabase } from "@/lib/auth/assert-teacher-api";
+import { loadTeacherPersonalizedPathEditorData } from "@/lib/teacher/personalized-path-editor";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -19,42 +20,18 @@ export async function GET(_request: Request, { params }: Ctx) {
     .eq("id", userId)
     .maybeSingle();
 
-  const { data: path } = await supabase
-    .from("personalized_paths")
-    .select(
-      "id, student_id, teacher_id, course_sequence, status, student_feedback, teacher_feedback, created_at, updated_at"
-    )
-    .eq("student_id", studentId)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (
-    path &&
-    me?.role !== "admin" &&
-    path.teacher_id != null &&
-    path.teacher_id !== userId
-  ) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const { data: courses } = await supabase
-    .from("courses")
-    .select("id, title, category")
-    .eq("status", "published")
-    .order("title", { ascending: true });
-
-  if (!path) {
-    return NextResponse.json({
-      path: null,
-      suggested: null,
-      courses: courses ?? [],
-    });
-  }
-
-  return NextResponse.json({
-    path,
-    suggested: null,
-    courses: courses ?? [],
+  const loaded = await loadTeacherPersonalizedPathEditorData({
+    supabase,
+    userId,
+    studentId,
+    isAdmin: me?.role === "admin",
   });
+  if (loaded.error || !loaded.data) {
+    return NextResponse.json(
+      { error: loaded.error ?? "Không tải được dữ liệu lộ trình." },
+      { status: loaded.status }
+    );
+  }
+
+  return NextResponse.json(loaded.data);
 }

@@ -2,14 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
 const baseNav = [
-  { href: "/student", label: "Dashboard" },
-  { href: "/roadmaps", label: "Roadmap" },
-  { href: "/quizzes", label: "Quiz" },
-  { href: "/assessment", label: "Trắc nghiệm cá nhân" },
+  { href: "/student/courses", label: "Khóa học" },
+  { href: "/personalized-roadmap", label: "Lộ trình cá nhân hóa" },
+  { href: "/study-schedule", label: "Lịch học thông minh" },
   { href: "/profile", label: "Profile" },
-  { href: "/student/teachers", label: "Kết nối GV" },
-  { href: "/student/connections", label: "Yêu cầu kết nối" },
-  { href: "/personalized-roadmap", label: "Lộ trình" },
 ] as const;
 
 export async function StudentNav() {
@@ -25,8 +21,7 @@ export async function StudentNav() {
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
-    showTeacher =
-      profile?.role === "teacher" || profile?.role === "admin";
+    showTeacher = profile?.role === "teacher" || profile?.role === "admin";
   }
 
   return (
