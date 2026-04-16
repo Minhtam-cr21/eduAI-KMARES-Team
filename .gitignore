@@ -11,6 +11,9 @@
 /.next/
 /out/
 
+# TypeScript incremental cache (do not commit)
+*.tsbuildinfo
+
 # production
 /build
 
@@ -33,3 +36,10 @@ yarn-error.log*
 
 # Supabase CLI (link / local state)
 supabase/.temp/
+
+# Local scratch experiments
+openai-test/node_modules/
+
+# One-off patch scripts (not part of app)
+scripts/_fix-toast-temp.mjs
+scripts/_patch-connections.mjs
