@@ -17,17 +17,26 @@ export function isRuntimeEnvError(error: unknown): error is RuntimeEnvError {
   return error instanceof RuntimeEnvError;
 }
 
-function readRequiredEnv(name: string): string | null {
-  const value = process.env[name]?.trim();
-  return value ? value : null;
+function readFirstEnv(names: string[]): string | null {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return null;
 }
 
 export function getSupabasePublicEnv(): {
   url: string;
   anonKey: string;
 } {
-  const url = readRequiredEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const anonKey = readRequiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const url = readFirstEnv([
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "SUPABASE_URL",
+  ]);
+  const anonKey = readFirstEnv([
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_ANON_KEY",
+  ]);
 
   const missingEnv = [
     !url ? "NEXT_PUBLIC_SUPABASE_URL" : null,
@@ -38,7 +47,9 @@ export function getSupabasePublicEnv(): {
     throw new RuntimeEnvError(
       missingEnv,
       "Thiếu cấu hình Supabase cho runtime hiện tại. " +
-        `Cần set: ${missingEnv.join(", ")}.`
+        `Trên Vercel hãy set ${missingEnv.join(" và ")} ` +
+        "(hoặc tương đương SUPABASE_URL và SUPABASE_ANON_KEY — next.config map sang NEXT_PUBLIC khi build). " +
+        "Sau đó Redeploy without cache."
     );
   }
 
