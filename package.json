@@ -21,6 +21,7 @@
     "gh:missed-deadlines": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-missed-deadlines-workflow.ps1",
     "test:flow": "npx tsx scripts/test-flow.ts",
     "create:demo-teacher": "npx tsx scripts/create-demo-teacher.ts",
+    "create:demo": "npx tsx scripts/create-demo-accounts.ts",
     "migrate:edu-v2": "npx tsx scripts/migrate-to-new-schema.ts"
   },
   "dependencies": {

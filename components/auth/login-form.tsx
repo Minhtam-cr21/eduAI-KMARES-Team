@@ -30,6 +30,79 @@ export function LoginForm({ oauthError }: Props) {
     defaultValues: { email: "", password: "", selectedRole: "student" },
   });
 
+  const DEMO_ACCOUNTS = [
+    {
+      label: "🎓 Học sinh",
+      email: "hocsinh@demo.eduai.local",
+      password: "Demo@123456",
+      role: "student" as const,
+      color: "from-blue-500 to-blue-600",
+      hoverColor: "hover:from-blue-600 hover:to-blue-700",
+    },
+    {
+      label: "👨‍🏫 Giáo viên",
+      email: "giaovien@demo.eduai.local",
+      password: "Demo@123456",
+      role: "teacher" as const,
+      color: "from-emerald-500 to-emerald-600",
+      hoverColor: "hover:from-emerald-600 hover:to-emerald-700",
+    },
+    {
+      label: "🛡️ Admin",
+      email: "admin@demo.eduai.local",
+      password: "Demo@123456",
+      role: "student" as const, // admin không cần chọn role tab
+      color: "from-violet-500 to-violet-600",
+      hoverColor: "hover:from-violet-600 hover:to-violet-700",
+    },
+  ] as const;
+
+  function loginAsDemo(account: (typeof DEMO_ACCOUNTS)[number]) {
+    setServerError(null);
+    // Chuyển tab role cho đúng
+    if (account.email !== "admin@demo.eduai.local") {
+      handleRoleChange(account.role);
+    }
+    startTransition(async () => {
+      const supabase = createSupabaseBrowserClient();
+      const { error, data: authData } = await supabase.auth.signInWithPassword({
+        email: account.email,
+        password: account.password,
+      });
+
+      if (error) {
+        setServerError(`Demo login thất bại: ${error.message}`);
+        return;
+      }
+
+      const userId = authData.user?.id;
+      if (!userId) {
+        setServerError("Không lấy được thông tin user. Vui lòng thử lại.");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, assessment_completed, onboarding_completed")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (profile?.role === "admin") {
+        router.replace("/admin");
+      } else if (profile?.role === "teacher") {
+        router.replace("/teacher");
+      } else {
+        router.replace(
+          studentPostAuthPath({
+            assessment_completed: profile?.assessment_completed,
+            onboarding_completed: profile?.onboarding_completed,
+          })
+        );
+      }
+      router.refresh();
+    });
+  }
+
   function onSubmit(data: LoginInput) {
     setServerError(null);
     startTransition(async () => {
@@ -192,6 +265,32 @@ export function LoginForm({ oauthError }: Props) {
               ? "Đăng nhập (Giáo viên)"
               : "Đăng nhập (Học sinh)"}
         </button>
+
+        {/* ── Demo Accounts ── */}
+        <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-4">
+          <p className="mb-3 text-center text-xs font-semibold uppercase tracking-widest text-neutral-400">
+            🚀 Tài khoản Demo
+          </p>
+          <div className="flex flex-col gap-2">
+            {DEMO_ACCOUNTS.map((account) => (
+              <button
+                key={account.email}
+                type="button"
+                disabled={isPending}
+                onClick={() => loginAsDemo(account)}
+                className={`flex items-center justify-between rounded-lg bg-gradient-to-r px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:shadow-md disabled:opacity-60 ${account.color} ${account.hoverColor}`}
+              >
+                <span>{account.label}</span>
+                <span className="rounded-md bg-white/20 px-2 py-0.5 text-xs font-normal">
+                  {isPending ? "Đang vào…" : "Đăng nhập"}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-center text-[10px] text-neutral-400">
+            Dành cho ban tổ chức demo — không dùng trên tài khoản thật
+          </p>
+        </div>
 
         <div className="relative py-2 text-center text-xs text-neutral-500">
           <span className="bg-white px-2">hoặc</span>
