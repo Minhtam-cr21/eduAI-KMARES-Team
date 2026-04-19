@@ -183,7 +183,7 @@ export function SignupForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Đã có tài khoản?{" "}
-        <Link href="/login" className="font-medium text-foreground underline underline-offset-4 hover:text-primary">
+        <Link href="/login" className="font-semibold text-primary underline underline-offset-4 hover:opacity-80">
           Đăng nhập
         </Link>
       </p>

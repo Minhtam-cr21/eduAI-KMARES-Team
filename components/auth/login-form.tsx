@@ -303,7 +303,7 @@ export function LoginForm({ oauthError }: Props) {
           Chưa có tài khoản?{" "}
           <Link
             href="/signup"
-            className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+            className="font-semibold text-primary underline underline-offset-4 hover:opacity-80"
           >
             Đăng ký
           </Link>
